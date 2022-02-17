@@ -80,40 +80,32 @@ Renderer::~Renderer()
     destroyAPI();
 }
 
-void Renderer::initializeAPI(xwin::Window& window)
+void InitializeDebugController(ID3D12Debug1* &debugController, UINT &dxgiFactoryFlags)
 {
-    // The renderer needs the window when resizing the swapchain
-    mWindow = &window;
-
-    // Create Factory
-
-    UINT dxgiFactoryFlags = 0;
 #if defined(_DEBUG)
-    ID3D12Debug* debugController;
     ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
-    ThrowIfFailed(
-        debugController->QueryInterface(IID_PPV_ARGS(&mDebugController)));
-    mDebugController->EnableDebugLayer();
-    mDebugController->SetEnableGPUBasedValidation(true);
+    ThrowIfFailed(debugController->QueryInterface(IID_PPV_ARGS(&debugController)));
+    debugController->EnableDebugLayer();
+    debugController->SetEnableGPUBasedValidation(true);
 
     dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 
     debugController->Release();
     debugController = nullptr;
-
 #endif
-    ThrowIfFailed(
-        CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&mFactory)));
+}
 
-    // Create Adapter
+void InitializeFactory(IDXGIFactory4* &dxgiFactory, UINT &dxgiFactoryFlags)
+{
+    ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
+}
 
-    for (UINT adapterIndex = 0;
-         DXGI_ERROR_NOT_FOUND !=
-         mFactory->EnumAdapters1(adapterIndex, &mAdapter);
-         ++adapterIndex)
+void InitializeAdapter(IDXGIAdapter1* &dxgiAdapter, IDXGIFactory4* dxgiFactory, D3D_FEATURE_LEVEL featureLevel)
+{
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != dxgiFactory->EnumAdapters1(adapterIndex, &dxgiAdapter); ++adapterIndex)
     {
         DXGI_ADAPTER_DESC1 desc;
-        mAdapter->GetDesc1(&desc);
+        dxgiAdapter->GetDesc1(&desc);
 
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
         {
@@ -121,29 +113,51 @@ void Renderer::initializeAPI(xwin::Window& window)
             continue;
         }
 
-        // Check to see if the adapter supports Direct3D 12, but don't create
+        // Check to see if the adapter supports required feature , but don't create
         // the actual device yet.
-        if (SUCCEEDED(D3D12CreateDevice(mAdapter, D3D_FEATURE_LEVEL_12_0,
-                                        _uuidof(ID3D12Device), nullptr)))
+        if (SUCCEEDED(D3D12CreateDevice(dxgiAdapter, featureLevel, _uuidof(ID3D12Device), nullptr)))
         {
             break;
         }
-
+        
         // We won't use this adapter, so release it
-        mAdapter->Release();
+        dxgiAdapter->Release();
     }
+}
+
+void InitializeDevice(ID3D12Device* &device, IDXGIAdapter1* dxgiAdapter, D3D_FEATURE_LEVEL featureLevel, LPCWSTR name) 
+{
+    ThrowIfFailed(D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(&device)));
+    device->SetName(name);
+}
+
+void InitializeDebugDevice(ID3D12DebugDevice* &debugDevice, ID3D12Device* device)
+{
+#if defined(_DEBUG)
+    ThrowIfFailed(device->QueryInterface(&debugDevice));
+#endif
+}
+
+void Renderer::initializeAPI(xwin::Window& window)
+{
+    // The renderer needs the window when resizing the swapchain
+    mWindow = &window;
+
+    const auto featureLevel = D3D_FEATURE_LEVEL_12_0;
+
+    // Create Factory
+    UINT dxgiFactoryFlags = 0;
+    InitializeDebugController(mDebugController, dxgiFactoryFlags);
+    InitializeFactory(mFactory, dxgiFactoryFlags);
+    
+    // Create Adapter
+    InitializeAdapter(mAdapter, mFactory, featureLevel);
 
     // Create Device
-    ID3D12Device* pDev = nullptr;
-    ThrowIfFailed(D3D12CreateDevice(mAdapter, D3D_FEATURE_LEVEL_12_0,
-                                    IID_PPV_ARGS(&mDevice)));
+    InitializeDevice(mDevice, mAdapter, featureLevel, L"Hello Triangle Device");
 
-    mDevice->SetName(L"Hello Triangle Device");
-
-#if defined(_DEBUG)
-    // Get debug device
-    ThrowIfFailed(mDevice->QueryInterface(&mDebugDevice));
-#endif
+    // Get the debug device
+    InitializeDebugDevice(mDebugDevice, mDevice);
 
     // Create Command Queue
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
