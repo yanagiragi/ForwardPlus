@@ -82,7 +82,7 @@ public:
 
 protected:
     // Initialize your Graphics API
-    void initializeAPI(xwin::Window& window);
+    void InitializeAPI(xwin::Window& window);
 
     // Destroy any Graphics API data structures used in this example
     void destroyAPI();

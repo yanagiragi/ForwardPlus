@@ -16,73 +16,8 @@
 
 using namespace glm;
 
-// Renderer
-
-Renderer::Renderer(xwin::Window& window)
-{
-    mWindow;
-
-    // Initialization
-    mFactory = nullptr;
-    mAdapter = nullptr;
-#if defined(_DEBUG)
-    mDebugController = nullptr;
-#endif
-    mDevice = nullptr;
-    mCommandQueue = nullptr;
-    mCommandAllocator = nullptr;
-    mCommandList = nullptr;
-    mSwapchain = nullptr;
-
-    // Resources
-
-    mVertexBuffer = nullptr;
-    mIndexBuffer = nullptr;
-
-    mUniformBuffer = nullptr;
-    mUniformBufferHeap = nullptr;
-    mMappedUniformBuffer = nullptr;
-
-    mRootSignature = nullptr;
-    mPipelineState = nullptr;
-
-    // Current Frame
-    mRtvHeap = nullptr;
-    for (size_t i = 0; i < backbufferCount; ++i)
-    {
-        mRenderTargets[i] = nullptr;
-    }
-    // Sync
-    mFence = nullptr;
-
-    initializeAPI(window);
-    initializeResources();
-    setupCommands();
-    tStart = std::chrono::high_resolution_clock::now();
-
-    mScene = new Scene();
-}
-
-Renderer::~Renderer()
-{
-    if (mSwapchain != nullptr)
-    {
-        mSwapchain->SetFullscreenState(false, nullptr);
-        mSwapchain->Release();
-        mSwapchain = nullptr;
-    }
-
-    delete mScene;
-
-    destroyCommands();
-    destroyFrameBuffer();
-    destroyResources();
-    destroyAPI();
-}
-
 void InitializeDebugController(ID3D12Debug1* &debugController, UINT &dxgiFactoryFlags)
 {
-#if defined(_DEBUG)
     ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
     ThrowIfFailed(debugController->QueryInterface(IID_PPV_ARGS(&debugController)));
     debugController->EnableDebugLayer();
@@ -92,7 +27,6 @@ void InitializeDebugController(ID3D12Debug1* &debugController, UINT &dxgiFactory
 
     debugController->Release();
     debugController = nullptr;
-#endif
 }
 
 void InitializeFactory(IDXGIFactory4* &dxgiFactory, UINT &dxgiFactoryFlags)
@@ -100,7 +34,7 @@ void InitializeFactory(IDXGIFactory4* &dxgiFactory, UINT &dxgiFactoryFlags)
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 }
 
-void InitializeAdapter(IDXGIAdapter1* &dxgiAdapter, IDXGIFactory4* dxgiFactory, D3D_FEATURE_LEVEL featureLevel)
+void InitializeAdapter(IDXGIAdapter1* &dxgiAdapter, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory)
 {
     for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != dxgiFactory->EnumAdapters1(adapterIndex, &dxgiAdapter); ++adapterIndex)
     {
@@ -125,7 +59,7 @@ void InitializeAdapter(IDXGIAdapter1* &dxgiAdapter, IDXGIFactory4* dxgiFactory, 
     }
 }
 
-void InitializeDevice(ID3D12Device* &device, IDXGIAdapter1* dxgiAdapter, D3D_FEATURE_LEVEL featureLevel, LPCWSTR name) 
+void InitializeDevice(ID3D12Device* &device, D3D_FEATURE_LEVEL featureLevel, LPCWSTR name, IDXGIAdapter1* dxgiAdapter)
 {
     ThrowIfFailed(D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(&device)));
     device->SetName(name);
@@ -133,12 +67,30 @@ void InitializeDevice(ID3D12Device* &device, IDXGIAdapter1* dxgiAdapter, D3D_FEA
 
 void InitializeDebugDevice(ID3D12DebugDevice* &debugDevice, ID3D12Device* device)
 {
-#if defined(_DEBUG)
     ThrowIfFailed(device->QueryInterface(&debugDevice));
-#endif
 }
 
-void Renderer::initializeAPI(xwin::Window& window)
+void InitializeCommandQueue(ID3D12CommandQueue*& commandQueue, D3D12_COMMAND_QUEUE_FLAGS commandQueueFlags, D3D12_COMMAND_LIST_TYPE commandListType, ID3D12Device* device)
+{
+    // Create Command Queue
+    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+    queueDesc.Flags = commandQueueFlags;
+    queueDesc.Type = commandListType;
+
+    ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+}
+
+void InitializeCommandAllocator(ID3D12CommandAllocator*& commandAllocator, D3D12_COMMAND_LIST_TYPE commandListType, ID3D12Device* device)
+{
+    ThrowIfFailed(device->CreateCommandAllocator(commandListType, IID_PPV_ARGS(&commandAllocator)));
+}
+
+void InitializeFence(ID3D12Fence* &fence, D3D12_FENCE_FLAGS fenceFlags, ID3D12Device* device)
+{
+    ThrowIfFailed(device->CreateFence(0, fenceFlags, IID_PPV_ARGS(&fence)));
+}
+
+void Renderer::InitializeAPI(xwin::Window& window)
 {
     // The renderer needs the window when resizing the swapchain
     mWindow = &window;
@@ -147,37 +99,102 @@ void Renderer::initializeAPI(xwin::Window& window)
 
     // Create Factory
     UINT dxgiFactoryFlags = 0;
-    InitializeDebugController(mDebugController, dxgiFactoryFlags);
     InitializeFactory(mFactory, dxgiFactoryFlags);
-    
+
+    // Create DebugController
+#if defined(_DEBUG)
+    InitializeDebugController(mDebugController, dxgiFactoryFlags);
+#endif
+
     // Create Adapter
-    InitializeAdapter(mAdapter, mFactory, featureLevel);
+    InitializeAdapter(mAdapter, featureLevel, mFactory);
 
     // Create Device
-    InitializeDevice(mDevice, mAdapter, featureLevel, L"Hello Triangle Device");
+    InitializeDevice(mDevice, featureLevel, L"Hello Triangle Device", mAdapter);
 
     // Get the debug device
+#if defined(_DEBUG)
     InitializeDebugDevice(mDebugDevice, mDevice);
+#endif
 
     // Create Command Queue
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-    ThrowIfFailed(
-        mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue)));
+    auto commandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    auto commandQueueFlags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+    InitializeCommandQueue(mCommandQueue, commandQueueFlags, commandListType, mDevice);
 
     // Create Command Allocator
-    ThrowIfFailed(mDevice->CreateCommandAllocator(
-        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&mCommandAllocator)));
+    InitializeCommandAllocator(mCommandAllocator, commandListType, mDevice);
 
-    // Sync
-    ThrowIfFailed(
-        mDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence)));
+    // Create Fence for sync
+    InitializeFence(mFence, D3D12_FENCE_FLAG_NONE, mDevice);
 
-    // Create Swapchain
+    // Create Swapchain, wip!!!!!!!!
     const xwin::WindowDesc wdesc = window.getDesc();
     resize(wdesc.width, wdesc.height);
+}
+
+// ========================================================================================== //
+
+Renderer::Renderer(xwin::Window& window)
+{
+    mWindow;
+
+    // Initialization
+    mFactory = nullptr;
+    mAdapter = nullptr;
+#if defined(_DEBUG)
+    mDebugController = nullptr;
+#endif
+    mDevice = nullptr;
+    mCommandQueue = nullptr;
+    mCommandAllocator = nullptr;
+    mCommandList = nullptr;
+    mSwapchain = nullptr;
+
+    // Resources
+    mVertexBuffer = nullptr;
+    mIndexBuffer = nullptr;
+
+    mUniformBuffer = nullptr;
+    mUniformBufferHeap = nullptr;
+    mMappedUniformBuffer = nullptr;
+
+    mRootSignature = nullptr;
+    mPipelineState = nullptr;
+
+    // Current Frame
+    mRtvHeap = nullptr;
+    for (size_t i = 0; i < backbufferCount; ++i)
+    {
+        mRenderTargets[i] = nullptr;
+    }
+
+    // Sync
+    mFence = nullptr;
+
+    InitializeAPI(window);
+    initializeResources();
+    setupCommands();
+    tStart = std::chrono::high_resolution_clock::now();
+
+    mScene = new Scene();
+}
+
+Renderer::~Renderer()
+{
+    if (mSwapchain != nullptr)
+    {
+        mSwapchain->SetFullscreenState(false, nullptr);
+        mSwapchain->Release();
+        mSwapchain = nullptr;
+    }
+
+    delete mScene;
+
+    destroyCommands();
+    destroyFrameBuffer();
+    destroyResources();
+    destroyAPI();
 }
 
 void Renderer::destroyAPI()
@@ -291,74 +308,69 @@ void Renderer::destroyFrameBuffer()
     }
 }
 
+void InitializeRootSignature(ID3D12RootSignature* &rootSignature, LPCWSTR rootSignatureName, ID3D12Device* device)
+{
+    D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+
+    // This is the highest version the sample supports. If
+    // CheckFeatureSupport succeeds, the HighestVersion returned will not be
+    // greater than this.
+    featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+    if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+    {
+        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+    }
+
+    D3D12_DESCRIPTOR_RANGE1 ranges[1];
+    ranges[0].BaseShaderRegister = 0;
+    ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    ranges[0].NumDescriptors = 1;
+    ranges[0].RegisterSpace = 0;
+    ranges[0].OffsetInDescriptorsFromTableStart = 0;
+    ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+
+    D3D12_ROOT_PARAMETER1 rootParameters[1];
+    rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[0].DescriptorTable.pDescriptorRanges = ranges;
+
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    rootSignatureDesc.Desc_1_1.NumParameters = 1;
+    rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
+    rootSignatureDesc.Desc_1_1.NumStaticSamplers = 0;
+    rootSignatureDesc.Desc_1_1.pStaticSamplers = nullptr;
+
+    ID3DBlob* signature;
+    ID3DBlob* error;
+    try
+    {
+        ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
+        ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+        rootSignature->SetName(rootSignatureName);
+    }
+    catch (std::exception e)
+    {
+        const char* errStr = (const char*)error->GetBufferPointer();
+        std::cout << errStr;
+        error->Release();
+        error = nullptr;
+    }
+
+    if (signature)
+    {
+        signature->Release();
+        signature = nullptr;
+    }
+}
+
 void Renderer::initializeResources()
 {
     // Create the root signature.
-    {
-        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-
-        // This is the highest version the sample supports. If
-        // CheckFeatureSupport succeeds, the HighestVersion returned will not be
-        // greater than this.
-        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-
-        if (FAILED(mDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE,
-                                                &featureData,
-                                                sizeof(featureData))))
-        {
-            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        }
-
-        D3D12_DESCRIPTOR_RANGE1 ranges[1];
-        ranges[0].BaseShaderRegister = 0;
-        ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 1;
-        ranges[0].RegisterSpace = 0;
-        ranges[0].OffsetInDescriptorsFromTableStart = 0;
-        ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-
-        D3D12_ROOT_PARAMETER1 rootParameters[1];
-        rootParameters[0].ParameterType =
-            D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-        rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-        rootParameters[0].DescriptorTable.pDescriptorRanges = ranges;
-
-        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootSignatureDesc.Desc_1_1.Flags =
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-        rootSignatureDesc.Desc_1_1.NumParameters = 1;
-        rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
-        rootSignatureDesc.Desc_1_1.NumStaticSamplers = 0;
-        rootSignatureDesc.Desc_1_1.pStaticSamplers = nullptr;
-
-        ID3DBlob* signature;
-        ID3DBlob* error;
-        try
-        {
-            ThrowIfFailed(D3D12SerializeVersionedRootSignature(
-                &rootSignatureDesc, &signature, &error));
-            ThrowIfFailed(mDevice->CreateRootSignature(
-                0, signature->GetBufferPointer(), signature->GetBufferSize(),
-                IID_PPV_ARGS(&mRootSignature)));
-            mRootSignature->SetName(L"Hello Triangle Root Signature");
-        }
-        catch (std::exception e)
-        {
-            const char* errStr = (const char*)error->GetBufferPointer();
-            std::cout << errStr;
-            error->Release();
-            error = nullptr;
-        }
-
-        if (signature)
-        {
-            signature->Release();
-            signature = nullptr;
-        }
-    }
+    InitializeRootSignature(mRootSignature, L"Hello Triangle Root Signature", mDevice);
 
     // Create the pipeline state, which includes compiling and loading shaders.
     {
