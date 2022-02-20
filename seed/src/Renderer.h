@@ -85,19 +85,19 @@ protected:
     void InitializeAPI(xwin::Window& window);
 
     // Destroy any Graphics API data structures used in this example
-    void destroyAPI();
+    void DestroyAPI();
 
     // Initialize any resources such as VBOs, IBOs, used in this example
-    void initializeResources();
+    void InitializeResources();
 
     // Destroy any resources used in this example
-    void destroyResources();
+    void DestroyResources();
 
     // Create graphics API specific data structures to send commands to the GPU
-    void createCommands();
+    // void createCommands();
 
     // Set up commands used when rendering frame by this app
-    void setupCommands();
+    void SetupCommands();
 
     // Destroy all commands
     void destroyCommands();
@@ -184,10 +184,12 @@ protected:
     UINT8* mMappedUniformBuffer;
 
     // Uniform data
-    struct
+    struct uboStruct
     {
         glm::mat4 projectionMatrix;
         glm::mat4 modelMatrix;
         glm::mat4 viewMatrix;
-    } uboVS;
+    };
+
+    struct uboStruct uboVS;
 };

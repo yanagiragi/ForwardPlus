@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "CrossWindow/CrossWindow.h"
+#include <direct.h>
 
 // Common Utils
 
@@ -37,4 +38,18 @@ inline void ThrowIfFailed(HRESULT hr)
     {
         throw std::exception();
     }
+}
+
+
+inline std::string GetCurrentWorkingDirectory(bool withTrailingSeperator)
+{
+    char pBuf[1024];
+    _getcwd(pBuf, 1024);
+    auto path = std::string(pBuf);
+    if (withTrailingSeperator)
+    {
+        path += "\\";
+    }
+
+    return path;
 }
