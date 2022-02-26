@@ -1,13 +1,18 @@
 #pragma once
 
 #include <Windows.h>
+#include <strsafe.h>
+#include <direct.h>
 
 #include <fstream>
 #include <iostream>
 #include <vector>
 
-#include <direct.h>
-
+/// <summary>
+/// Read file into lines of string
+/// </summary>
+/// <param name="filename"></param>
+/// <returns></returns>
 inline std::vector<char> readFile(const std::string& filename)
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -29,15 +34,32 @@ inline std::vector<char> readFile(const std::string& filename)
     return buffer;
 };
 
-inline void ThrowIfFailed(HRESULT hr)
+/// <summary>
+/// Display error message box and throw exception if HRESULT fails
+/// </summary>
+/// <param name="hr"></param>
+/// <param name="title"></param>
+/// <param name="description"></param>
+/// <param name="exception"></param>
+inline void AssertIfFailed(HRESULT hr, LPTSTR title, LPTSTR description, LPTSTR exception = nullptr)
 {
     if (FAILED(hr))
     {
-        throw std::exception();
+        MessageBox(0, TEXT(title), TEXT(description), MB_OK);
+        if (exception != nullptr) {
+            throw new std::exception(exception);
+        }
+        else {
+            throw new std::exception(description);
+        }
     }
 }
 
-// Safely release a COM object.
+/// <summary>
+/// Safely release a COM object
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="ptr"></param>
 template<typename T>
 inline void SafeRelease(T& ptr)
 {
@@ -48,6 +70,51 @@ inline void SafeRelease(T& ptr)
     }
 }
 
+/// <summary>
+/// Display last error from Win32api in message box
+/// </summary>
+/// <param name="messagePrefix"></param>
+inline void DisplayLastError(LPTSTR messagePrefix)
+{
+    // Retrieve the system error message for the last-error code
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        dw,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR)&lpMsgBuf,
+        0, NULL);
+
+    // Display the error message and exit the process
+    lpDisplayBuf = (LPVOID)LocalAlloc(
+        LMEM_ZEROINIT,
+        (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)messagePrefix) + 50) * sizeof(TCHAR)
+    );
+    StringCchPrintf(
+        (LPTSTR)lpDisplayBuf,
+        LocalSize(lpDisplayBuf) / sizeof(TCHAR),
+        TEXT("%s, error code = [%d], error message = %s"),
+        messagePrefix,
+        dw,
+        lpMsgBuf
+    );
+    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+}
+
+/// <summary>
+/// Get current working directory
+/// </summary>
+/// <param name="withTrailingSeperator"></param>
+/// <returns></returns>
 inline std::string GetCurrentWorkingDirectory(bool withTrailingSeperator)
 {
     char pBuf[1024];
