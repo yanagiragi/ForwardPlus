@@ -25,22 +25,39 @@ using namespace DirectX;
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 template<class ShaderClass>
-ShaderClass* LoadShader(const std::wstring& fileName, const std::string& entryPoint, const std::string& profile);
+std::string GetLatestProfile(ID3D11Device* device);
+
+template<>
+std::string GetLatestProfile<ID3D11VertexShader>(ID3D11Device* device);
+
+template<>
+std::string GetLatestProfile<ID3D11PixelShader>(ID3D11Device* device);
+
+template<class ShaderClass>
+ShaderClass* CreateShader(ID3D11Device* device, ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage);
+
+template<>
+ID3D11VertexShader* CreateShader<ID3D11VertexShader>(ID3D11Device* device, ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage);
+
+template<>
+ID3D11PixelShader* CreateShader<ID3D11PixelShader>(ID3D11Device* device, ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage);
+
+template<class ShaderClass>
+ID3DBlob* LoadShader(const std::wstring& fileName, const std::string& entryPoint, const std::string& _profile);
+
+void Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil);
+void Present(bool vSync);
+DXGI_RATIONAL QueryRefreshRate(UINT screenWidth, UINT screenHeight, BOOL vsync);
 
 int InitApplication(HINSTANCE hInstance, int nCmdShow);
 int InitDirectX(HINSTANCE hInstance, BOOL vSync);
 
 int Run();
-bool LoadContent();
+void LoadContent();
 void UnloadContent();
-
-void Update(float deltaTime);
 void Render();
 void Cleanup();
-
-void Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil);
-void Present(bool vSync);
-DXGI_RATIONAL QueryRefreshRate(UINT screenWidth, UINT screenHeight, BOOL vsync);
+void Update(float deltaTime);
 
 #pragma endregion
 
@@ -248,12 +265,8 @@ int Run()
             // debugging and you don't want the deltaTime value to explode.
             deltaTime = std::min<float>(deltaTime, maxTimeStep);
 
-            Clear(Colors::CornflowerBlue, 1.0f, 0);
-
-            //            Update( deltaTime );
-            //            Render();
-
-            Present(g_EnableVSync);
+            Update( deltaTime );
+            Render();
         }
     }
 
@@ -513,12 +526,460 @@ void Present(bool vSync)
 {
     if (vSync)
     {
-        g_d3dSwapChain->Present(1, 0);
+        g_d3dSwapChain->Present(
+            1,                      // synchronize presentation of a frame with the vertical black
+                                    // 0 for no synchronization, 1,2,3,4 means synchronize presentation after the nth vertical blank
+            0                       // flags of swap-chain presentation options
+        );
     }
     else
     {
         g_d3dSwapChain->Present(0, 0);
     }
+}
+
+/// <summary>
+/// Get latest d3d profile of vertex shader
+/// </summary>
+/// <param name="device"></param>
+/// <returns></returns>
+template<>
+std::string GetLatestProfile<ID3D11VertexShader>(ID3D11Device* device)
+{
+    assert(device);
+
+    // Query the current feature level:
+    D3D_FEATURE_LEVEL featureLevel = device->GetFeatureLevel();
+
+    switch (featureLevel)
+    {
+    case D3D_FEATURE_LEVEL_11_1:
+    case D3D_FEATURE_LEVEL_11_0:
+    {
+        return "vs_5_0";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_10_1:
+    {
+        return "vs_4_1";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_10_0:
+    {
+        return "vs_4_0";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_9_3:
+    {
+        return "vs_4_0_level_9_3";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_9_2:
+    case D3D_FEATURE_LEVEL_9_1:
+    {
+        return "vs_4_0_level_9_1";
+    }
+    break;
+    } // switch( featureLevel )
+
+    return "";
+}
+
+/// <summary>
+/// Get latest d3d profile of pixel shader
+/// </summary>
+/// <param name="device"></param>
+/// <returns></returns>
+template<>
+std::string GetLatestProfile<ID3D11PixelShader>(ID3D11Device* device)
+{
+    assert(device);
+
+    // Query the current feature level:
+    D3D_FEATURE_LEVEL featureLevel = device->GetFeatureLevel();
+    switch (featureLevel)
+    {
+    case D3D_FEATURE_LEVEL_11_1:
+    case D3D_FEATURE_LEVEL_11_0:
+    {
+        return "ps_5_0";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_10_1:
+    {
+        return "ps_4_1";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_10_0:
+    {
+        return "ps_4_0";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_9_3:
+    {
+        return "ps_4_0_level_9_3";
+    }
+    break;
+    case D3D_FEATURE_LEVEL_9_2:
+    case D3D_FEATURE_LEVEL_9_1:
+    {
+        return "ps_4_0_level_9_1";
+    }
+    break;
+    }
+    return "";
+}
+
+/// <summary>
+/// Create vertex shader
+/// </summary>
+/// <param name="device"></param>
+/// <param name="pShaderBlob"></param>
+/// <param name="pClassLinkage"></param>
+/// <returns>pointer to ID3D11VertexShader instance</returns>
+template<>
+ID3D11VertexShader* CreateShader<ID3D11VertexShader>(ID3D11Device* device, ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+    assert(device);
+    assert(pShaderBlob);
+
+    ID3D11VertexShader* pVertexShader = nullptr;
+    device->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader);
+
+    return pVertexShader;
+}
+
+/// <summary>
+/// Create pixel shader
+/// </summary>
+/// <param name="device"></param>
+/// <param name="pShaderBlob"></param>
+/// <param name="pClassLinkage"></param>
+/// <returns>pointer to ID3D11VertexShader instance</returns>
+template<>
+ID3D11PixelShader* CreateShader<ID3D11PixelShader>(ID3D11Device* device, ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+    assert(device);
+    assert(pShaderBlob);
+
+    ID3D11PixelShader* pPixelShader = nullptr;
+    device->CreatePixelShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pPixelShader);
+
+    return pPixelShader;
+}
+
+/// <summary>
+/// Load Shader and compile it
+/// </summary>
+/// <typeparam name="ShaderClass">ID3D11VertexShader or ID3D11PixelShader</typeparam>
+/// <param name="fileName"></param>
+/// <param name="entryPoint"></param>
+/// <param name="_profile"></param>
+/// <returns>pointer to ID3DBlob instance</returns>
+template<class ShaderClass>
+ID3DBlob* LoadShader(const std::wstring& fileName, const std::string& entryPoint, const std::string& _profile)
+{
+    ID3DBlob* pShaderBlob = nullptr;
+    ID3DBlob* pErrorBlob = nullptr;
+
+    std::string profile = _profile;
+    if (profile == "latest")
+    {
+        profile = GetLatestProfile<ShaderClass>(g_d3dDevice);
+    }
+
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if _DEBUG
+    flags |= D3DCOMPILE_DEBUG;
+#endif
+
+    HRESULT hr = D3DCompileFromFile(
+        fileName.c_str(),                       // name of the shader file
+        nullptr,                                // optional array of shader macros
+        D3D_COMPILE_STANDARD_FILE_INCLUDE,      // optional pointer to include files, D3D_COMPILE_STANDARD_FILE_INCLUDE implies it include files that are relative to the current directory
+        entryPoint.c_str(),                     // entry point of the shader
+        profile.c_str(),                        // shader target
+        flags,                                  // shader compile options of a HLSL code
+        0,                                      // shader compile options of a effect
+        &pShaderBlob,                           // pointer to the compiled code
+        &pErrorBlob                             // pointer to the error messages
+    );
+
+    if (FAILED(hr))
+    {
+        if (pErrorBlob)
+        {
+            std::string errorMessage = (char*)pErrorBlob->GetBufferPointer();
+            OutputDebugStringA(errorMessage.c_str());
+
+            SafeRelease(pShaderBlob);
+            SafeRelease(pErrorBlob);
+        }
+
+        return nullptr;
+    }
+    
+    SafeRelease(pErrorBlob);
+
+    return pShaderBlob;
+}
+
+/// <summary>
+/// Load resources of the application
+/// </summary>
+void LoadContent()
+{
+    assert(g_d3dDevice);
+
+    // Create an initialize the vertex buffer.
+    D3D11_BUFFER_DESC vertexBufferDesc;
+    ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    vertexBufferDesc.ByteWidth = sizeof(VertexPosColor) * _countof(g_Vertices);     // size of the buffer in bytes
+    vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                   // how the buffer is expected to be read from and written to
+    vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                          // how the buffer will be bound to the pipeline
+    vertexBufferDesc.CPUAccessFlags = 0;                                            // no CPI access is necessary
+
+    D3D11_SUBRESOURCE_DATA resourceData;
+    ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+    resourceData.pSysMem = g_Vertices;                                              // pointer to the data to initialize the buffer with
+    resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
+                                                                                    // No used for now.
+    resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
+                                                                                    // no used for now.
+
+    HRESULT hr = g_d3dDevice->CreateBuffer(
+        &vertexBufferDesc,                                                          // buffer description
+        &resourceData,                                                              // pointer to the initialization data
+        &g_d3dVertexBuffer                                                          // pointer to the created buffer object
+    );
+    AssertIfFailed(hr, "Load Content", "Unable to create vertex buffer");
+    
+    // Create and initialize the index buffer.
+    D3D11_BUFFER_DESC indexBufferDesc;
+    ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    indexBufferDesc.ByteWidth = sizeof(WORD) * _countof(g_Indicies);
+    indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    indexBufferDesc.CPUAccessFlags = 0;
+    
+    //re-use resourceData
+    resourceData.pSysMem = g_Indicies;
+
+    hr = g_d3dDevice->CreateBuffer(&indexBufferDesc, &resourceData, &g_d3dIndexBuffer);
+    AssertIfFailed(hr, "Load Content", "Unable to create index buffer");
+    
+    // Create the constant buffers for the variables defined in the vertex shader.
+    D3D11_BUFFER_DESC constantBufferDesc;
+    ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+    constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    constantBufferDesc.CPUAccessFlags = 0;
+
+    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Application]);
+    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Application");
+    
+    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Frame]);
+    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Frame");
+    
+    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Object]);
+    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
+    
+    // Note:
+    // Since we will need to update the contents of the constant buffer in the application,
+    // Instead of set the buffer¡¦s Usage property to D3D11_USAGE_DYNAMIC and the CPU AccessFlags to D3D11_CPU_ACCESS_WRITE,
+    // we'll be using ID3D11DeviceContext::UpdateSubresource method,
+    // which it expects constant buffers to be initialized with D3D11_USAGE_DEFAULT usage flag
+    // and buffers that are created with the D3D11_USAGE_DEFAULT flag must have their CPU AccessFlags set to 0.
+
+    // Load and compile the vertex shader
+    ID3DBlob* vertexShaderBlob;
+    vertexShaderBlob = LoadShader<ID3D11VertexShader>(L"assets/simpleVertexShader.hlsl", "main", "latest");
+    g_d3dVertexShader = CreateShader<ID3D11VertexShader>(g_d3dDevice, vertexShaderBlob, nullptr);
+    
+    // Create the input layout for the vertex shader.
+    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+    {
+        {
+            "POSITION",                             // semantic name
+            0,                                      // semantic index
+            DXGI_FORMAT_R32G32B32_FLOAT,            // format
+            0,                                      // input slot (used for packed vertex buffers)
+            offsetof(VertexPosColor, Position),     // aligned byte offset
+            D3D11_INPUT_PER_VERTEX_DATA,            // input slot class
+            0                                       // additional param for slot class: D3D11_INPUT_PER_INSTANCE_DATA
+        },
+        {
+            "COLOR",
+            0,
+            DXGI_FORMAT_R32G32B32_FLOAT,
+            0,
+            offsetof(VertexPosColor, Color),
+            D3D11_INPUT_PER_VERTEX_DATA,
+            0
+        }
+    };
+
+    hr = g_d3dDevice->CreateInputLayout(
+        vertexLayoutDesc,                           // input layout description
+        _countof(vertexLayoutDesc),                 // amount of the elements
+        vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+        vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+        &g_d3dInputLayout                           // pointer to the input-layout object
+    );
+    AssertIfFailed(hr, "Load Content", "Unable to create input layout");
+
+    // After creating input layouy, the shader blob is no longer needed
+    SafeRelease(vertexShaderBlob);
+
+    // Load and compile the pixel shader
+    ID3DBlob* pixelShaderBlob;
+    pixelShaderBlob = LoadShader<ID3D11PixelShader>(L"assets/simplePixelShader.hlsl", "main", "latest");
+    g_d3dPixelShader = CreateShader<ID3D11PixelShader>(g_d3dDevice, pixelShaderBlob, nullptr);
+    SafeRelease(pixelShaderBlob);
+
+    // Setup the projection matrix.
+    RECT clientRect;
+    GetClientRect(g_WindowHandle, &clientRect);
+
+    // Compute the exact client dimensions, which is required for a correct projection matrix.
+    float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
+    float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
+
+    // LH stands for left hand coordinate
+    g_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
+
+    g_d3dDeviceContext->UpdateSubresource(
+        g_d3dConstantBuffers[CB_Application],           // pointer to the destination resource
+        0,                                              // zero-based index that identifies the destination subresource
+        nullptr,                                        // pointer to the box that defines the portion of the destination subresource
+                                                        // to copy the resource data into
+        &g_ProjectionMatrix,                            // pointer to the source data in memory
+        0,                                              // size of one row of the source data
+        0                                               // size of one depth slice of source data
+    );
+}
+
+/// <summary>
+/// The render loop
+/// </summary>
+void Render()
+{
+    assert(g_d3dDevice);
+    assert(g_d3dDeviceContext);
+
+    Clear(Colors::CornflowerBlue, 1.0f, 0);
+
+    // Setup the input assembler stage
+    const UINT vertexStride = sizeof(VertexPosColor);
+    const UINT offset = 0;
+    g_d3dDeviceContext->IASetVertexBuffers(
+        0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+        1,                                      // number of vertex buffers in the array
+        &g_d3dVertexBuffer,                     // pointer to an array of vertex buffers
+        &vertexStride,                          // pointer to stride values
+        &offset                                 // pointer to offset values
+    );
+    g_d3dDeviceContext->IASetInputLayout(g_d3dInputLayout);
+    g_d3dDeviceContext->IASetIndexBuffer(
+        g_d3dIndexBuffer,                       // pointer to indicies
+        DXGI_FORMAT_R16_UINT,                   // indicies format
+        0                                       // offset
+    );
+    g_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Setup the vertex shader stage
+    g_d3dDeviceContext->VSSetShader(
+        g_d3dVertexShader,                      // pointer to vertex shader
+        nullptr,                                // pointer to an array of class-instance interfaces, NULL means shader does not use any interface
+        0                                       // number of class-instance interfaces of previous param
+    );
+    g_d3dDeviceContext->VSSetConstantBuffers(
+        0,                                      // start slot
+        3,                                      // number of buffers
+        g_d3dConstantBuffers                    // array of constant buffers
+    );
+
+    // Setup the rasterizer stage
+    g_d3dDeviceContext->RSSetState(g_d3dRasterizerState);
+    g_d3dDeviceContext->RSSetViewports(
+        1,                                      // numbers of the viewport to bind
+        &g_Viewport                             // array of viewport
+    );
+
+    // Setup the pixel stage stage
+    g_d3dDeviceContext->PSSetShader(g_d3dPixelShader, nullptr, 0);
+
+    // Setup the output merger stage
+    g_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        &g_d3dRenderTargetView,                 // pointer to an array of render-target view
+        g_d3dDepthStencilView                   // pointer to depth-stencil view
+    );
+    g_d3dDeviceContext->OMSetDepthStencilState(
+        g_d3dDepthStencilState,                 // depth stencil state
+        1                                       // stencil reference
+    );
+
+    // Draw the cube
+    g_d3dDeviceContext->DrawIndexed(
+        _countof(g_Indicies),                   // number of the indicies to draw
+        0,                                      // start index location of index buffer
+        0                                       // a value to added to each index before reading a vertex from vertex buffer
+    );
+
+    // present swap chain's back buffer to the screen
+    Present(g_EnableVSync);
+}
+
+/// <summary>
+/// Unload resources of the application
+/// </summary>
+void UnloadContent()
+{
+    SafeRelease(g_d3dConstantBuffers[CB_Application]);
+    SafeRelease(g_d3dConstantBuffers[CB_Frame]);
+    SafeRelease(g_d3dConstantBuffers[CB_Object]);
+    SafeRelease(g_d3dIndexBuffer);
+    SafeRelease(g_d3dVertexBuffer);
+    SafeRelease(g_d3dInputLayout);
+    SafeRelease(g_d3dVertexShader);
+    SafeRelease(g_d3dPixelShader);
+}
+
+/// <summary>
+/// Unload all resources
+/// </summary>
+void Cleanup()
+{
+    SafeRelease(g_d3dDepthStencilView);
+    SafeRelease(g_d3dRenderTargetView);
+    SafeRelease(g_d3dDepthStencilBuffer);
+    SafeRelease(g_d3dDepthStencilState);
+    SafeRelease(g_d3dRasterizerState);
+    SafeRelease(g_d3dSwapChain);
+    SafeRelease(g_d3dDeviceContext);
+    SafeRelease(g_d3dDevice);
+}
+
+/// <summary>
+/// The Logic loop
+/// </summary>
+/// <param name="deltaTime"></param>
+void Update(float deltaTime)
+{
+    XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+    XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
+    XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
+    g_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_ViewMatrix, 0, 0);
+
+    static float angle = 0.0f;
+    angle += 90.0f * deltaTime;
+    XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+
+    g_WorldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &g_WorldMatrix, 0, 0);
 }
 
 /// <summary>
@@ -556,11 +1017,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR pCmdLin
         return returnCode;
     }
 
+    LoadContent();
+
     returnCode = Run();
     if (returnCode != 0)
     {
         DisplayLastError("Failed to perform Run().");
     }
+
+    UnloadContent();
+    Cleanup();
 
     return returnCode;
 }
