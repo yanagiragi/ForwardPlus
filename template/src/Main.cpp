@@ -1,24 +1,31 @@
+// Windows includes
 #include <Windows.h>
 
 // DirectX includes
 #include <d3d11.h>
 #include <d3dcompiler.h>
-#include <DirectXMath.h>
-#include <DirectXColors.h>
 
 // STL includes
 #include <iostream>
 #include <string>
+
+// GLM includes
+#define GLM_FORCE_SSE42 1
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES 1
+#define GLM_FORCE_LEFT_HANDED
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+
+// Project includes
 #include "Common.h"
+#include "Camera.h"
 
 // Link library dependencies
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "winmm.lib")
-
-// For DirectX Math
-using namespace DirectX;
 
 #pragma region Forward declarations
 
@@ -109,28 +116,39 @@ enum ConstantBuffer
 
 ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
-// Demo parameters
-XMMATRIX g_WorldMatrix;
-XMMATRIX g_ViewMatrix;
-XMMATRIX g_ProjectionMatrix;
+// Matrixs
+glm::mat4 g_ModelMatrix;
+glm::mat4 g_ViewMatrix;
+glm::mat4 g_ProjectionMatrix;
+
+// Camera Params
+Camera* g_Camera = new Camera(
+    glm::vec3(0, 0, -10),
+    0, // theta in degree
+    -90  // phi in degree
+);
+
+// Input Params
+float g_CameraTranslateStep = .5f;
+float g_CameraRotateStep = 1.0f; // in degrees
 
 // Vertex data for a colored cube.
 struct VertexPosColor
 {
-    XMFLOAT3 Position;
-    XMFLOAT3 Color;
+    glm::vec3 Position;
+    glm::vec3 Color;
 };
 
 VertexPosColor g_Vertices[8] =
 {
-    { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-    { XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-    { XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-    { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-    { XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-    { XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-    { XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-    { XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
+    { glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(0.0f, 0.0f, 0.0f) }, // 0
+    { glm::vec3(-1.0f,  1.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f) }, // 1
+    { glm::vec3(1.0f,  1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 0.0f) }, // 2
+    { glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f) }, // 3
+    { glm::vec3(-1.0f, -1.0f,  1.0f), glm::vec3(0.0f, 0.0f, 1.0f) }, // 4
+    { glm::vec3(-1.0f,  1.0f,  1.0f), glm::vec3(0.0f, 1.0f, 1.0f) }, // 5
+    { glm::vec3(1.0f,  1.0f,  1.0f), glm::vec3(1.0f, 1.0f, 1.0f) }, // 6
+    { glm::vec3(1.0f, -1.0f,  1.0f), glm::vec3(1.0f, 0.0f, 1.0f) }  // 7
 };
 
 WORD g_Indicies[36] =
@@ -200,6 +218,48 @@ int InitApplication(HINSTANCE hInstance, int nCmdShow)
     return 0;
 }
 
+void HandleKeyDown(int keycode)
+{
+    printf("keydown :%4x\n", keycode);
+
+    switch (keycode)
+    {
+    case 0x41: // A
+        g_Camera->Translate(glm::vec3(1, 0, 0) * g_CameraTranslateStep);
+        break;
+    case 0x44: // D
+        g_Camera->Translate(glm::vec3(-1, 0, 0) * g_CameraTranslateStep);
+        break;
+    case 0x57: // W
+        g_Camera->Translate(glm::vec3(0, 0, 1) * g_CameraTranslateStep);
+        break;
+    case 0x53: // S
+        g_Camera->Translate(glm::vec3(0, 0, -1) * g_CameraTranslateStep);
+        break;
+    case 0x51: // Q
+        g_Camera->Translate(glm::vec3(0, 1, 0) * g_CameraTranslateStep);
+        
+        break;
+    case 0x45: // E
+        g_Camera->Translate(glm::vec3(0, -1, 0) * g_CameraTranslateStep);
+        break;
+    case 0x49: // I
+        g_Camera->Rotate(g_CameraRotateStep, 0);
+        break;
+    case 0x4a: // J
+        g_Camera->Rotate(0, -g_CameraRotateStep);
+        break;
+    case 0x4c: // L
+        g_Camera->Rotate(0, g_CameraRotateStep);
+        break;
+    case 0x4b: // K
+        g_Camera->Rotate(-g_CameraRotateStep, 0);
+
+    default:
+        break;
+    }
+}
+
 /// <summary>
 /// Handles window event
 /// </summary>
@@ -215,6 +275,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
+    case WM_KEYDOWN:
+        HandleKeyDown(GetVKcode(lParam));
+        break;
+    case WM_KEYUP:
+        {
+            printf("keyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
+        }
+        break;
+    case WM_SYSKEYDOWN:
+        {
+            printf("syskeydown    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
+        }
+        break;
+    case WM_SYSKEYUP:
+        {
+            printf("syskeyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
+        }
+        break;
+
     case WM_PAINT:
         {
             hDC = BeginPaint(hwnd, &paintStruct);
@@ -771,7 +850,7 @@ void LoadContent()
     // Create the constant buffers for the variables defined in the vertex shader.
     D3D11_BUFFER_DESC constantBufferDesc;
     ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+    constantBufferDesc.ByteWidth = sizeof(glm::mat4);
     constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
     constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     constantBufferDesc.CPUAccessFlags = 0;
@@ -846,15 +925,14 @@ void LoadContent()
     float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
     float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
-    // LH stands for left hand coordinate
-    g_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
-
+    // Setup projection matrix
+    g_ProjectionMatrix = glm::perspective(glm::radians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
     g_d3dDeviceContext->UpdateSubresource(
         g_d3dConstantBuffers[CB_Application],           // pointer to the destination resource
         0,                                              // zero-based index that identifies the destination subresource
         nullptr,                                        // pointer to the box that defines the portion of the destination subresource
                                                         // to copy the resource data into
-        &g_ProjectionMatrix,                            // pointer to the source data in memory
+        glm::value_ptr(g_ProjectionMatrix),             // pointer to the source data in memory
         0,                                              // size of one row of the source data
         0                                               // size of one depth slice of source data
     );
@@ -868,7 +946,8 @@ void Render()
     assert(g_d3dDevice);
     assert(g_d3dDeviceContext);
 
-    Clear(Colors::CornflowerBlue, 1.0f, 0);
+    // CornflowerBlue = #6495ED
+    Clear(glm::value_ptr(glm::vec3(0.392f, 0.584f, 0.929f)), 1.0f, 0);
 
     // Setup the input assembler stage
     const UINT vertexStride = sizeof(VertexPosColor);
@@ -960,6 +1039,8 @@ void Cleanup()
     SafeRelease(g_d3dSwapChain);
     SafeRelease(g_d3dDeviceContext);
     SafeRelease(g_d3dDevice);
+
+    delete g_Camera;
 }
 
 /// <summary>
@@ -968,18 +1049,17 @@ void Cleanup()
 /// <param name="deltaTime"></param>
 void Update(float deltaTime)
 {
-    XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-    XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-    XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-    g_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_ViewMatrix, 0, 0);
+    g_ViewMatrix = g_Camera->GetViewMatrix();
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, glm::value_ptr(g_ViewMatrix), 0, 0);
 
-    static float angle = 0.0f;
+    static float angle = 0.0;
     angle += 90.0f * deltaTime;
-    XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+    glm::vec3 rotationAxis = glm::vec3(0, 1, 1);
 
-    g_WorldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
-    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &g_WorldMatrix, 0, 0);
+    g_ModelMatrix = glm::mat4(1);
+    g_ModelMatrix = glm::rotate(g_ModelMatrix, glm::radians(angle), rotationAxis);
+
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, glm::value_ptr(g_ModelMatrix), 0, 0);
 }
 
 /// <summary>
@@ -999,13 +1079,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR pCmdLin
 #ifdef _DEBUG
     RedirectIOToConsole();
 #endif
-
-    // Check for DirectX Math library support.
-    if (!XMVerifyCPUSupport())
-    {
-        DisplayLastError("Failed to verify DirectX Math library support.");
-        return -1;
-    }
 
     int returnCode = InitApplication(hInstance, nCmdShow);
     if (returnCode != 0)

@@ -37,10 +37,11 @@ endif()
 # Dependencies
 
 # GLM
-# message(STATUS "Installing glm via submodule")
-# set(BUILD_STATIC_LIBS ON)
-# add_subdirectory(../external/glm/glm)
-# set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
+message(STATUS "Installing glm via COPY")
+file(COPY ../external DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
+set(BUILD_STATIC_LIBS ON)
+add_subdirectory(external/glm/glm)
+set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
 
 # =============================================================
 
@@ -74,21 +75,25 @@ add_executable(
 
 # Finish Dependencies
 
-#target_link_libraries(
-#    ${PROJECT_NAME}
-#    glm_static
-#)
+target_link_libraries(
+    ${PROJECT_NAME}
+    glm_static
+)
 
-#target_include_directories(
-#  ${PROJECT_NAME}
-#  PUBLIC external/glm
-#)
+target_include_directories(
+    ${PROJECT_NAME}
+    PUBLIC external/glm
+)
 
-#add_dependencies(
-#    ${PROJECT_NAME}
-#    glm_static   
-#)
+target_include_directories(
+    glm_static
+    PUBLIC external/glm
+)
 
+add_dependencies(
+    ${PROJECT_NAME}
+    glm_static
+)
 
 # =============================================================
 
