@@ -996,6 +996,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR pCmdLin
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(pCmdLine);
 
+#ifdef _DEBUG
+    RedirectIOToConsole();
+#endif
+
     // Check for DirectX Math library support.
     if (!XMVerifyCPUSupport())
     {
