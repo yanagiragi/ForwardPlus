@@ -125,7 +125,7 @@ glm::mat4 g_ProjectionMatrix;
 Camera* g_Camera = new Camera(
     glm::vec3(0, 0, -10),
     0, // theta in degree
-    -90  // phi in degree
+    90  // phi in degree
 );
 
 // Input Params
@@ -238,19 +238,18 @@ void HandleKeyDown(int keycode)
         break;
     case 0x51: // Q
         g_Camera->Translate(glm::vec3(0, 1, 0) * g_CameraTranslateStep);
-        
         break;
     case 0x45: // E
         g_Camera->Translate(glm::vec3(0, -1, 0) * g_CameraTranslateStep);
         break;
-    case 0x49: // I
-        g_Camera->Rotate(g_CameraRotateStep, 0);
-        break;
     case 0x4a: // J
-        g_Camera->Rotate(0, -g_CameraRotateStep);
+        g_Camera->Rotate(0, g_CameraRotateStep);
         break;
     case 0x4c: // L
-        g_Camera->Rotate(0, g_CameraRotateStep);
+        g_Camera->Rotate(0, -g_CameraRotateStep);
+        break;
+    case 0x49: // I
+        g_Camera->Rotate(g_CameraRotateStep, 0);
         break;
     case 0x4b: // K
         g_Camera->Rotate(-g_CameraRotateStep, 0);
