@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 cmake_policy(VERSION 3.6)
-project(DirectX11Seed
+project("template"
         VERSION 1.0.0.0
         LANGUAGES C CXX
 )
@@ -37,10 +37,10 @@ endif()
 # Dependencies
 
 # GLM
-message(STATUS "Installing glm via submodule")
-set(BUILD_STATIC_LIBS ON)
-add_subdirectory(external/glm/glm)
-set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
+# message(STATUS "Installing glm via submodule")
+# set(BUILD_STATIC_LIBS ON)
+# add_subdirectory(../external/glm/glm)
+# set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
 
 # =============================================================
 
@@ -74,21 +74,20 @@ add_executable(
 
 # Finish Dependencies
 
-target_link_libraries(
-    ${PROJECT_NAME}
-    glm_static
-)
+#target_link_libraries(
+#    ${PROJECT_NAME}
+#    glm_static
+#)
 
-target_include_directories(
-  ${PROJECT_NAME}
-  PUBLIC external/glm
-)
+#target_include_directories(
+#  ${PROJECT_NAME}
+#  PUBLIC external/glm
+#)
 
-add_dependencies(
-    ${PROJECT_NAME}
-    glm_static
-    
-)
+#add_dependencies(
+#    ${PROJECT_NAME}
+#    glm_static   
+#)
 
 
 # =============================================================

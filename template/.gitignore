@@ -354,3 +354,6 @@ external/*
 
 ## compiled shaders
 assets/*.dxbc
+
+# logs
+[Dd]ev[Ll]og.md

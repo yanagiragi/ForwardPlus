@@ -1,6 +1,6 @@
 # DirectX 11 Seed
 
-Modified from [alaingalvan/directx12-seed](https://github.com/alaingalvan/directx12-seed)
+Modified from [jpvanoosten/LearningDirectX11](https://github.com/jpvanoosten/LearningDirectX11/tree/v1.0.0) from [this article](https://www.3dgep.com/introduction-to-directx-11/#DirectX_11_Pipeline)
 
 ## Setup
 
@@ -16,17 +16,10 @@ Then type the following in your [terminal](https://hyper.is/).
 
 ```bash
 # Clone the repo
-git clone https://github.com/yanagiragi/ForwardPlus --recurse-submodules
+git clone https://github.com/yanagiragi/ForwardPlus
 
 # go inside the folder
-cd "DirectX11 - seed"
-
-# If you forget to `recurse-submodules` you can always run:
-# git submodule update --init
-
-# submodule is not ready for now, manual download glm for now
-mkdir -p external/
-git clone https://github.com/g-truc/glm.git
+cd "template"
 
 # Make a build folder
 mkdir build
@@ -41,11 +34,9 @@ cmake --build .
 ## Project Layout
 
 ```bash
-├─ 📂 external/                    # Dependencies
-│  └─ 📁 glm/                            # Linear Algebra
 ├─ 📂 src/                         # Source Files
-│  ├─ 📄 Common.h                        # Utilities (Load Files, Check Shaders, etc.)
-│  └─ 📄 Main.cpp                        # Application Main
+│  ├─ 📄 Common.h                  # Utilities (Load Files, Check Shaders, etc.)
+│  └─ 📄 Main.cpp                  # Application Main
 ├─ 📄 .gitignore                   # Ignore certain files in git repo
 ├─ 📄 CMakeLists.txt               # Build Script
 ├─ 📄 license.md                   # Your License (Unlicense)
