@@ -123,6 +123,9 @@ struct ApplicationConstantBuffer
 struct FrameConstantBuffer
 {
     glm::mat4 viewMatrix;
+    // glm::vec3 lightPosition;
+    //glm::vec4 lightDirection;
+    float one;
 };
 
 struct ObjectConstantBuffer
@@ -841,20 +844,34 @@ void LoadContent()
     */
 
     // Create the constant buffers for the variables defined in the vertex shader.
-    D3D11_BUFFER_DESC constantBufferDesc;
-    ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    constantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
-    constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    constantBufferDesc.CPUAccessFlags = 0;
+    D3D11_BUFFER_DESC applicationConstantBufferDesc;
+    ZeroMemory(&applicationConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    applicationConstantBufferDesc.ByteWidth = sizeof(struct ApplicationConstantBuffer);
+    applicationConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    applicationConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    applicationConstantBufferDesc.CPUAccessFlags = 0;
 
-    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Application]);
+    hr = g_d3dDevice->CreateBuffer(&applicationConstantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Application]);
     AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Application");
     
-    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Frame]);
+    D3D11_BUFFER_DESC frameConstantBufferDesc;
+    ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    frameConstantBufferDesc.ByteWidth = sizeof(struct FrameConstantBuffer);
+    frameConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    frameConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    frameConstantBufferDesc.CPUAccessFlags = 0;
+
+    hr = g_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Frame]);
     AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Frame");
     
-    hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Object]);
+    D3D11_BUFFER_DESC objectConstantBufferDesc;
+    ZeroMemory(&objectConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    objectConstantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
+    objectConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    objectConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    objectConstantBufferDesc.CPUAccessFlags = 0;
+
+    hr = g_d3dDevice->CreateBuffer(&objectConstantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Object]);
     AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
     
     // Note:
@@ -986,6 +1003,11 @@ void Render()
 
     // Setup the pixel stage stage
     g_d3dDeviceContext->PSSetShader(g_d3dPixelShader, nullptr, 0);
+    g_d3dDeviceContext->PSSetConstantBuffers(
+        0,                                      // start slot
+        3,                                      // number of buffers
+        g_d3dConstantBuffers                    // array of constant buffers
+    );
 
     // Setup the output merger stage
     g_d3dDeviceContext->OMSetRenderTargets(
@@ -1058,7 +1080,11 @@ void Cleanup()
 /// <param name="deltaTime"></param>
 void Update(float deltaTime)
 {
+    static float angle2 = 0.0;
+    angle2 += 10.0f * deltaTime;
     g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
+    //g_FrameConstantBuffer.lightDirection = glm::vec4(sin(angle2), 0.5, 0, 1);
+    g_FrameConstantBuffer.one = sin(angle2);
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
     static float angle = 0.0;
@@ -1066,9 +1092,8 @@ void Update(float deltaTime)
     glm::vec3 rotationAxis = glm::vec3(0, 1, 1);
 
     auto model = glm::mat4(1);
-    model = glm::rotate(model, glm::radians(angle), rotationAxis);
+    //model = glm::rotate(model, glm::radians(angle), rotationAxis);
     bunnyConstantBuffer.modelMatrix = model;
-
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &bunnyConstantBuffer, 0, 0);
 }
 

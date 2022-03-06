@@ -196,3 +196,9 @@ inline void RedirectIOToConsole()
     std::wcin.clear();
     std::cin.clear();
 }
+
+template<typename T>
+inline UINT GetAlignedSize()
+{
+    return static_cast<UINT>(sizeof(T) + (16 - (sizeof(T) % 16)));
+}

@@ -6,6 +6,7 @@ cbuffer PerApplication : register(b0)
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
+    float one;
 }
 
 cbuffer PerObject : register(b2)
@@ -22,8 +23,8 @@ struct AppData
 
 struct VertexShaderOutput
 {
-    float4 color : COLOR;
     float4 position : SV_POSITION;
+    float4 color : COLOR;
 };
 
 VertexShaderOutput main(AppData IN)
