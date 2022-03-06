@@ -115,12 +115,29 @@ enum ConstantBuffer
     NumConstantBuffers
 };
 
+struct ApplicationConstantBuffer
+{
+    glm::mat4 projectionMatrix;
+};
+
+struct FrameConstantBuffer
+{
+    glm::mat4 viewMatrix;
+};
+
+struct ObjectConstantBuffer
+{
+    glm::mat4 modelMatrix;
+};
+
+struct ApplicationConstantBuffer g_ApplicationConstantBuffer;
+struct FrameConstantBuffer g_FrameConstantBuffer;
+
 ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
-// Matrixs
-glm::mat4 g_ModelMatrix;
-glm::mat4 g_ViewMatrix;
-glm::mat4 g_ProjectionMatrix;
+// Entities
+struct ObjectConstantBuffer bunnyConstantBuffer;
+Model* bunny;
 
 // Camera Params
 Camera* g_Camera = new Camera(
@@ -132,8 +149,6 @@ Camera* g_Camera = new Camera(
 // Input Params
 float g_CameraTranslateStep = .5f;
 float g_CameraRotateStep = 1.0f; // in degrees
-
-Model* bunny;
 
 #pragma endregion
 
@@ -828,7 +843,7 @@ void LoadContent()
     // Create the constant buffers for the variables defined in the vertex shader.
     D3D11_BUFFER_DESC constantBufferDesc;
     ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    constantBufferDesc.ByteWidth = sizeof(glm::mat4);
+    constantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
     constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
     constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     constantBufferDesc.CPUAccessFlags = 0;
@@ -913,13 +928,13 @@ void LoadContent()
     float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
     // Setup projection matrix
-    g_ProjectionMatrix = glm::perspective(glm::radians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
+    g_ApplicationConstantBuffer.projectionMatrix = glm::perspective(glm::radians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
     g_d3dDeviceContext->UpdateSubresource(
         g_d3dConstantBuffers[CB_Application],           // pointer to the destination resource
         0,                                              // zero-based index that identifies the destination subresource
         nullptr,                                        // pointer to the box that defines the portion of the destination subresource
                                                         // to copy the resource data into
-        glm::value_ptr(g_ProjectionMatrix),             // pointer to the source data in memory
+        &g_ApplicationConstantBuffer,                   // pointer to the source data in memory
         0,                                              // size of one row of the source data
         0                                               // size of one depth slice of source data
     );
@@ -1043,17 +1058,18 @@ void Cleanup()
 /// <param name="deltaTime"></param>
 void Update(float deltaTime)
 {
-    g_ViewMatrix = g_Camera->GetViewMatrix();
-    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, glm::value_ptr(g_ViewMatrix), 0, 0);
+    g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
     static float angle = 0.0;
     angle += 90.0f * deltaTime;
     glm::vec3 rotationAxis = glm::vec3(0, 1, 1);
 
-    g_ModelMatrix = glm::mat4(1);
-    g_ModelMatrix = glm::rotate(g_ModelMatrix, glm::radians(angle), rotationAxis);
+    auto model = glm::mat4(1);
+    model = glm::rotate(model, glm::radians(angle), rotationAxis);
+    bunnyConstantBuffer.modelMatrix = model;
 
-    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, glm::value_ptr(g_ModelMatrix), 0, 0);
+    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &bunnyConstantBuffer, 0, 0);
 }
 
 /// <summary>
