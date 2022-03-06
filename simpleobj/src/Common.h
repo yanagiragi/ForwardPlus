@@ -45,17 +45,11 @@ inline std::vector<char> readFile(const std::string& filename)
 /// <param name="title"></param>
 /// <param name="description"></param>
 /// <param name="exception"></param>
-inline void AssertIfFailed(HRESULT hr, LPTSTR title, LPTSTR description, LPTSTR exception = nullptr)
+inline void AssertIfFailed(HRESULT hr, LPTSTR title, LPTSTR description)
 {
     if (FAILED(hr))
     {
-        MessageBox(0, TEXT(title), TEXT(description), MB_OK);
-        if (exception != nullptr) {
-            throw new std::exception(exception);
-        }
-        else {
-            throw new std::exception(description);
-        }
+        MessageBox(0, TEXT(description), TEXT(title), MB_OK);
     }
 }
 
