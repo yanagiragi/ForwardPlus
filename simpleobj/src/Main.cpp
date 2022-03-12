@@ -4,18 +4,11 @@
 // DirectX includes
 #include <d3d11.h>
 #include <d3dcompiler.h>
+#include "SimpleMath.h"
 
 // STL includes
 #include <iostream>
 #include <string>
-
-// GLM includes
-#define GLM_FORCE_SSE42 1
-#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES 1
-#define GLM_FORCE_LEFT_HANDED
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
 
 // Project includes
 #include "Common.h"
@@ -27,6 +20,9 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "winmm.lib")
+
+using namespace DirectX::SimpleMath;
+
 
 #pragma region Forward declarations
 
@@ -117,20 +113,41 @@ enum ConstantBuffer
 
 struct ApplicationConstantBuffer
 {
-    glm::mat4 projectionMatrix;
+    Matrix projectionMatrix;
+};
+
+
+struct LightData
+{
+    Vector4 param1; // position, type
+    Vector4 param2; // direction, strength
+
+    LightData() {}
+
+    LightData(enum LightType type, Vector3 position, Vector3 direction, float strength)
+    {
+        param1 = Vector4(position.x, position.y, position.z, type);
+        param2 = Vector4(direction.x, direction.y, direction.z, strength);
+    }
 };
 
 struct FrameConstantBuffer
 {
-    glm::mat4 viewMatrix;
-    glm::vec4 lightPosition;
-    glm::vec4 lightDirection;
+    Matrix viewMatrix;
+    struct LightData lightData;
+};
+
+enum LightType
+{
+    Directional,
+    Point,
+    NumLightType
 };
 
 struct ObjectConstantBuffer
 {
-    glm::mat4 modelMatrix;
-    glm::mat4 normalMatrix;
+    Matrix modelMatrix;
+    Matrix normalMatrix;
 };
 
 struct ApplicationConstantBuffer g_ApplicationConstantBuffer;
@@ -142,13 +159,13 @@ ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 struct ObjectConstantBuffer bunnyConstantBuffer;
 Model* bunny;
 float bunnyAngle = 0.0f;
-float bunnyRotateSpeed = 0.0f;
+float bunnyRotateSpeed = 1.0f;
 
 // Camera Params
 Camera* g_Camera = new Camera(
-    glm::vec3(-0.13, 1, 8.5),
-    0, // theta in degree
-    -90  // phi in degree
+    Vector3(0.5, 1.0, 14.5),
+    0,      // theta in degree
+    -90     // phi in degree
 );
 
 // Input Params
@@ -219,22 +236,22 @@ void HandleKeyDown(int keycode)
     switch (keycode)
     {
     case 0x41: // A
-        g_Camera->Translate(glm::vec3(1, 0, 0) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(1, 0, 0) * g_CameraTranslateStep);
         break;
     case 0x44: // D
-        g_Camera->Translate(glm::vec3(-1, 0, 0) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(-1, 0, 0) * g_CameraTranslateStep);
         break;
     case 0x57: // W
-        g_Camera->Translate(glm::vec3(0, 0, 1) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(0, 0, 1) * g_CameraTranslateStep);
         break;
     case 0x53: // S
-        g_Camera->Translate(glm::vec3(0, 0, -1) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(0, 0, -1) * g_CameraTranslateStep);
         break;
     case 0x51: // Q
-        g_Camera->Translate(glm::vec3(0, 1, 0) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(0, 1, 0) * g_CameraTranslateStep);
         break;
     case 0x45: // E
-        g_Camera->Translate(glm::vec3(0, -1, 0) * g_CameraTranslateStep);
+        g_Camera->Translate(Vector3(0, -1, 0) * g_CameraTranslateStep);
         break;
     case 0x4a: // J
         g_Camera->Rotate(0, g_CameraRotateStep);
@@ -243,10 +260,10 @@ void HandleKeyDown(int keycode)
         g_Camera->Rotate(0, -g_CameraRotateStep);
         break;
     case 0x49: // I
-        g_Camera->Rotate(g_CameraRotateStep, 0);
+        g_Camera->Rotate(-g_CameraRotateStep, 0);
         break;
     case 0x4b: // K
-        g_Camera->Rotate(-g_CameraRotateStep, 0);
+        g_Camera->Rotate(g_CameraRotateStep, 0);
 
     default:
         break;
@@ -946,8 +963,12 @@ void LoadContent()
     float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
     float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
-    // Setup projection matrix
-    g_ApplicationConstantBuffer.projectionMatrix = glm::perspective(glm::radians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
+    // Setup projection matrix in LH coordinates
+    g_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
+    
+    // DirectXTK default uses RH coordintate, don't use it
+    // g_ApplicationConstantBuffer.projectionMatrix = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
+
     g_d3dDeviceContext->UpdateSubresource(
         g_d3dConstantBuffers[CB_Application],           // pointer to the destination resource
         0,                                              // zero-based index that identifies the destination subresource
@@ -968,8 +989,8 @@ void Render()
     assert(g_d3dDeviceContext);
 
     // CornflowerBlue = #6495ED
-    auto CornflowerBlue = glm::vec3(0.392f, 0.584f, 0.929f);
-    Clear(glm::value_ptr(CornflowerBlue), 1.0f, 0);
+    float CornflowerBlue[3] = { 0.392f, 0.584f, 0.929f };
+    Clear(CornflowerBlue, 1.0f, 0);
 
     // Setup the input assembler stage
     const UINT vertexStride = sizeof(VertexData);
@@ -1082,25 +1103,24 @@ void Cleanup()
 /// <param name="deltaTime"></param>
 void Update(float deltaTime)
 {    
-    static float angle2 = 0.0;
-    angle2 += deltaTime;
+    // view matrix
     g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
-    g_FrameConstantBuffer.lightDirection = glm::vec4(sin(angle2), 0.5, 0, 1);
-    auto lookAt = glm::normalize(glm::vec3(
-        glm::cos(glm::radians(angle2)) * glm::cos(glm::radians(0.0f)),
-        glm::sin(glm::radians(angle2)),
-        glm::cos(glm::radians(angle2)) * glm::sin(glm::radians(0.0f))
-    ));
-    g_FrameConstantBuffer.lightPosition = glm::vec4(lookAt, 1.0);
+    
+    // light data
+    // g_FrameConstantBuffer.lightData = struct LightData(Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
+    g_FrameConstantBuffer.lightData = struct LightData(Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
+    
+    // TODO: debug draw light pos and dir
+    
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
     // update angle
-    bunnyAngle += 90.0f * deltaTime * bunnyRotateSpeed;
+    bunnyAngle += deltaTime * bunnyRotateSpeed;    
+    auto model = Matrix::Identity;
+    model = Matrix::CreateTranslation(Vector3(5, 0, 0)) * Matrix::CreateFromYawPitchRoll(bunnyAngle, 0, 0);
     
-    auto model = glm::mat4(1);
-    model = glm::rotate(model, glm::radians(bunnyAngle), glm::vec3(0, 1, 1));
     bunnyConstantBuffer.modelMatrix = model;
-    bunnyConstantBuffer.normalMatrix = glm::transpose(glm::inverse(model * g_FrameConstantBuffer.viewMatrix));
+    bunnyConstantBuffer.normalMatrix = model.Transpose().Invert();
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &bunnyConstantBuffer, 0, 0);
 }
 

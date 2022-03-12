@@ -1,65 +1,92 @@
 #pragma once
 
-#define GLM_FORCE_SSE42 1
-#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES 1
-#define GLM_FORCE_LEFT_HANDED
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
+#include "SimpleMath.h"
 
-using namespace glm;
+using namespace DirectX::SimpleMath;
 
 class Camera
 {
 public:
-    inline vec3 GetPosition()
+
+    inline float ToRadians(float degree)
+    {
+        return degree * DirectX::XM_PI / 180.0f;
+    }
+
+    inline Vector3 GetPosition()
     {
         return m_position;
     }
 
-    inline vec3 GetForward()
+    inline Vector3 GetForward()
     {
-        return  glm::normalize(vec3(
-            cos(radians(m_theta)) * cos(radians(m_phi)),
-            sin(radians(m_theta)),
-            cos(radians(m_theta)) * sin(radians(m_phi))
-        ));
+        auto cosTheta = cos(ToRadians(m_theta));
+        auto sinTheta = sin(ToRadians(m_theta));
+        auto cosPhi = cos(ToRadians(m_phi));
+        auto sinPhi = sin(ToRadians(m_phi));
+        auto result = Vector3(
+            cosTheta * cosPhi,
+            sinTheta,
+            cosTheta * sinPhi
+        );
+        return result;
     }
 
-    inline mat4 GetViewMatrix()
+    inline Matrix GetViewMatrix()
     {
-        return lookAt(m_position, m_position + GetForward(), m_worldUp);
+        // use LH coordinate instead of RH coordinate from DirectXTK
+        return XMMatrixLookAtLH(m_position, m_position + GetForward(), Vector3::UnitY);
     }
 
-    inline void Translate(vec3 translation)
+    inline void Translate(Vector3 translation)
     {
         auto forward = GetForward();
-        auto right = glm::normalize(glm::cross(forward, m_worldUp));
-        auto up = glm::normalize(glm::cross(right, forward));
-
-        m_position += translation.x * right;
-        m_position += translation.y * up;
-        m_position += translation.z * forward;
+        forward.Normalize();
         
-        printf("Camera position: (%f, %f, %f)\n", m_position.x, m_position.y, m_position.z);
+        auto right = forward.Cross(Vector3::UnitY);
+        right.Normalize();
+        
+        auto up = right.Cross(forward);
+        up.Normalize();
+
+        m_position += right * translation.x;
+        m_position += up * translation.y;
+        m_position += forward * translation.z;
+        
+        PrintInfo();
     }
 
     inline void Rotate(float theta, float phi)
     {
+        auto intergerPart = 0;
+
         m_theta += theta;
         m_phi += phi;
 
         if (m_theta > 89.f)
+        {
             m_theta = 89.f;
+        }
+        
         if (m_theta < -89.f)
+        {
             m_theta = -89.f;
+        }
 
         if (m_phi > 360.f || m_phi < -360.f)
-            m_phi = glm::mod(m_phi, 360.f);
+        {
+            m_phi = fmod(m_phi, 360.0f);
+        }
 
-        printf("Camera angle: (theta = %f, phi = %f)\n", m_theta, m_phi);
+        PrintInfo();
     }
 
-    Camera(vec3 position, float theta, float phi) :
+    inline void PrintInfo()
+    {
+        printf("Camera position: (%f, %f, %f), Camera angle: (theta = %f, phi = %f)\n", m_position.x, m_position.y, m_position.z, m_theta, m_phi);
+    }
+
+    Camera(Vector3 position, float theta, float phi) :
         m_position(position),
         m_theta(theta),
         m_phi(phi)
@@ -67,7 +94,6 @@ public:
     }
 
 private:
-    vec3 m_position;
+    Vector3 m_position;
     float m_theta, m_phi;
-    vec3 m_worldUp = glm::vec3(0, 1, 0);
 };

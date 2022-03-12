@@ -6,8 +6,8 @@ cbuffer PerApplication : register(b0)
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    float4 lightPosition;
-    float4 lightDirection;
+    // float4 lightPosition;
+    // float4 lightDirection;
 }
 
 cbuffer PerObject : register(b2)
@@ -27,7 +27,8 @@ struct VertexShaderOutput
 {
     float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
-    float3 worldNormal : TEXCOORD1;
+    float3 worldPosition : TEXCOORD1;
+    float3 worldNormal : TEXCOORD2;
 };
 
 VertexShaderOutput main(AppData IN)
@@ -35,6 +36,7 @@ VertexShaderOutput main(AppData IN)
     VertexShaderOutput OUT;
     matrix mvp = mul(projectionMatrix, mul(viewMatrix, modelMatrix));
     OUT.position = mul(mvp, float4(IN.position, 1.0f));
+    OUT.worldPosition = mul(modelMatrix, float4(IN.normal, 1.0f));
     OUT.worldNormal = mul(normalMatrix, float4(IN.normal, 1.0f));
     OUT.uv = IN.uv;
     return OUT;
