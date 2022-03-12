@@ -1,17 +1,21 @@
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    float one;
+    float4 lightPosition;
+    float4 lightDirection;
 }
 
 struct PixelShaderInput
 {
     float4 position : SV_POSITION;
-    float4 color : COLOR;
+    float2 uv : TEXCOORD0;
+    float3 worldNormal : TEXCOORD1;
 };
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    return float4(one, 0, 0, 1);
-    return IN.color;
+    float3 normal = normalize(IN.worldNormal);
+    float NdotL = dot(lightDirection.xyz, normal);
+    
+    return float4(NdotL, NdotL, NdotL, 1);
 }

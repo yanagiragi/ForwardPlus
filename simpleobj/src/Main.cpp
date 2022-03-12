@@ -123,14 +123,14 @@ struct ApplicationConstantBuffer
 struct FrameConstantBuffer
 {
     glm::mat4 viewMatrix;
-    // glm::vec3 lightPosition;
-    //glm::vec4 lightDirection;
-    float one;
+    glm::vec4 lightPosition;
+    glm::vec4 lightDirection;
 };
 
 struct ObjectConstantBuffer
 {
     glm::mat4 modelMatrix;
+    glm::mat4 normalMatrix;
 };
 
 struct ApplicationConstantBuffer g_ApplicationConstantBuffer;
@@ -141,12 +141,14 @@ ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 // Entities
 struct ObjectConstantBuffer bunnyConstantBuffer;
 Model* bunny;
+float bunnyAngle = 0.0f;
+float bunnyRotateSpeed = 0.0f;
 
 // Camera Params
 Camera* g_Camera = new Camera(
-    glm::vec3(0, 0, -10),
+    glm::vec3(-0.13, 1, 8.5),
     0, // theta in degree
-    90  // phi in degree
+    -90  // phi in degree
 );
 
 // Input Params
@@ -1079,21 +1081,26 @@ void Cleanup()
 /// </summary>
 /// <param name="deltaTime"></param>
 void Update(float deltaTime)
-{
+{    
     static float angle2 = 0.0;
-    angle2 += 10.0f * deltaTime;
+    angle2 += deltaTime;
     g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
-    //g_FrameConstantBuffer.lightDirection = glm::vec4(sin(angle2), 0.5, 0, 1);
-    g_FrameConstantBuffer.one = sin(angle2);
+    g_FrameConstantBuffer.lightDirection = glm::vec4(sin(angle2), 0.5, 0, 1);
+    auto lookAt = glm::normalize(glm::vec3(
+        glm::cos(glm::radians(angle2)) * glm::cos(glm::radians(0.0f)),
+        glm::sin(glm::radians(angle2)),
+        glm::cos(glm::radians(angle2)) * glm::sin(glm::radians(0.0f))
+    ));
+    g_FrameConstantBuffer.lightPosition = glm::vec4(lookAt, 1.0);
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
-    static float angle = 0.0;
-    angle += 90.0f * deltaTime;
-    glm::vec3 rotationAxis = glm::vec3(0, 1, 1);
-
+    // update angle
+    bunnyAngle += 90.0f * deltaTime * bunnyRotateSpeed;
+    
     auto model = glm::mat4(1);
-    //model = glm::rotate(model, glm::radians(angle), rotationAxis);
+    model = glm::rotate(model, glm::radians(bunnyAngle), glm::vec3(0, 1, 1));
     bunnyConstantBuffer.modelMatrix = model;
+    bunnyConstantBuffer.normalMatrix = glm::transpose(glm::inverse(model * g_FrameConstantBuffer.viewMatrix));
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &bunnyConstantBuffer, 0, 0);
 }
 
