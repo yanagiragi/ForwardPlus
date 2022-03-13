@@ -37,15 +37,22 @@ endif()
 # Dependencies
 
 # GLM
-message(STATUS "Installing glm via COPY")
-file(COPY ../external/glm DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
-set(BUILD_STATIC_LIBS ON)
-add_subdirectory(external/glm/glm)
-set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
+# message(STATUS "Installing glm via COPY")
+# file(COPY ../external/glm DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+# set(BUILD_STATIC_LIBS ON)
+# add_subdirectory(external/glm/glm)
+# set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
 
 # TinyObjLoader
 message(STATUS "Installing TinyObjLoader via COPY")
 file(COPY ../external/tinyobjloader/tiny_obj_loader.h DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/tinyobjloader)
+
+# DirectXTK
+message(STATUS "Installing DirectXTK")
+file(COPY ../external/DirectXTK DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+set(BUILD_TOOLS OFF)
+add_subdirectory(external/DirectXTK)
+set_property(TARGET DirectXTK PROPERTY FOLDER "Dependencies")
 
 # =============================================================
 
@@ -82,12 +89,14 @@ add_executable(
 target_link_libraries(
     ${PROJECT_NAME}
     glm_static
+    DirectXTK
 )
 
 target_include_directories(
     ${PROJECT_NAME}
     PUBLIC external/glm
     PUBLIC external/tinyobjloader
+    PUBLIC external/DirectXTK/Inc
 )
 
 target_include_directories(
@@ -98,6 +107,7 @@ target_include_directories(
 add_dependencies(
     ${PROJECT_NAME}
     glm_static
+    DirectXTK
 )
 
 # =============================================================

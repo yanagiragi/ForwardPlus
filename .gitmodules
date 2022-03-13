@@ -4,3 +4,6 @@
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader.git
+[submodule "external/DirectXTK"]
+	path = external/DirectXTK
+	url = https://github.com/microsoft/DirectXTK
