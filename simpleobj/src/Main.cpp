@@ -1,14 +1,21 @@
 // Windows includes
 #include <Windows.h>
 
-// DirectX includes
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#include "SimpleMath.h"
-
 // STL includes
 #include <iostream>
 #include <string>
+
+// DirectX includes
+#include <d3d11.h>
+#include <d3dcompiler.h>
+
+// DirectXTK includes
+#include "SimpleMath.h"
+
+// imgui includes
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx11.h"
 
 // Project includes
 #include "Common.h"
@@ -21,12 +28,15 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "winmm.lib")
 
+// use namespace
 using namespace DirectX::SimpleMath;
-
 
 #pragma region Forward declarations
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+// Forward declare message handler from imgui_impl_win32.cpp
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 template<class ShaderClass>
 std::string GetLatestProfile(ID3D11Device* device);
@@ -55,13 +65,17 @@ DXGI_RATIONAL QueryRefreshRate(UINT screenWidth, UINT screenHeight, BOOL vsync);
 
 int InitApplication(HINSTANCE hInstance, int nCmdShow);
 int InitDirectX(HINSTANCE hInstance, BOOL vSync);
-
 int Run();
+
 void LoadContent();
 void UnloadContent();
 void Render();
 void Cleanup();
 void Update(float deltaTime);
+void SetupImgui();
+void RenderImgui();
+void CreateRenderTarget();
+void ReleaseRenderTarget();
 
 #pragma endregion
 
@@ -175,6 +189,63 @@ float g_CameraRotateStep = 1.0f; // in degrees
 #pragma endregion
 
 /// <summary>
+/// Create main render target
+/// </summary>
+void CreateRenderTarget()
+{
+    HRESULT hr;
+    ID3D11Texture2D* backBuffer;
+    
+    hr = g_d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+    AssertIfFailed(hr, "InitDirectX", "Unable to get buffer from SwapChain");
+
+    hr = g_d3dDevice->CreateRenderTargetView(
+        backBuffer,                     // pointer to ID3D11Resource that represents a render target
+        nullptr,                        // pointer to render-target view description, NULL means it can access all of the subresources in mipmap level 0
+        &g_d3dRenderTargetView          // address of a pointer to a ID3D11RenderTargetView
+    );
+
+    // After RTV if created, back buffer texture can be released.
+    SafeRelease(backBuffer);
+}
+
+/// <summary>
+/// Release main render target
+/// </summary>
+void ReleaseRenderTarget()
+{
+    if (g_d3dRenderTargetView)
+    {
+        SafeRelease(g_d3dRenderTargetView);
+    }
+}
+
+/// <summary>
+/// Render imgui
+/// </summary>
+void RenderImgui()
+{
+    // Our state
+    bool show_demo_window = true;
+    bool show_another_window = false;
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow(&show_demo_window);
+
+    // Rendering
+    ImGui::Render();
+    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+    // g_d3dDeviceContext->OMSetRenderTargets(1, &g_d3dRenderTargetView, NULL);
+    // g_d3dDeviceContext->ClearRenderTargetView(g_d3dRenderTargetView, clear_color_with_alpha);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+/// <summary>
 /// Initialize the application window
 /// </summary>
 /// <param name="hInstance"></param>
@@ -283,45 +354,58 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     PAINTSTRUCT paintStruct;
     HDC hDC;
 
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
+    {
+        return true;
+    }
+
     switch (message)
     {
+    case WM_SIZE:
+        if (g_d3dDevice != NULL && wParam != SIZE_MINIMIZED)
+        {
+            ReleaseRenderTarget();
+            g_d3dSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
+            CreateRenderTarget();
+        }
+        break;
+
+    case WM_SYSCOMMAND:
+        if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
+        {
+            break;
+        }
+
     case WM_KEYDOWN:
         HandleKeyDown(GetVKcode(lParam));
         break;
+    
     case WM_KEYUP:
-        {
-            printf("keyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
-        }
+        printf("keyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
         break;
+    
     case WM_SYSKEYDOWN:
-        {
-            printf("syskeydown    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
-        }
+        printf("syskeydown    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
         break;
+    
     case WM_SYSKEYUP:
-        {
-            printf("syskeyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
-        }
+        printf("syskeyup    wparam:%4x  lparam:%8x  virtual-key code:%4x\n", wParam, lParam, GetVKcode(lParam));
         break;
 
     case WM_PAINT:
-        {
-            hDC = BeginPaint(hwnd, &paintStruct);
-            EndPaint(hwnd, &paintStruct);
-        }
+        hDC = BeginPaint(hwnd, &paintStruct);
+        EndPaint(hwnd, &paintStruct);
         break;
     
     case WM_DESTROY:
-        {
-            PostQuitMessage(0);
-        }
+        PostQuitMessage(0);
         break;
     
     default:
-        return DefWindowProc(hwnd, message, wParam, lParam);
+        break;
     }
 
-    return 0;
+    return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
 /// <summary>
@@ -356,6 +440,10 @@ int Run()
 
             Update( deltaTime );
             Render();
+
+            RenderImgui();
+
+            Present(g_EnableVSync);
         }
     }
 
@@ -512,19 +600,7 @@ int InitDirectX(HINSTANCE hInstance, BOOL vSync)
     AssertIfFailed(hr, "InitDirectX", "Unable to create D3D11Device And D3D11SwapChain");
 
     // Next initialize the back buffer of the swap chain and associate it to a render target view.
-    ID3D11Texture2D* backBuffer;
-    hr = g_d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
-    AssertIfFailed(hr, "InitDirectX", "Unable to get buffer from SwapChain");
-
-    hr = g_d3dDevice->CreateRenderTargetView(
-        backBuffer,                     // pointer to ID3D11Resource that represents a render target
-        nullptr,                        // pointer to render-target view description, NULL means it can access all of the subresources in mipmap level 0
-        &g_d3dRenderTargetView          // address of a pointer to a ID3D11RenderTargetView
-    );
-    AssertIfFailed(hr, "InitDirectX", "Unable to create Render Target View from backBuffer");
-
-    // After RTV if created, back buffer texture can be released.
-    SafeRelease(backBuffer);
+    CreateRenderTarget();
 
     // Create the depth buffer for use with the depth/stencil view.
     D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
@@ -1062,7 +1138,7 @@ void Render()
     );
 
     // present swap chain's back buffer to the screen
-    Present(g_EnableVSync);
+    // Present(g_EnableVSync);
 }
 
 /// <summary>
@@ -1125,6 +1201,26 @@ void Update(float deltaTime)
 }
 
 /// <summary>
+/// Initialize imgui
+/// </summary>
+void SetupImgui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(g_WindowHandle);
+    ImGui_ImplDX11_Init(g_d3dDevice, g_d3dDeviceContext);
+}
+
+/// <summary>
 /// Entry point of the program
 /// </summary>
 /// <param name="hInstance"></param>
@@ -1157,6 +1253,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR pCmdLin
     }
 
     LoadContent();
+    SetupImgui();
 
     returnCode = Run();
     if (returnCode != 0)

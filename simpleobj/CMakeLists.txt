@@ -44,15 +44,27 @@ endif()
 # set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
 
 # TinyObjLoader
-message(STATUS "Installing TinyObjLoader via COPY")
+message(STATUS "Installing TinyObjLoader")
 file(COPY ../external/tinyobjloader/tiny_obj_loader.h DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/tinyobjloader)
 
 # DirectXTK
 message(STATUS "Installing DirectXTK")
 file(COPY ../external/DirectXTK DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
 set(BUILD_TOOLS OFF)
+set(BUILD_XAUDIO_WIN10 OFF)
+set(BUILD_XAUDIO_WIN8 OFF)
+set(BUILD_XAUDIO_WIN7 OFF)
 add_subdirectory(external/DirectXTK)
 set_property(TARGET DirectXTK PROPERTY FOLDER "Dependencies")
+
+message(STATUS "Installing Dear Imgui")
+file(GLOB IMGUI_FILES
+  "../external/imgui/*.h"
+  "../external/imgui/*.cpp"
+  "../external/imgui/backends/imgui_impl_win32*"
+  "../external/imgui/backends/imgui_impl_dx11*"
+)
+file(COPY ${IMGUI_FILES} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 
 # =============================================================
 
@@ -64,12 +76,17 @@ file(GLOB_RECURSE FILE_SOURCES RELATIVE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
 )
 
+file(GLOB_RECURSE IMGUI_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/*.cpp
+)
+
 # Solution Filters
 foreach(source IN LISTS FILE_SOURCES)
-    get_filename_component(source_path "${source}" PATH)
-    string(REPLACE "/" "\\" source_path_msvc "${source_path}")
-    string(REPLACE "src" "" source_path_final "${source_path_msvc}")
-    source_group("${source_path_final}" FILES "${source}")
+    source_group("" FILES "${source}")
+endforeach()
+
+foreach(source IN LISTS IMGUI_SOURCES)
+    source_group("imgui" FILES "${source}")
 endforeach()
 
 # =============================================================
@@ -80,6 +97,7 @@ add_executable(
     ${PROJECT_NAME}
     WIN32
     "${FILE_SOURCES}"
+    "${IMGUI_SOURCES}"
 )
 
 # =============================================================
@@ -88,25 +106,18 @@ add_executable(
 
 target_link_libraries(
     ${PROJECT_NAME}
-    glm_static
     DirectXTK
 )
 
 target_include_directories(
     ${PROJECT_NAME}
-    PUBLIC external/glm
     PUBLIC external/tinyobjloader
     PUBLIC external/DirectXTK/Inc
-)
-
-target_include_directories(
-    glm_static
-    PUBLIC external/glm
+    PUBLIC external/Imgui
 )
 
 add_dependencies(
     ${PROJECT_NAME}
-    glm_static
     DirectXTK
 )
 

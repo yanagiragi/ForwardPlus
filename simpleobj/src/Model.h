@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "glm/glm.hpp"
-
 struct VertexData
 {
     float vertex[3];
