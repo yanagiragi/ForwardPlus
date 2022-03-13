@@ -357,3 +357,5 @@ assets/*.dxbc
 
 # logs
 [Dd]ev[Ll]og.md
+
+!assets/*
