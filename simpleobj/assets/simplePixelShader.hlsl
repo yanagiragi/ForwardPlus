@@ -25,15 +25,15 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 normal = normalize(IN.worldNormal);
     float3 finalColor = float3(0, 0, 0);
 
-    float attentuation;
+    float attentuation = 0;
     float3 lightVector;
 
     for (int i = 0; i < LIGHT_COUNT; ++i)
     {
         // unpack light params
-        float lightPosition = lightParams[i].Param1.xyz;
-        float lightType = lightParams[i].Param1.w;
-        float lightDirection = lightParams[i].Param2.xyz;
+        float3 lightPosition = lightParams[i].Param1.xyz;
+        int lightType = lightParams[i].Param1.w;
+        float3 lightDirection = lightParams[i].Param2.xyz;
         float lightStrengh = lightParams[i].Param2.w;
 
         // None
@@ -45,7 +45,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         // directional light
         else if (lightType == 1)
         {
-            lightVector = lightDirection;
+            lightVector = -lightDirection;
             attentuation = 1.0f;
         }
 
@@ -53,8 +53,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         else if (lightType == 2)
         {
             lightVector = lightPosition - IN.worldPosition;
-            float distance = length(lightVector);
-            attentuation = 1.0f / (distance * distance);
+            attentuation = 1.0f / dot(lightVector, lightVector);
         }
 
         float NdotL = dot(lightVector, normal);

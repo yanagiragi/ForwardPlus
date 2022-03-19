@@ -141,6 +141,14 @@ struct ApplicationConstantBuffer
     Matrix projectionMatrix;
 };
 
+enum class LightType
+{
+    None,
+    Directional,
+    Point,
+    NumLightType
+};
+
 struct LightData
 {
     Vector4 param1; // position, type
@@ -148,9 +156,9 @@ struct LightData
 
     LightData() {}
 
-    LightData(enum LightType type, Vector3 position, Vector3 direction, float strength)
+    LightData(LightType type, Vector3 position, Vector3 direction, float strength)
     {
-        param1 = Vector4(position.x, position.y, position.z, type);
+        param1 = Vector4(position.x, position.y, position.z, (int)type);
         param2 = Vector4(direction.x, direction.y, direction.z, strength);
     }
 };
@@ -162,14 +170,6 @@ struct FrameConstantBuffer
 {
     Matrix viewMatrix;
     struct LightData lightData[g_LightCount];
-};
-
-enum LightType
-{
-    None,
-    Directional,
-    Point,
-    NumLightType
 };
 
 struct ObjectConstantBuffer
@@ -237,8 +237,29 @@ void RenderDebug()
     g_d3dDeviceContext->IASetInputLayout(g_d3dPrimitiveBatchInputLayout);
     g_d3dPrimitiveBatch->Begin();
     {
-        auto sphere = BoundingSphere(Vector3(0, 0, 0), 5);
-        DX::Draw(g_d3dPrimitiveBatch, sphere, DirectX::Colors::White); // BoundingSphere
+        float directionalLightDebugLength = 2.0f;
+        for (auto light : g_FrameConstantBuffer.lightData)
+        {
+            auto position = Vector3(light.param1.x, light.param1.y, light.param1.z);
+            auto type = (LightType)light.param1.w;
+            auto strength = light.param2.w;
+
+            if (type == LightType::Point)
+            {
+                auto radius = sqrtf(strength);
+                auto sphere = BoundingSphere(position, radius);
+                DX::Draw(g_d3dPrimitiveBatch, sphere, DirectX::Colors::White);
+            }
+
+            else if (type == LightType::Directional)
+            {
+                auto direction = Vector3(light.param2.x, light.param2.y, light.param2.z);
+                direction.Normalize();
+                auto v1 = VertexPositionColor(position, Colors::Red);
+                auto v2 = VertexPositionColor(position + direction * directionalLightDebugLength, Colors::PowderBlue);
+                g_d3dPrimitiveBatch->DrawLine(v1, v2);
+            }
+        }
     }
     g_d3dPrimitiveBatch->End();
 }
@@ -329,7 +350,6 @@ void RenderImgui()
         light->param2.z = rotation[2];
 
         float strength = light->param2.w;
-        bool isActive = light->param1.w != (float)(None);
         ImGui::DragFloat(format("Light (%d): Strength", i).c_str(), &strength, dragSpeed, 0.0f, 10.0f);
         light->param2.w = strength;
 
@@ -1152,8 +1172,8 @@ void LoadContent()
     );
 
     // Setup light data
-    g_FrameConstantBuffer.lightData[0] = struct LightData(Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
-    g_FrameConstantBuffer.lightData[1] = struct LightData(Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
+    g_FrameConstantBuffer.lightData[0] = struct LightData(LightType::Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
+    g_FrameConstantBuffer.lightData[1] = struct LightData(LightType::Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
 
     // Prepare to setup Primitive Batcher
     g_d3dStates = new CommonStates(g_d3dDevice);

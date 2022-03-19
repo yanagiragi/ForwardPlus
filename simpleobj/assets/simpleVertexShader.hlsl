@@ -43,7 +43,7 @@ VertexShaderOutput main(AppData IN)
     VertexShaderOutput OUT;
     matrix mvp = mul(projectionMatrix, mul(viewMatrix, modelMatrix));
     OUT.position = mul(mvp, float4(IN.position, 1.0f));
-    OUT.worldPosition = mul(modelMatrix, float4(IN.normal, 1.0f));
+    OUT.worldPosition = mul(modelMatrix, float4(IN.position, 1.0f));
     OUT.worldNormal = mul(normalMatrix, float4(IN.normal, 1.0f));
     OUT.uv = IN.uv;
     return OUT;
