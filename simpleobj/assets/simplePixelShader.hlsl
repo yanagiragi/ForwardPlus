@@ -1,8 +1,15 @@
+#define LIGHT_COUNT 2
+
+struct LightParam
+{
+    float4 Param1; // position, type
+    float4 Param2; // direction, strength
+};
+
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    float4 lightParam1; // position, type
-    float4 lightParam2; // direction, strength
+    struct LightParam lightParams[LIGHT_COUNT];
 }
 
 struct PixelShaderInput
@@ -15,34 +22,46 @@ struct PixelShaderInput
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    // unpack light params
-    float lightPosition = lightParam1.xyz;
-    float lightType = lightParam1.w;
-    float lightDirection = lightParam2.xyz;
-    float lightStrengh = lightParam2.w;
+    float3 normal = normalize(IN.worldNormal);
+    float3 finalColor = float3(0, 0, 0);
 
     float attentuation;
     float3 lightVector;
-    
-    float3 normal = normalize(IN.worldNormal);
 
-    // directional light
-    if (lightType == 0)
+    for (int i = 0; i < LIGHT_COUNT; ++i)
     {
-        lightVector = lightDirection;
-        attentuation = 1.0f;
+        // unpack light params
+        float lightPosition = lightParams[i].Param1.xyz;
+        float lightType = lightParams[i].Param1.w;
+        float lightDirection = lightParams[i].Param2.xyz;
+        float lightStrengh = lightParams[i].Param2.w;
+
+        // None
+        if (lightType == 0)
+        {
+            attentuation = 0;
+        }
+
+        // directional light
+        else if (lightType == 1)
+        {
+            lightVector = lightDirection;
+            attentuation = 1.0f;
+        }
+
+        // point light
+        else if (lightType == 2)
+        {
+            lightVector = lightPosition - IN.worldPosition;
+            float distance = length(lightVector);
+            attentuation = 1.0f / (distance * distance);
+        }
+
+        float NdotL = dot(lightVector, normal);
+        float c = attentuation * NdotL * lightStrengh;
+
+        finalColor += float3(c, c, c);
     }
 
-    // point light
-    else if (lightType == 1)
-    {
-        lightVector = lightPosition - IN.worldPosition;
-        float distance = length(lightVector);
-        attentuation = 1.0f / (distance * distance);
-    }
-
-    float NdotL = dot(lightVector, normal);
-    float c = attentuation * NdotL * lightStrengh;
-    
-    return float4(c, c, c, 1);
+    return float4(finalColor, 1);
 }

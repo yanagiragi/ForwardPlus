@@ -29,6 +29,7 @@
 #pragma comment(lib, "winmm.lib")
 
 // use namespace
+using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
 #pragma region Forward declarations
@@ -69,9 +70,9 @@ int Run();
 
 void LoadContent();
 void UnloadContent();
-void Render();
+void RenderScene();
 void Cleanup();
-void Update(float deltaTime);
+void UpdateScene(float deltaTime);
 void SetupImgui();
 void RenderImgui();
 void CreateRenderTarget();
@@ -109,8 +110,6 @@ D3D11_VIEWPORT g_Viewport = { 0 };
 
 // Vertex buffer data
 ID3D11InputLayout* g_d3dInputLayout = nullptr;
-ID3D11Buffer* g_d3dVertexBuffer = nullptr;
-ID3D11Buffer* g_d3dIndexBuffer = nullptr;
 
 // Shader data
 ID3D11VertexShader* g_d3dVertexShader = nullptr;
@@ -130,7 +129,6 @@ struct ApplicationConstantBuffer
     Matrix projectionMatrix;
 };
 
-
 struct LightData
 {
     Vector4 param1; // position, type
@@ -145,14 +143,18 @@ struct LightData
     }
 };
 
+// should be same to LIGHT_COUNT in shader
+const int g_LightCount = 2;
+
 struct FrameConstantBuffer
 {
     Matrix viewMatrix;
-    struct LightData lightData;
+    struct LightData lightData[g_LightCount];
 };
 
 enum LightType
 {
+    None,
     Directional,
     Point,
     NumLightType
@@ -170,10 +172,32 @@ struct FrameConstantBuffer g_FrameConstantBuffer;
 ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
 // Entities
-struct ObjectConstantBuffer bunnyConstantBuffer;
-Model* bunny;
-float bunnyAngle = 0.0f;
-float bunnyRotateSpeed = 1.0f;
+class Entity
+{
+public:
+    Entity(std::string name, std::string path) : Name(name), ModelPath(path) {}
+
+    Entity(std::string name, std::string path, Vector3 position) :
+        Name(name),
+        ModelPath(path),
+        Position(position)
+    {}
+
+    std::string Name;
+    std::string ModelPath;
+    struct ObjectConstantBuffer ConstantBuffer;
+    Model* Model = nullptr;
+    Vector3 Position;
+    float RotationAngle = 0.0f;
+    float RotateSpeed = 1.0f;
+
+    ID3D11Buffer* VertexBuffer = nullptr;
+};
+
+struct Entity* Scene[] =
+{
+    new Entity("bunny", "assets/bunny.obj", Vector3(5, 0, 0))
+};
 
 // Camera Params
 Camera* g_Camera = new Camera(
@@ -225,23 +249,74 @@ void ReleaseRenderTarget()
 /// </summary>
 void RenderImgui()
 {
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
     // Start the Dear ImGui frame
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
+    // Setup UI state
+    bool show_demo_window = true;
     ImGui::ShowDemoWindow(&show_demo_window);
 
-    // Rendering
+    const float dragSpeed = 0.1f;
+
+    for (auto entity : Scene)
+    {
+        auto name = entity->Name.c_str();
+        ImGui::Text(name);
+
+        float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
+        ImGui::DragFloat3(format("%s: Position", name).c_str(), position, dragSpeed);
+        entity->Position.x = position[0];
+        entity->Position.y = position[1];
+        entity->Position.z = position[2];
+
+        float speed = abs(entity->RotateSpeed);
+        bool isClockwise = entity->RotateSpeed > 0;
+        ImGui::DragFloat(format("%s: Rotate Speed", name).c_str(), &speed, dragSpeed, 0.0f, 10.0f);
+        ImGui::Checkbox(format("%s: Clockwise", name).c_str(), &isClockwise);
+        speed *= (isClockwise) ? 1.0f : -1.0f;
+        entity->RotateSpeed = speed;
+    }
+    
+    for (int i = 0; i < g_LightCount; ++i)
+    {
+        auto light = &g_FrameConstantBuffer.lightData[i];
+
+        ImGui::Text(format("Light (%d)", i).c_str());
+
+        float position[3] = { light->param1.x, light->param1.y, light->param1.z };
+        ImGui::DragFloat3(format("Light (%d): Position", i).c_str(), position, dragSpeed);
+        light->param1.x = position[0];
+        light->param1.y = position[1];
+        light->param1.z = position[2];
+
+        float rotation[3] = { light->param2.x, light->param2.y, light->param2.z };
+        ImGui::DragFloat3(format("Light (%d): Rotation", i).c_str(), rotation, dragSpeed);
+        light->param2.x = rotation[0];
+        light->param2.y = rotation[1];
+        light->param2.z = rotation[2];
+
+        float strength = light->param2.w;
+        bool isActive = light->param1.w != (float)(None);
+        ImGui::DragFloat(format("Light (%d): Strength", i).c_str(), &strength, dragSpeed, 0.0f, 10.0f);
+        light->param2.w = strength;
+
+        int style_idx = light->param1.w;
+        if (ImGui::Combo(format("Light (%d): Type", i).c_str(), &style_idx, "None\0Directional\0Point\0"))
+        {
+            switch (style_idx)
+            {
+            case 0: light->param1.w = 0; break;
+            case 1: light->param1.w = 1; break;
+            case 2: light->param1.w = 2; break;
+            default: break;
+            }
+        }
+    }
+
+    // Actual Rendering
     ImGui::Render();
-    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-    // g_d3dDeviceContext->OMSetRenderTargets(1, &g_d3dRenderTargetView, NULL);
-    // g_d3dDeviceContext->ClearRenderTargetView(g_d3dRenderTargetView, clear_color_with_alpha);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
@@ -438,9 +513,8 @@ int Run()
             // debugging and you don't want the deltaTime value to explode.
             deltaTime = std::min<float>(deltaTime, maxTimeStep);
 
-            Update( deltaTime );
-            Render();
-
+            UpdateScene(deltaTime);
+            RenderScene();
             RenderImgui();
 
             Present(g_EnableVSync);
@@ -896,47 +970,37 @@ void LoadContent()
 {
     assert(g_d3dDevice);
 
-    bunny = new Model();
-    bunny->Load("assets/bunny.obj");
+    HRESULT hr;
 
-    // Create an initialize the vertex buffer.
-    D3D11_BUFFER_DESC vertexBufferDesc;
-    ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    vertexBufferDesc.ByteWidth = sizeof(VertexData) * bunny->Vertices()->size();    // size of the buffer in bytes
-    vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                   // how the buffer is expected to be read from and written to
-    vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                          // how the buffer will be bound to the pipeline
-    vertexBufferDesc.CPUAccessFlags = 0;                                            // no CPI access is necessary
+    for (auto entity : Scene)
+    {
+        entity->Model = new Model();
+        entity->Model->Load(entity->ModelPath.c_str());
 
-    D3D11_SUBRESOURCE_DATA resourceData;
-    ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-    resourceData.pSysMem = bunny->Head();                                           // pointer to the data to initialize the buffer with
-    resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
-                                                                                    // No used for now.
-    resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
-                                                                                    // no used for now.
+        // Create an initialize the vertex buffer.
+        D3D11_BUFFER_DESC vertexBufferDesc;
+        ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        vertexBufferDesc.ByteWidth = sizeof(VertexData) * entity->Model->Vertices()->size();    // size of the buffer in bytes
+        vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+        vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
 
-    HRESULT hr = g_d3dDevice->CreateBuffer(
-        &vertexBufferDesc,                                                          // buffer description
-        &resourceData,                                                              // pointer to the initialization data
-        &g_d3dVertexBuffer                                                          // pointer to the created buffer object
-    );
-    AssertIfFailed(hr, "Load Content", "Unable to create vertex buffer");
-    
-    /*
-    // Create and initialize the index buffer.
-    D3D11_BUFFER_DESC indexBufferDesc;
-    ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    indexBufferDesc.ByteWidth = sizeof(WORD) * _countof(g_Indicies);
-    indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    indexBufferDesc.CPUAccessFlags = 0;
-    
-    //re-use resourceData
-    resourceData.pSysMem = g_Indicies;
+        D3D11_SUBRESOURCE_DATA resourceData;
+        ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+        resourceData.pSysMem = entity->Model->Head();                                   // pointer to the data to initialize the buffer with
+        resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
+                                                                                        // No used for now.
+        resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
+                                                                                        // no used for now.
 
-    hr = g_d3dDevice->CreateBuffer(&indexBufferDesc, &resourceData, &g_d3dIndexBuffer);
-    AssertIfFailed(hr, "Load Content", "Unable to create index buffer");
-    */
+        hr = g_d3dDevice->CreateBuffer(
+            &vertexBufferDesc,                                                          // buffer description
+            &resourceData,                                                              // pointer to the initialization data
+            &entity->VertexBuffer                                                       // pointer to the created buffer object
+        );
+        std::string message = "Unable to create vertex buffer of " + entity->ModelPath;
+        AssertIfFailed(hr, "Load Content", message.c_str());
+    }
 
     // Create the constant buffers for the variables defined in the vertex shader.
     D3D11_BUFFER_DESC applicationConstantBufferDesc;
@@ -1041,7 +1105,7 @@ void LoadContent()
 
     // Setup projection matrix in LH coordinates
     g_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
-    
+
     // DirectXTK default uses RH coordintate, don't use it
     // g_ApplicationConstantBuffer.projectionMatrix = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
 
@@ -1054,12 +1118,16 @@ void LoadContent()
         0,                                              // size of one row of the source data
         0                                               // size of one depth slice of source data
     );
+
+    // Setup light data
+    g_FrameConstantBuffer.lightData[0] = struct LightData(Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
+    g_FrameConstantBuffer.lightData[1] = struct LightData(Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
 }
 
 /// <summary>
 /// The render loop
 /// </summary>
-void Render()
+void RenderScene()
 {
     assert(g_d3dDevice);
     assert(g_d3dDeviceContext);
@@ -1069,15 +1137,6 @@ void Render()
     Clear(CornflowerBlue, 1.0f, 0);
 
     // Setup the input assembler stage
-    const UINT vertexStride = sizeof(VertexData);
-    const UINT offset = 0;
-    g_d3dDeviceContext->IASetVertexBuffers(
-        0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-        1,                                      // number of vertex buffers in the array
-        &g_d3dVertexBuffer,                     // pointer to an array of vertex buffers
-        &vertexStride,                          // pointer to stride values
-        &offset                                 // pointer to offset values
-    );
     g_d3dDeviceContext->IASetInputLayout(g_d3dInputLayout);
     g_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -1119,26 +1178,25 @@ void Render()
         1                                       // stencil reference
     );
 
-    // Use index buffer to draw the object
-    /*g_d3dDeviceContext->IASetIndexBuffer(
-        g_d3dIndexBuffer,                       // pointer to indicies
-        DXGI_FORMAT_R16_UINT,                   // indicies format
-        0                                       // offset
-    );
-    g_d3dDeviceContext->DrawIndexed(
-        _countof(g_Indicies),                   // number of the indicies to draw
-        0,                                      // start index location of index buffer
-        0                                       // a value to added to each index before reading a vertex from vertex buffer
-    );*/
+    const UINT vertexStride = sizeof(VertexData);
+    const UINT offset = 0;
+    for (auto entity : Scene)
+    {
+        // bind ConstantBuffers at object level
+        g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &entity->ConstantBuffer, 0, 0);
 
-    // or simply use glDrawArrays
-    g_d3dDeviceContext->Draw(
-        bunny->Vertices()->size(),
-        0
-    );
-
-    // present swap chain's back buffer to the screen
-    // Present(g_EnableVSync);
+        g_d3dDeviceContext->IASetVertexBuffers(
+            0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+            1,                                      // number of vertex buffers in the array
+            &entity->VertexBuffer,                  // pointer to an array of vertex buffers
+            &vertexStride,                          // pointer to stride values
+            &offset                                 // pointer to offset values
+        );
+        g_d3dDeviceContext->Draw(
+            entity->Model->Vertices()->size(),
+            0
+        );
+    }
 }
 
 /// <summary>
@@ -1149,8 +1207,6 @@ void UnloadContent()
     SafeRelease(g_d3dConstantBuffers[CB_Application]);
     SafeRelease(g_d3dConstantBuffers[CB_Frame]);
     SafeRelease(g_d3dConstantBuffers[CB_Object]);
-    SafeRelease(g_d3dIndexBuffer);
-    SafeRelease(g_d3dVertexBuffer);
     SafeRelease(g_d3dInputLayout);
     SafeRelease(g_d3dVertexShader);
     SafeRelease(g_d3dPixelShader);
@@ -1177,27 +1233,23 @@ void Cleanup()
 /// The Logic loop
 /// </summary>
 /// <param name="deltaTime"></param>
-void Update(float deltaTime)
+void UpdateScene(float deltaTime)
 {    
     // view matrix
     g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
     
-    // light data
-    // g_FrameConstantBuffer.lightData = struct LightData(Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
-    g_FrameConstantBuffer.lightData = struct LightData(Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
-    
-    // TODO: debug draw light pos and dir
-    
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
-    // update angle
-    bunnyAngle += deltaTime * bunnyRotateSpeed;    
-    auto model = Matrix::Identity;
-    model = Matrix::CreateTranslation(Vector3(5, 0, 0)) * Matrix::CreateFromYawPitchRoll(bunnyAngle, 0, 0);
-    
-    bunnyConstantBuffer.modelMatrix = model;
-    bunnyConstantBuffer.normalMatrix = model.Transpose().Invert();
-    g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &bunnyConstantBuffer, 0, 0);
+    for (auto entity : Scene)
+    {
+        // update angle
+        entity->RotationAngle += deltaTime * entity->RotateSpeed;
+        
+        auto model = Matrix::Identity;
+        model = Matrix::CreateFromYawPitchRoll(Vector3(0, entity->RotationAngle, 0)) * Matrix::CreateTranslation(entity->Position);
+        entity->ConstantBuffer.modelMatrix = model;
+        entity->ConstantBuffer.normalMatrix = model.Transpose().Invert();
+    }
 }
 
 /// <summary>

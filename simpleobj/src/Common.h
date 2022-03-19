@@ -8,6 +8,9 @@
 #include <iostream>
 #include <vector>
 
+#include <string>
+#include <cstdarg>
+
 // For redirect console outputs
 #include <fcntl.h>
 #include <io.h>
@@ -46,6 +49,21 @@ inline std::vector<char> readFile(const std::string& filename)
 /// <param name="description"></param>
 /// <param name="exception"></param>
 inline void AssertIfFailed(HRESULT hr, LPTSTR title, LPTSTR description)
+{
+    if (FAILED(hr))
+    {
+        MessageBox(0, TEXT(description), TEXT(title), MB_OK);
+    }
+}
+
+// <summary>
+/// Display error message box and throw exception if HRESULT fails
+/// </summary>
+/// <param name="hr"></param>
+/// <param name="title"></param>
+/// <param name="description"></param>
+/// <param name="exception"></param>
+inline void AssertIfFailed(HRESULT hr, const char* title, const char* description)
 {
     if (FAILED(hr))
     {
@@ -201,4 +219,25 @@ template<typename T>
 inline UINT GetAlignedSize()
 {
     return static_cast<UINT>(sizeof(T) + (16 - (sizeof(T) % 16)));
+}
+
+//missing string printf
+//this is safe and convenient but not exactly efficient
+inline std::string format(const char* fmt, ...) {
+    int size = 512;
+    char* buffer = 0;
+    buffer = new char[size];
+    va_list vl;
+    va_start(vl, fmt);
+    int nsize = vsnprintf(buffer, size, fmt, vl);
+    if (size <= nsize) { //fail delete buffer and try again
+        delete[] buffer;
+        buffer = 0;
+        buffer = new char[nsize + 1]; //+1 for /0
+        nsize = vsnprintf(buffer, size, fmt, vl);
+    }
+    std::string ret(buffer);
+    va_end(vl);
+    delete[] buffer;
+    return ret;
 }

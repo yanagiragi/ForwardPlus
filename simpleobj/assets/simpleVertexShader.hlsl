@@ -3,11 +3,18 @@ cbuffer PerApplication : register(b0)
     matrix projectionMatrix;
 }
 
+#define LIGHT_COUNT 2
+
+struct LightParam
+{
+    float4 Param1; // position, type
+    float4 Param2; // direction, strength
+};
+
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    // float4 lightPosition;
-    // float4 lightDirection;
+    struct LightParam lightParams[LIGHT_COUNT];
 }
 
 cbuffer PerObject : register(b2)
