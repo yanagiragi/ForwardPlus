@@ -11,6 +11,12 @@
 
 // DirectXTK includes
 #include "SimpleMath.h"
+#include "PrimitiveBatch.h"
+#include "VertexTypes.h"
+#include "CommonStates.h"
+#include "Effects.h"
+#include "DebugDraw.h"
+#include "DirectXHelpers.h" // for CreateInputLayoutFromEffect()
 
 // imgui includes
 #include "imgui.h"
@@ -115,6 +121,12 @@ ID3D11InputLayout* g_d3dInputLayout = nullptr;
 ID3D11VertexShader* g_d3dVertexShader = nullptr;
 ID3D11PixelShader* g_d3dPixelShader = nullptr;
 
+// Primitive Batch
+CommonStates* g_d3dStates = nullptr;
+BasicEffect* g_d3dEffect;
+PrimitiveBatch<VertexPositionColor>* g_d3dPrimitiveBatch;
+ID3D11InputLayout* g_d3dPrimitiveBatchInputLayout;
+
 // Shader resources
 enum ConstantBuffer
 {
@@ -211,6 +223,25 @@ float g_CameraTranslateStep = .5f;
 float g_CameraRotateStep = 1.0f; // in degrees
 
 #pragma endregion
+
+void RenderDebug()
+{
+    g_d3dEffect->SetWorld(Matrix::Identity);
+    g_d3dEffect->SetView(g_Camera->GetViewMatrix());
+
+    g_d3dDeviceContext->OMSetBlendState(g_d3dStates->Opaque(), nullptr, 0xFFFFFFFF);
+    g_d3dDeviceContext->OMSetDepthStencilState(g_d3dStates->DepthNone(), 0);
+    g_d3dDeviceContext->RSSetState(g_d3dStates->CullNone());
+    g_d3dEffect->Apply(g_d3dDeviceContext);
+
+    g_d3dDeviceContext->IASetInputLayout(g_d3dPrimitiveBatchInputLayout);
+    g_d3dPrimitiveBatch->Begin();
+    {
+        auto sphere = BoundingSphere(Vector3(0, 0, 0), 5);
+        DX::Draw(g_d3dPrimitiveBatch, sphere, DirectX::Colors::White); // BoundingSphere
+    }
+    g_d3dPrimitiveBatch->End();
+}
 
 /// <summary>
 /// Create main render target
@@ -515,6 +546,7 @@ int Run()
 
             UpdateScene(deltaTime);
             RenderScene();
+            RenderDebug();
             RenderImgui();
 
             Present(g_EnableVSync);
@@ -1122,6 +1154,20 @@ void LoadContent()
     // Setup light data
     g_FrameConstantBuffer.lightData[0] = struct LightData(Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
     g_FrameConstantBuffer.lightData[1] = struct LightData(Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
+
+    // Prepare to setup Primitive Batcher
+    g_d3dStates = new CommonStates(g_d3dDevice);
+    g_d3dEffect = new BasicEffect(g_d3dDevice);
+    g_d3dEffect->SetVertexColorEnabled(true);
+    
+    hr = CreateInputLayoutFromEffect<VertexPositionColor>(g_d3dDevice, g_d3dEffect, &g_d3dPrimitiveBatchInputLayout);
+    AssertIfFailed(hr, "Create Primitive Batch Failed", "Unable to call CreateInputLayoutFromEffect()");
+
+    // Create Primitive Batcher
+    g_d3dPrimitiveBatch = new PrimitiveBatch<VertexPositionColor>(g_d3dDeviceContext);
+
+    // setup projection matrix for effect
+    g_d3dEffect->SetProjection(g_ApplicationConstantBuffer.projectionMatrix);
 }
 
 /// <summary>
@@ -1210,6 +1256,10 @@ void UnloadContent()
     SafeRelease(g_d3dInputLayout);
     SafeRelease(g_d3dVertexShader);
     SafeRelease(g_d3dPixelShader);
+
+    delete g_d3dStates;
+    delete g_d3dEffect;
+    delete g_d3dPrimitiveBatch;
 }
 
 /// <summary>

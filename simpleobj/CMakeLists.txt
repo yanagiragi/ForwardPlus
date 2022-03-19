@@ -66,6 +66,9 @@ file(GLOB IMGUI_FILES
 )
 file(COPY ${IMGUI_FILES} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 
+message(STATUS "Installing DirectXTK-DebugDraw")
+file(COPY ../external/DirectXTK-DebugDraw DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+
 # =============================================================
 
 # Sources
@@ -74,6 +77,10 @@ file(GLOB_RECURSE FILE_SOURCES RELATIVE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
+)
+
+file(GLOB_RECURSE DEBUG_DRAW_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DirectXTK-DebugDraw/*.cpp
 )
 
 file(GLOB_RECURSE IMGUI_SOURCES
@@ -89,6 +96,10 @@ foreach(source IN LISTS IMGUI_SOURCES)
     source_group("imgui" FILES "${source}")
 endforeach()
 
+foreach(source IN LISTS DEBUG_DRAW_SOURCES)
+    source_group("DebugDraw" FILES "${source}")
+endforeach()
+
 # =============================================================
 
 # Finalize App
@@ -98,6 +109,7 @@ add_executable(
     WIN32
     "${FILE_SOURCES}"
     "${IMGUI_SOURCES}"
+    "${DEBUG_DRAW_SOURCES}"
 )
 
 # =============================================================
@@ -113,6 +125,8 @@ target_include_directories(
     ${PROJECT_NAME}
     PUBLIC external/tinyobjloader
     PUBLIC external/DirectXTK/Inc
+    PUBLIC external/DirectXTK/Src # for pch.h
+    PUBLIC external/DirectXTK-DebugDraw
     PUBLIC external/Imgui
 )
 
