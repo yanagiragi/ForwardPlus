@@ -56,6 +56,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             attentuation = 1.0f / dot(lightVector, lightVector);
         }
 
+        lightVector = normalize(-lightVector);
         float NdotL = dot(lightVector, normal);
         float c = attentuation * NdotL * lightStrengh;
 

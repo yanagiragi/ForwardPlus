@@ -69,6 +69,9 @@ file(COPY ${IMGUI_FILES} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 message(STATUS "Installing DirectXTK-DebugDraw")
 file(COPY ../external/DirectXTK-DebugDraw DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
+message(STATUS "Installing imGuIZMO.quat")
+file(COPY ../external/imGuIZMO.quat/imGuIZMO.quat DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+
 # =============================================================
 
 # Sources
@@ -83,6 +86,10 @@ file(GLOB_RECURSE DEBUG_DRAW_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/DirectXTK-DebugDraw/*.cpp
 )
 
+file(GLOB_RECURSE IMGUI_PLUGIN_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imGuIZMO.quat/*.cpp
+)
+
 file(GLOB_RECURSE IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/*.cpp
 )
@@ -93,6 +100,10 @@ foreach(source IN LISTS FILE_SOURCES)
 endforeach()
 
 foreach(source IN LISTS IMGUI_SOURCES)
+    source_group("imgui" FILES "${source}")
+endforeach()
+
+foreach(source IN LISTS IMGUI_PLUGIN_SOURCES)
     source_group("imgui" FILES "${source}")
 endforeach()
 
@@ -110,6 +121,7 @@ add_executable(
     "${FILE_SOURCES}"
     "${IMGUI_SOURCES}"
     "${DEBUG_DRAW_SOURCES}"
+    "${IMGUI_PLUGIN_SOURCES}"
 )
 
 # =============================================================
@@ -128,6 +140,8 @@ target_include_directories(
     PUBLIC external/DirectXTK/Src # for pch.h
     PUBLIC external/DirectXTK-DebugDraw
     PUBLIC external/Imgui
+    PUBLIC external/imGuIZMO.quat
+    PUBLIC external # for imGuIZMO.quat/imGuIZMOquat.cpp
 )
 
 add_dependencies(

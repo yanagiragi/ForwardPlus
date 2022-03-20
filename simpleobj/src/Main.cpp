@@ -23,6 +23,8 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 
+#include "imGuIZMOquat.h"
+
 // Project includes
 #include "Common.h"
 #include "Camera.h"
@@ -158,6 +160,7 @@ struct LightData
 
     LightData(LightType type, Vector3 position, Vector3 direction, float strength)
     {
+        // direction.Normalize();
         param1 = Vector4(position.x, position.y, position.z, (int)type);
         param2 = Vector4(direction.x, direction.y, direction.z, strength);
     }
@@ -200,9 +203,8 @@ public:
     struct ObjectConstantBuffer ConstantBuffer;
     Model* Model = nullptr;
     Vector3 Position;
-    float RotationAngle = 0.0f;
-    float RotateSpeed = 1.0f;
-
+    Quaternion rotation;
+    Vector3 rotateAxisSpeed;
     ID3D11Buffer* VertexBuffer = nullptr;
 };
 
@@ -222,17 +224,28 @@ Camera* g_Camera = new Camera(
 float g_CameraTranslateStep = .5f;
 float g_CameraRotateStep = 1.0f; // in degrees
 
+// UI Flags
+bool g_ShowGizmoWindow = false;
+std::function<quat(void)> g_GizmoWindowQuaternionGetter = nullptr;
+std::function<void(quat)> g_GizmoWindowQuaternionSetter = nullptr;
+std::function<const char*(void)> g_GizmoWindowNameGetter = nullptr;
+
+bool g_ShowDirectionWindow = false;
+std::function<vec3(void)> g_DirectionWindowVec3Getter = nullptr;
+std::function<void(vec3)> g_DirectionWindowVec3Setter = nullptr;
+std::function<const char* (void)> g_DirectionWindowNameGetter = nullptr;
+
 #pragma endregion
 
 void RenderDebug()
 {
-    g_d3dEffect->SetWorld(Matrix::Identity);
-    g_d3dEffect->SetView(g_Camera->GetViewMatrix());
-
     g_d3dDeviceContext->OMSetBlendState(g_d3dStates->Opaque(), nullptr, 0xFFFFFFFF);
     g_d3dDeviceContext->OMSetDepthStencilState(g_d3dStates->DepthNone(), 0);
     g_d3dDeviceContext->RSSetState(g_d3dStates->CullNone());
     g_d3dEffect->Apply(g_d3dDeviceContext);
+
+    g_d3dEffect->SetWorld(Matrix::Identity);
+    g_d3dEffect->SetView(g_Camera->GetViewMatrix());
 
     g_d3dDeviceContext->IASetInputLayout(g_d3dPrimitiveBatchInputLayout);
     g_d3dPrimitiveBatch->Begin();
@@ -255,8 +268,9 @@ void RenderDebug()
             {
                 auto direction = Vector3(light.param2.x, light.param2.y, light.param2.z);
                 direction.Normalize();
+                // use negative direction to visual actual light dir calculation in shader
                 auto v1 = VertexPositionColor(position, Colors::Red);
-                auto v2 = VertexPositionColor(position + direction * directionalLightDebugLength, Colors::PowderBlue);
+                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, Colors::PowderBlue);
                 g_d3dPrimitiveBatch->DrawLine(v1, v2);
             }
         }
@@ -311,11 +325,49 @@ void RenderImgui()
     ImGui::ShowDemoWindow(&show_demo_window);
 
     const float dragSpeed = 0.1f;
+    const float slowDragSpeed = 0.01f;
 
     for (auto entity : Scene)
     {
         auto name = entity->Name.c_str();
         ImGui::Text(name);
+        
+        ImGui::SameLine();
+        if (ImGui::Button("Reset"))
+        {
+            entity->rotation.x = 0;
+            entity->rotation.y = 0;
+            entity->rotation.z = 0;
+            entity->rotation.w = 0;
+
+            entity->rotateAxisSpeed.x = 0;
+            entity->rotateAxisSpeed.y = 0;
+            entity->rotateAxisSpeed.z = 0;
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button(format("%s: Gizmo", name).c_str()))
+        {
+            g_ShowGizmoWindow = true;
+            
+            g_GizmoWindowNameGetter = [&entity]()
+            {
+                return entity->Name.c_str();
+            };
+            
+            g_GizmoWindowQuaternionGetter = [&entity]()
+            {
+                return quat(entity->rotation.w, entity->rotation.x, entity->rotation.y, entity->rotation.z);
+            };
+            
+            g_GizmoWindowQuaternionSetter = [&entity](quat value)
+            {
+                entity->rotation.x = value.x;
+                entity->rotation.y = value.y;
+                entity->rotation.z = value.z;
+                entity->rotation.w = value.w;
+            };
+        }
 
         float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
         ImGui::DragFloat3(format("%s: Position", name).c_str(), position, dragSpeed);
@@ -323,19 +375,48 @@ void RenderImgui()
         entity->Position.y = position[1];
         entity->Position.z = position[2];
 
-        float speed = abs(entity->RotateSpeed);
-        bool isClockwise = entity->RotateSpeed > 0;
-        ImGui::DragFloat(format("%s: Rotate Speed", name).c_str(), &speed, dragSpeed, 0.0f, 10.0f);
-        ImGui::Checkbox(format("%s: Clockwise", name).c_str(), &isClockwise);
-        speed *= (isClockwise) ? 1.0f : -1.0f;
-        entity->RotateSpeed = speed;
+        Vector3 v_rotation = entity->rotation.ToEuler();
+        float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
+        ImGui::DragFloat3(format("%s: Rotation", name).c_str(), rotation, dragSpeed);
+        entity->rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
+
+        Vector3 v_rotationAxisSpeed = entity->rotateAxisSpeed;
+        float rotationAxisSpeed[3] = { v_rotationAxisSpeed.x, v_rotationAxisSpeed.y, v_rotationAxisSpeed.z };
+        ImGui::DragFloat3(format("%s: Rotate Axis Speed", name).c_str(), rotationAxisSpeed, slowDragSpeed);
+        entity->rotateAxisSpeed.x = rotationAxisSpeed[0];
+        entity->rotateAxisSpeed.y = rotationAxisSpeed[1];
+        entity->rotateAxisSpeed.z = rotationAxisSpeed[2];
     }
     
     for (int i = 0; i < g_LightCount; ++i)
     {
         auto light = &g_FrameConstantBuffer.lightData[i];
+        auto lightType = (LightType)light->param1.w;
+        auto lightName = format("Light (%d)", i);
 
-        ImGui::Text(format("Light (%d)", i).c_str());
+        ImGui::Text(lightName.c_str());
+        
+        if (lightType == LightType::Directional)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button(format("Light (%d): Direction", i).c_str()))
+            {
+                g_ShowDirectionWindow = true;
+                g_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
+                g_DirectionWindowVec3Getter = [i]()
+                {
+                    auto light = &g_FrameConstantBuffer.lightData[i];
+                    return vec3(light->param2.x, light->param2.y, light->param2.z);
+                };
+                g_DirectionWindowVec3Setter = [i](vec3 value)
+                {
+                    auto light = &g_FrameConstantBuffer.lightData[i];
+                    light->param2.x = value.x;
+                    light->param2.y = value.y;
+                    light->param2.z = value.z;
+                };
+            }
+        }
 
         float position[3] = { light->param1.x, light->param1.y, light->param1.z };
         ImGui::DragFloat3(format("Light (%d): Position", i).c_str(), position, dragSpeed);
@@ -364,6 +445,33 @@ void RenderImgui()
             default: break;
             }
         }
+    }
+
+    if (g_ShowGizmoWindow)
+    {
+        if (ImGui::Begin(format("Gizmo: %s", g_GizmoWindowNameGetter()).c_str(), &g_ShowGizmoWindow))
+        {
+            quat qRot = g_GizmoWindowQuaternionGetter();
+            ImGui::gizmo3D("##gizmo1", qRot, 300);
+            g_GizmoWindowQuaternionSetter(qRot);
+        }
+        ImGui::End();
+    }
+
+    if (g_ShowDirectionWindow)
+    {
+        if (ImGui::Begin(format("Direction: %s", g_DirectionWindowNameGetter()).c_str(), &g_ShowDirectionWindow))
+        {
+            vec3 light = g_DirectionWindowVec3Getter();
+            light.y *= -1.0f; // coordinate conversion
+            light.z *= -1.0f; // coordinate conversion
+            ImGui::gizmo3D("##Dir1", light, 300);
+            light.y *= -1.0f;
+            //light.x *= -1.0f; // coordinate conversion
+            light.z *= -1.0f; // coordinate conversion
+            g_DirectionWindowVec3Setter(light);
+        }
+        ImGui::End();
     }
 
     // Actual Rendering
@@ -1173,7 +1281,7 @@ void LoadContent()
 
     // Setup light data
     g_FrameConstantBuffer.lightData[0] = struct LightData(LightType::Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
-    g_FrameConstantBuffer.lightData[1] = struct LightData(LightType::Directional, Vector3::Zero, Vector3(1.0, 0.5, 0), 0.5f);
+    g_FrameConstantBuffer.lightData[1] = struct LightData(LightType::Directional, Vector3::Zero, Vector3(1.0, 0.5, 0.25), 0.5f);
 
     // Prepare to setup Primitive Batcher
     g_d3dStates = new CommonStates(g_d3dDevice);
@@ -1313,10 +1421,13 @@ void UpdateScene(float deltaTime)
     for (auto entity : Scene)
     {
         // update angle
-        entity->RotationAngle += deltaTime * entity->RotateSpeed;
+        // entity->RotationAngle += deltaTime * entity->RotateSpeed;
+        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), entity->rotateAxisSpeed.x);
+        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), entity->rotateAxisSpeed.y);
+        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->rotateAxisSpeed.z);
         
         auto model = Matrix::Identity;
-        model = Matrix::CreateFromYawPitchRoll(Vector3(0, entity->RotationAngle, 0)) * Matrix::CreateTranslation(entity->Position);
+        model = Matrix::CreateFromYawPitchRoll(entity->rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
         entity->ConstantBuffer.modelMatrix = model;
         entity->ConstantBuffer.normalMatrix = model.Transpose().Invert();
     }
