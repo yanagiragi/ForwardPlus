@@ -52,12 +52,12 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         // point light
         else if (lightType == 2)
         {
-            lightVector = lightPosition - IN.worldPosition;
+            lightVector = IN.worldPosition - lightPosition;
             attentuation = 1.0f / dot(lightVector, lightVector);
         }
 
-        lightVector = normalize(-lightVector);
-        float NdotL = dot(lightVector, normal);
+        lightVector = normalize(lightVector);
+        float NdotL = dot(-lightVector, normal);
         float c = attentuation * NdotL * lightStrengh;
 
         finalColor += float3(c, c, c);
