@@ -83,7 +83,7 @@ void Cleanup();
 void UpdateScene(float deltaTime);
 void SetupImgui();
 void RenderImgui();
-void CreateRenderTarget();
+void CreateRenderTarget(float, float);
 void ReleaseRenderTarget();
 
 #pragma endregion
@@ -107,8 +107,6 @@ IDXGISwapChain* g_d3dSwapChain = nullptr;
 ID3D11RenderTargetView* g_d3dRenderTargetView = nullptr;
 // Depth/stencil view for use as a depth buffer.
 ID3D11DepthStencilView* g_d3dDepthStencilView = nullptr;
-// A texture to associate to the depth stencil view.
-ID3D11Texture2D* g_d3dDepthStencilBuffer = nullptr;
 
 // Define the functionality of the depth/stencil stages.
 ID3D11DepthStencilState* g_d3dDepthStencilState = nullptr;
@@ -220,6 +218,10 @@ Camera* g_Camera = new Camera(
     -90     // phi in degree
 );
 
+const float fov = DirectX::XM_PI / 4.f;
+const float nearPlane = 0.1f;
+const float farPlane = 100.f;
+
 // Input Params
 float g_CameraTranslateStep = .5f;
 float g_CameraRotateStep = 1.0f; // in degrees
@@ -237,6 +239,9 @@ std::function<const char* (void)> g_DirectionWindowNameGetter = nullptr;
 
 #pragma endregion
 
+/// <summary>
+/// Draw wireframe for debugging
+/// </summary>
 void RenderDebug()
 {
     g_d3dDeviceContext->OMSetBlendState(g_d3dStates->Opaque(), nullptr, 0xFFFFFFFF);
@@ -281,7 +286,7 @@ void RenderDebug()
 /// <summary>
 /// Create main render target
 /// </summary>
-void CreateRenderTarget()
+void CreateRenderTarget(float width, float height)
 {
     HRESULT hr;
     ID3D11Texture2D* backBuffer;
@@ -297,6 +302,41 @@ void CreateRenderTarget()
 
     // After RTV if created, back buffer texture can be released.
     SafeRelease(backBuffer);
+
+    // A texture to associate to the depth stencil view.
+    ID3D11Texture2D* depthStencilBuffer = nullptr;
+
+    // Create the depth buffer for use with the depth/stencil view.
+    D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
+    ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
+    depthStencilBufferDesc.Width = width;                     // texture width, should be same to width of swap chain's back buffer
+    depthStencilBufferDesc.Height = height;                   // texture height, should be same to height of swap chain's back buffer
+    depthStencilBufferDesc.MipLevels = 1;                           // mip level, use 1 for a multisampled texture
+    depthStencilBufferDesc.ArraySize = 1;                           // number of textures in the texture array
+    depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;  // texture format, in here we use a 32-bit z-buffer that supports 24 bits for depth and 8 bits for stencil
+    depthStencilBufferDesc.SampleDesc.Count = 1;                    // multisamping settings
+    depthStencilBufferDesc.SampleDesc.Quality = 0;                  // multisamping settings
+    depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;             // how the texture is to read from and written to, DEFAULT means it is a resource that requires read and write access by the GPU.
+    depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;    // how a resource is binded to the pipeline
+    depthStencilBufferDesc.CPUAccessFlags = 0;                      // the types of CPU access allowed for a resource. 0 means no CPU access required.
+
+    hr = g_d3dDevice->CreateTexture2D(
+        &depthStencilBufferDesc,        // resource description
+        nullptr,                        // a pointer to an array of f D3D11_SUBRESOURCE_DATA represent as initial data.
+                                        // The param has to be NULL for multiple sampled texture since it cannot be initialized with data when they are created.
+        &depthStencilBuffer        // pointer to a buffer that receives the texture2D interface of the created texture
+    );
+    AssertIfFailed(hr, "InitDirectX", "Unable to create Depth and Stencil Texture");
+
+    hr = g_d3dDevice->CreateDepthStencilView(
+        depthStencilBuffer,        // pointer to the resource that will serve as the depth-stencil surface
+        nullptr,                        // pointer to depth-stencil-view description. NULL means it can access all of the subresources in mipmap level 0
+        &g_d3dDepthStencilView          // address of a pointer to an ID3D11DepthStencilView
+    );
+    AssertIfFailed(hr, "InitDirectX", "Unable to create Depth Stencil View");
+
+    // Release texture
+    SafeRelease(depthStencilBuffer);
 }
 
 /// <summary>
@@ -308,10 +348,15 @@ void ReleaseRenderTarget()
     {
         SafeRelease(g_d3dRenderTargetView);
     }
+
+    if (g_d3dRenderTargetView)
+    {
+        SafeRelease(g_d3dDepthStencilView);
+    }
 }
 
 /// <summary>
-/// Render imgui
+/// Render UI
 /// </summary>
 void RenderImgui()
 {
@@ -546,6 +591,11 @@ int InitApplication(HINSTANCE hInstance, int nCmdShow)
     return 0;
 }
 
+/// <summary>
+/// Handle regular keyinputs
+/// </summary>
+/// <param name="keycode"></param>
+/// <returns></returns>
 void HandleKeyDown(int keycode)
 {
     printf("keydown :%4x\n", keycode);
@@ -588,6 +638,35 @@ void HandleKeyDown(int keycode)
 }
 
 /// <summary>
+/// Adjust viewport, projection and rtv when resize
+/// </summary>
+/// <param name="width"></param>
+/// <param name="height"></param>
+void Resize(UINT width, UINT height)
+{
+    ReleaseRenderTarget();
+    g_d3dSwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+    CreateRenderTarget(width, height);
+
+    g_Viewport.Width = width;
+    g_Viewport.Height = height;
+    
+    g_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(fov, float(g_Viewport.Width) / float(g_Viewport.Height), nearPlane, farPlane);
+    g_d3dDeviceContext->UpdateSubresource(
+        g_d3dConstantBuffers[CB_Application],           // pointer to the destination resource
+        0,                                              // zero-based index that identifies the destination subresource
+        nullptr,                                        // pointer to the box that defines the portion of the destination subresource
+                                                        // to copy the resource data into
+        &g_ApplicationConstantBuffer,                   // pointer to the source data in memory
+        0,                                              // size of one row of the source data
+        0                                               // size of one depth slice of source data
+    );
+
+    // setup projection matrix for effect
+    g_d3dEffect->SetProjection(g_ApplicationConstantBuffer.projectionMatrix);
+}
+
+/// <summary>
 /// Handles window event
 /// </summary>
 /// <param name="hwnd"></param>
@@ -610,9 +689,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_SIZE:
         if (g_d3dDevice != NULL && wParam != SIZE_MINIMIZED)
         {
-            ReleaseRenderTarget();
-            g_d3dSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-            CreateRenderTarget();
+            auto width = (UINT)LOWORD(lParam);
+            auto height = (UINT)HIWORD(lParam);
+            Resize(width, height);
         }
         break;
 
@@ -846,38 +925,9 @@ int InitDirectX(HINSTANCE hInstance, BOOL vSync)
     AssertIfFailed(hr, "InitDirectX", "Unable to create D3D11Device And D3D11SwapChain");
 
     // Next initialize the back buffer of the swap chain and associate it to a render target view.
-    CreateRenderTarget();
+    CreateRenderTarget(clientWidth, clientHeight);
 
-    // Create the depth buffer for use with the depth/stencil view.
-    D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
-    ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
-    depthStencilBufferDesc.Width = clientWidth;                     // texture width, should be same to width of swap chain's back buffer
-    depthStencilBufferDesc.Height = clientHeight;                   // texture height, should be same to height of swap chain's back buffer
-    depthStencilBufferDesc.MipLevels = 1;                           // mip level, use 1 for a multisampled texture
-    depthStencilBufferDesc.ArraySize = 1;                           // number of textures in the texture array
-    depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;  // texture format, in here we use a 32-bit z-buffer that supports 24 bits for depth and 8 bits for stencil
-    depthStencilBufferDesc.SampleDesc.Count = 1;                    // multisamping settings
-    depthStencilBufferDesc.SampleDesc.Quality = 0;                  // multisamping settings
-    depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;             // how the texture is to read from and written to, DEFAULT means it is a resource that requires read and write access by the GPU.
-    depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;    // how a resource is binded to the pipeline
-    depthStencilBufferDesc.CPUAccessFlags = 0;                      // the types of CPU access allowed for a resource. 0 means no CPU access required.
-
-    hr = g_d3dDevice->CreateTexture2D(
-        &depthStencilBufferDesc,        // resource description
-        nullptr,                        // a pointer to an array of f D3D11_SUBRESOURCE_DATA represent as initial data.
-                                        // The param has to be NULL for multiple sampled texture since it cannot be initialized with data when they are created.
-        &g_d3dDepthStencilBuffer        // pointer to a buffer that receives the texture2D interface of the created texture
-    );
-    AssertIfFailed(hr, "InitDirectX", "Unable to create Depth and Stencil Texture");
-    
-    hr = g_d3dDevice->CreateDepthStencilView(
-        g_d3dDepthStencilBuffer,        // pointer to the resource that will serve as the depth-stencil surface
-        nullptr,                        // pointer to depth-stencil-view description. NULL means it can access all of the subresources in mipmap level 0
-        &g_d3dDepthStencilView          // address of a pointer to an ID3D11DepthStencilView
-    );
-    AssertIfFailed(hr, "InitDirectX", "Unable to create Depth Stencil View");
-
-    // Setup depth/stencil state.
+   // Setup depth/stencil state.
     D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
     ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
     depthStencilStateDesc.DepthEnable = TRUE;                                   // is depth test enabled?
@@ -1409,7 +1459,6 @@ void Cleanup()
 {
     SafeRelease(g_d3dDepthStencilView);
     SafeRelease(g_d3dRenderTargetView);
-    SafeRelease(g_d3dDepthStencilBuffer);
     SafeRelease(g_d3dDepthStencilState);
     SafeRelease(g_d3dRasterizerState);
     SafeRelease(g_d3dSwapChain);
