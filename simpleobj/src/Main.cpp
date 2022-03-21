@@ -327,9 +327,13 @@ void RenderImgui()
     const float dragSpeed = 0.1f;
     const float slowDragSpeed = 0.01f;
 
-    for (auto entity : Scene)
+    auto sceneCount = _countof(Scene);
+    for (int i = 0; i < sceneCount; ++i)
     {
+        auto entity = Scene[i];
         auto name = entity->Name.c_str();
+
+        ImGui::PushID(format("##Entity:%d-%s", i, name).c_str());
         ImGui::Text(name);
         
         ImGui::SameLine();
@@ -346,7 +350,7 @@ void RenderImgui()
         }
 
         ImGui::SameLine();
-        if (ImGui::Button(format("%s: Gizmo", name).c_str()))
+        if (ImGui::Button("Gizmo"))
         {
             g_ShowGizmoWindow = true;
             
@@ -370,22 +374,24 @@ void RenderImgui()
         }
 
         float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
-        ImGui::DragFloat3(format("%s: Position", name).c_str(), position, dragSpeed);
+        ImGui::DragFloat3("Position", position, dragSpeed);
         entity->Position.x = position[0];
         entity->Position.y = position[1];
         entity->Position.z = position[2];
 
         Vector3 v_rotation = entity->rotation.ToEuler();
         float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
-        ImGui::DragFloat3(format("%s: Rotation", name).c_str(), rotation, dragSpeed);
+        ImGui::DragFloat3("Rotation", rotation, dragSpeed);
         entity->rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
 
         Vector3 v_rotationAxisSpeed = entity->rotateAxisSpeed;
         float rotationAxisSpeed[3] = { v_rotationAxisSpeed.x, v_rotationAxisSpeed.y, v_rotationAxisSpeed.z };
-        ImGui::DragFloat3(format("%s: Rotate Axis Speed", name).c_str(), rotationAxisSpeed, slowDragSpeed);
+        ImGui::DragFloat3("Rotate Axis Speed", rotationAxisSpeed, slowDragSpeed);
         entity->rotateAxisSpeed.x = rotationAxisSpeed[0];
         entity->rotateAxisSpeed.y = rotationAxisSpeed[1];
         entity->rotateAxisSpeed.z = rotationAxisSpeed[2];
+
+        ImGui::PopID();
     }
     
     for (int i = 0; i < g_LightCount; ++i)
@@ -393,13 +399,17 @@ void RenderImgui()
         auto light = &g_FrameConstantBuffer.lightData[i];
         auto lightType = (LightType)light->param1.w;
         auto lightName = format("Light (%d)", i);
+        auto name = lightName.c_str();
 
-        ImGui::Text(lightName.c_str());
+        auto id = format("##Light:%d", i);
+        ImGui::PushID(id.c_str());
+        
+        ImGui::Text(name);
         
         if (lightType == LightType::Directional)
         {
             ImGui::SameLine();
-            if (ImGui::Button(format("Light (%d): Direction", i).c_str()))
+            if (ImGui::Button("Direction"))
             {
                 g_ShowDirectionWindow = true;
                 g_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
@@ -419,23 +429,23 @@ void RenderImgui()
         }
 
         float position[3] = { light->param1.x, light->param1.y, light->param1.z };
-        ImGui::DragFloat3(format("Light (%d): Position", i).c_str(), position, dragSpeed);
+        ImGui::DragFloat3("Position", position, dragSpeed);
         light->param1.x = position[0];
         light->param1.y = position[1];
         light->param1.z = position[2];
 
         float rotation[3] = { light->param2.x, light->param2.y, light->param2.z };
-        ImGui::DragFloat3(format("Light (%d): Rotation", i).c_str(), rotation, dragSpeed);
+        ImGui::DragFloat3("Rotation", rotation, dragSpeed);
         light->param2.x = rotation[0];
         light->param2.y = rotation[1];
         light->param2.z = rotation[2];
 
         float strength = light->param2.w;
-        ImGui::DragFloat(format("Light (%d): Strength", i).c_str(), &strength, dragSpeed, 0.0f, 10.0f);
+        ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 10.0f);
         light->param2.w = strength;
 
         int style_idx = light->param1.w;
-        if (ImGui::Combo(format("Light (%d): Type", i).c_str(), &style_idx, "None\0Directional\0Point\0"))
+        if (ImGui::Combo("Type", &style_idx, "None\0Directional\0Point\0"))
         {
             switch (style_idx)
             {
@@ -445,6 +455,8 @@ void RenderImgui()
             default: break;
             }
         }
+
+        ImGui::PopID();
     }
 
     if (g_ShowGizmoWindow)
