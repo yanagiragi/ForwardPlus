@@ -23,6 +23,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 
+#define VGM_USES_LEFT_HAND_AXES
 #include "imGuIZMOquat.h"
 
 // Project includes
