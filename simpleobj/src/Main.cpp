@@ -30,6 +30,8 @@
 #include "Common.h"
 #include "Camera.h"
 #include "Model.h"
+#include "Entity.h"
+#include "Light.h"
 
 // Link library dependencies
 #pragma comment(lib, "d3d11.lib")
@@ -86,7 +88,7 @@ void SetupImgui();
 void RenderImgui();
 void CreateRenderTarget(float, float);
 void ReleaseRenderTarget();
-
+void LoadShaderResources();
 #pragma endregion
 
 #pragma region Global Variables
@@ -97,6 +99,7 @@ LPCSTR g_WindowClassName = "DirectXWindowClass";
 LPCSTR g_WindowName = "DirectX Template";
 HWND g_WindowHandle = 0;
 
+float g_DeltaTime = 0.0f;
 const BOOL g_EnableVSync = TRUE;
 
 // Direct3D device and swap chain.
@@ -119,7 +122,9 @@ D3D11_VIEWPORT g_Viewport = { 0 };
 ID3D11InputLayout* g_d3dInputLayout = nullptr;
 
 // Shader data
+__int64 g_d3dVertexShaderSize = 0;
 ID3D11VertexShader* g_d3dVertexShader = nullptr;
+__int64 g_d3dPixelShaderSize = 0;
 ID3D11PixelShader* g_d3dPixelShader = nullptr;
 
 // Primitive Batch
@@ -142,42 +147,11 @@ struct ApplicationConstantBuffer
     Matrix projectionMatrix;
 };
 
-enum class LightType
-{
-    None,
-    Directional,
-    Point,
-    NumLightType
-};
-
-struct LightData
-{
-    Vector4 param1; // position, type
-    Vector4 param2; // direction, strength
-
-    LightData() {}
-
-    LightData(LightType type, Vector3 position, Vector3 direction, float strength)
-    {
-        // direction.Normalize();
-        param1 = Vector4(position.x, position.y, position.z, (int)type);
-        param2 = Vector4(direction.x, direction.y, direction.z, strength);
-    }
-};
-
-// should be same to LIGHT_COUNT in shader
-const int g_LightCount = 2;
-
 struct FrameConstantBuffer
 {
     Matrix viewMatrix;
-    struct LightData lightData[g_LightCount];
-};
-
-struct ObjectConstantBuffer
-{
-    Matrix modelMatrix;
-    Matrix normalMatrix;
+    Vector4 eyePosition;
+    struct Light lights[MAX_LIGHTS];
 };
 
 struct ApplicationConstantBuffer g_ApplicationConstantBuffer;
@@ -185,36 +159,17 @@ struct FrameConstantBuffer g_FrameConstantBuffer;
 
 ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
-// Entities
-class Entity
-{
-public:
-    Entity(std::string name, std::string path) : Name(name), ModelPath(path) {}
-
-    Entity(std::string name, std::string path, Vector3 position) :
-        Name(name),
-        ModelPath(path),
-        Position(position)
-    {}
-
-    std::string Name;
-    std::string ModelPath;
-    struct ObjectConstantBuffer ConstantBuffer;
-    Model* Model = nullptr;
-    Vector3 Position;
-    Quaternion rotation;
-    Vector3 rotateAxisSpeed;
-    ID3D11Buffer* VertexBuffer = nullptr;
-};
+struct Material defaultMaterial;
 
 struct Entity* Scene[] =
 {
-    new Entity("bunny", "assets/bunny.obj", Vector3(5, 0, 0))
+    new Entity("bunny", "assets/bunny.obj", Vector3(5, 0, 0), Quaternion::Identity, defaultMaterial),
+    new Entity("bunny", "assets/bunny.obj", Vector3(-3, 0, 0), Quaternion::CreateFromYawPitchRoll(0.7, 0, 0), defaultMaterial)
 };
 
 // Camera Params
 Camera* g_Camera = new Camera(
-    Vector3(0.5, 1.0, 14.5),
+    Vector3(-2.5, 1.0, 14.5),
     0,      // theta in degree
     -90     // phi in degree
 );
@@ -257,11 +212,12 @@ void RenderDebug()
     g_d3dPrimitiveBatch->Begin();
     {
         float directionalLightDebugLength = 2.0f;
-        for (auto light : g_FrameConstantBuffer.lightData)
+        for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
-            auto position = Vector3(light.param1.x, light.param1.y, light.param1.z);
-            auto type = (LightType)light.param1.w;
-            auto strength = light.param2.w;
+            auto light = &g_FrameConstantBuffer.lights[i];
+            auto position = Vector3(light->Position.x, light->Position.y, light->Position.z);
+            auto type = (LightType)light->LightType;
+            auto strength = light->Strength;
 
             if (type == LightType::Point)
             {
@@ -270,9 +226,9 @@ void RenderDebug()
                 DX::Draw(g_d3dPrimitiveBatch, sphere, DirectX::Colors::White);
             }
 
-            else if (type == LightType::Directional)
+            else if (type == LightType::Directional || type == LightType::SPOTLIGHT)
             {
-                auto direction = Vector3(light.param2.x, light.param2.y, light.param2.z);
+                auto direction = Vector3(light->Direction.x, light->Direction.y, light->Direction.z);
                 direction.Normalize();
                 // use negative direction to visual actual light dir calculation in shader
                 auto v1 = VertexPositionColor(position, Colors::Red);
@@ -372,6 +328,9 @@ void RenderImgui()
 
     const float dragSpeed = 0.1f;
     const float slowDragSpeed = 0.01f;
+    const float fastDragSpeed = 5.0f;
+
+    ImGui::Text(format("Fps: %f (%f ms)", 1.0f / g_DeltaTime, g_DeltaTime).c_str());
 
     auto sceneCount = _countof(Scene);
     for (int i = 0; i < sceneCount; ++i)
@@ -385,14 +344,14 @@ void RenderImgui()
         ImGui::SameLine();
         if (ImGui::Button("Reset"))
         {
-            entity->rotation.x = 0;
-            entity->rotation.y = 0;
-            entity->rotation.z = 0;
-            entity->rotation.w = 0;
+            entity->Rotation.x = 0;
+            entity->Rotation.y = 0;
+            entity->Rotation.z = 0;
+            entity->Rotation.w = 0;
 
-            entity->rotateAxisSpeed.x = 0;
-            entity->rotateAxisSpeed.y = 0;
-            entity->rotateAxisSpeed.z = 0;
+            entity->RotateAxisSpeed.x = 0;
+            entity->RotateAxisSpeed.y = 0;
+            entity->RotateAxisSpeed.z = 0;
         }
 
         ImGui::SameLine();
@@ -407,15 +366,15 @@ void RenderImgui()
             
             g_GizmoWindowQuaternionGetter = [&entity]()
             {
-                return quat(entity->rotation.w, entity->rotation.x, entity->rotation.y, entity->rotation.z);
+                return quat(entity->Rotation.w, entity->Rotation.x, entity->Rotation.y, entity->Rotation.z);
             };
             
             g_GizmoWindowQuaternionSetter = [&entity](quat value)
             {
-                entity->rotation.x = value.x;
-                entity->rotation.y = value.y;
-                entity->rotation.z = value.z;
-                entity->rotation.w = value.w;
+                entity->Rotation.x = value.x;
+                entity->Rotation.y = value.y;
+                entity->Rotation.z = value.z;
+                entity->Rotation.w = value.w;
             };
         }
 
@@ -425,34 +384,48 @@ void RenderImgui()
         entity->Position.y = position[1];
         entity->Position.z = position[2];
 
-        Vector3 v_rotation = entity->rotation.ToEuler();
+        Vector3 v_rotation = entity->Rotation.ToEuler();
         float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
         ImGui::DragFloat3("Rotation", rotation, dragSpeed);
-        entity->rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
+        entity->Rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
 
-        Vector3 v_rotationAxisSpeed = entity->rotateAxisSpeed;
+        Vector3 v_rotationAxisSpeed = entity->RotateAxisSpeed;
         float rotationAxisSpeed[3] = { v_rotationAxisSpeed.x, v_rotationAxisSpeed.y, v_rotationAxisSpeed.z };
         ImGui::DragFloat3("Rotate Axis Speed", rotationAxisSpeed, slowDragSpeed);
-        entity->rotateAxisSpeed.x = rotationAxisSpeed[0];
-        entity->rotateAxisSpeed.y = rotationAxisSpeed[1];
-        entity->rotateAxisSpeed.z = rotationAxisSpeed[2];
+        entity->RotateAxisSpeed.x = rotationAxisSpeed[0];
+        entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
+        entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
+
+        float specularPower = entity->Material.SpecularPower;
+        ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
+        entity->Material.SpecularPower = specularPower;
 
         ImGui::PopID();
     }
     
-    for (int i = 0; i < g_LightCount; ++i)
+    for (int i = 0; i < MAX_LIGHTS; ++i)
     {
-        auto light = &g_FrameConstantBuffer.lightData[i];
-        auto lightType = (LightType)light->param1.w;
+        auto light = &g_FrameConstantBuffer.lights[i];
         auto lightName = format("Light (%d)", i);
         auto name = lightName.c_str();
-
+        
         auto id = format("##Light:%d", i);
         ImGui::PushID(id.c_str());
-        
+
+        bool enabled = light->Enabled;
+        ImGui::Checkbox("", &enabled);
+        light->Enabled = enabled;
+
+        ImGui::SameLine();
         ImGui::Text(name);
+
+        /*if (!light->Enabled)
+        {
+            ImGui::PopID();
+            continue;
+        }*/
         
-        if (lightType == LightType::Directional)
+        if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::SPOTLIGHT)
         {
             ImGui::SameLine();
             if (ImGui::Button("Direction"))
@@ -461,43 +434,43 @@ void RenderImgui()
                 g_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
                 g_DirectionWindowVec3Getter = [i]()
                 {
-                    auto light = &g_FrameConstantBuffer.lightData[i];
-                    return vec3(light->param2.x, light->param2.y, light->param2.z);
+                    auto light = &g_FrameConstantBuffer.lights[i];
+                    return vec3(light->Direction.x, light->Direction.y, light->Direction.z);
                 };
                 g_DirectionWindowVec3Setter = [i](vec3 value)
                 {
-                    auto light = &g_FrameConstantBuffer.lightData[i];
-                    light->param2.x = value.x;
-                    light->param2.y = value.y;
-                    light->param2.z = value.z;
+                    auto light = &g_FrameConstantBuffer.lights[i];
+                    light->Direction.x = value.x;
+                    light->Direction.y = value.y;
+                    light->Direction.z = value.z;
                 };
             }
         }
 
-        float position[3] = { light->param1.x, light->param1.y, light->param1.z };
+        float position[3] = { light->Position.x, light->Position.y, light->Position.z };
         ImGui::DragFloat3("Position", position, dragSpeed);
-        light->param1.x = position[0];
-        light->param1.y = position[1];
-        light->param1.z = position[2];
+        light->Position.x = position[0];
+        light->Position.y = position[1];
+        light->Position.z = position[2];
 
-        float rotation[3] = { light->param2.x, light->param2.y, light->param2.z };
+        float rotation[3] = { light->Direction.x, light->Direction.y, light->Direction.z };
         ImGui::DragFloat3("Rotation", rotation, dragSpeed);
-        light->param2.x = rotation[0];
-        light->param2.y = rotation[1];
-        light->param2.z = rotation[2];
+        light->Direction.x = rotation[0];
+        light->Direction.y = rotation[1];
+        light->Direction.z = rotation[2];
 
-        float strength = light->param2.w;
-        ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 10.0f);
-        light->param2.w = strength;
+        float strength = light->Strength;
+        ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
+        light->Strength = strength;
 
-        int style_idx = light->param1.w;
-        if (ImGui::Combo("Type", &style_idx, "None\0Directional\0Point\0"))
+        int style_idx = light->LightType;
+        if (ImGui::Combo("Type", &style_idx, "Directional\0Point\0SpotLight\0"))
         {
             switch (style_idx)
             {
-            case 0: light->param1.w = 0; break;
-            case 1: light->param1.w = 1; break;
-            case 2: light->param1.w = 2; break;
+            case 0: light->LightType = 0; break;
+            case 1: light->LightType = 1; break;
+            case 2: light->LightType = 2; break;
             default: break;
             }
         }
@@ -763,6 +736,12 @@ int Run()
             // Cap the delta time to the max time step (useful if your 
             // debugging and you don't want the deltaTime value to explode.
             deltaTime = std::min<float>(deltaTime, maxTimeStep);
+
+            g_DeltaTime = deltaTime;
+
+#if _DEBUG
+            LoadShaderResources();
+#endif
 
             UpdateScene(deltaTime);
             RenderScene();
@@ -1187,6 +1166,88 @@ ID3DBlob* LoadShader(const std::wstring& fileName, const std::string& entryPoint
 }
 
 /// <summary>
+/// Wrapper to load shader resources
+/// </summary>
+void LoadShaderResources()
+{
+    HRESULT hr;
+
+    // Note:
+    // Since we will need to update the contents of the constant buffer in the application,
+    // Instead of set the buffer¡¦s Usage property to D3D11_USAGE_DYNAMIC and the CPU AccessFlags to D3D11_CPU_ACCESS_WRITE,
+    // we'll be using ID3D11DeviceContext::UpdateSubresource method,
+    // which it expects constant buffers to be initialized with D3D11_USAGE_DEFAULT usage flag
+    // and buffers that are created with the D3D11_USAGE_DEFAULT flag must have their CPU AccessFlags set to 0.
+
+    // Load and compile the vertex shader
+    ID3DBlob* vertexShaderBlob;
+    std::wstring filename = L"assets/simpleVertexShader.hlsl";
+    _int64 size = GetFileSize(filename);
+    if (size != g_d3dVertexShaderSize)
+    {
+        vertexShaderBlob = LoadShader<ID3D11VertexShader>(filename, "main", "latest");
+        g_d3dVertexShader = CreateShader<ID3D11VertexShader>(g_d3dDevice, vertexShaderBlob, nullptr);
+        g_d3dVertexShaderSize = size;
+
+        // Create the input layout for the vertex shader.
+        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+        {
+            {
+                "POSITION",                             // semantic name
+                0,                                      // semantic index
+                DXGI_FORMAT_R32G32B32_FLOAT,            // format
+                0,                                      // input slot (used for packed vertex buffers)
+                offsetof(VertexData, vertex),           // aligned byte offset
+                D3D11_INPUT_PER_VERTEX_DATA,            // input slot class
+                0                                       // additional param for slot class: D3D11_INPUT_PER_INSTANCE_DATA
+            },
+            {
+                "NORMAL",
+                0,
+                DXGI_FORMAT_R32G32B32_FLOAT,
+                0,
+                offsetof(VertexData, normal),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            },
+            {
+                "TEXCOORD",
+                0,
+                DXGI_FORMAT_R32G32_FLOAT,
+                0,
+                offsetof(VertexData, uv),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            }
+        };
+
+        hr = g_d3dDevice->CreateInputLayout(
+            vertexLayoutDesc,                           // input layout description
+            _countof(vertexLayoutDesc),                 // amount of the elements
+            vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+            vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+            &g_d3dInputLayout                           // pointer to the input-layout object
+        );
+        AssertIfFailed(hr, "Load Content", "Unable to create input layout");
+
+        // After creating input layouy, the shader blob is no longer needed
+        SafeRelease(vertexShaderBlob);
+    }
+
+    // Load and compile the pixel shader
+    ID3DBlob* pixelShaderBlob;
+    filename = L"assets/simplePixelShader.hlsl";
+    size = GetFileSize(filename);
+    if (size != g_d3dPixelShaderSize)
+    {
+        pixelShaderBlob = LoadShader<ID3D11PixelShader>(filename, "main", "latest");
+        g_d3dPixelShader = CreateShader<ID3D11PixelShader>(g_d3dDevice, pixelShaderBlob, nullptr);
+        SafeRelease(pixelShaderBlob);
+        g_d3dPixelShaderSize = size;
+    }
+}
+
+/// <summary>
 /// Load resources of the application
 /// </summary>
 void LoadContent()
@@ -1256,67 +1317,7 @@ void LoadContent()
     hr = g_d3dDevice->CreateBuffer(&objectConstantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Object]);
     AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
     
-    // Note:
-    // Since we will need to update the contents of the constant buffer in the application,
-    // Instead of set the buffer¡¦s Usage property to D3D11_USAGE_DYNAMIC and the CPU AccessFlags to D3D11_CPU_ACCESS_WRITE,
-    // we'll be using ID3D11DeviceContext::UpdateSubresource method,
-    // which it expects constant buffers to be initialized with D3D11_USAGE_DEFAULT usage flag
-    // and buffers that are created with the D3D11_USAGE_DEFAULT flag must have their CPU AccessFlags set to 0.
-
-    // Load and compile the vertex shader
-    ID3DBlob* vertexShaderBlob;
-    vertexShaderBlob = LoadShader<ID3D11VertexShader>(L"assets/simpleVertexShader.hlsl", "main", "latest");
-    g_d3dVertexShader = CreateShader<ID3D11VertexShader>(g_d3dDevice, vertexShaderBlob, nullptr);
-    
-    // Create the input layout for the vertex shader.
-    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-    {
-        {
-            "POSITION",                             // semantic name
-            0,                                      // semantic index
-            DXGI_FORMAT_R32G32B32_FLOAT,            // format
-            0,                                      // input slot (used for packed vertex buffers)
-            offsetof(VertexData, vertex),           // aligned byte offset
-            D3D11_INPUT_PER_VERTEX_DATA,            // input slot class
-            0                                       // additional param for slot class: D3D11_INPUT_PER_INSTANCE_DATA
-        },
-        {
-            "NORMAL",
-            0,
-            DXGI_FORMAT_R32G32B32_FLOAT,
-            0,
-            offsetof(VertexData, normal),
-            D3D11_INPUT_PER_VERTEX_DATA,
-            0
-        },
-        {
-            "TEXCOORD",
-            0,
-            DXGI_FORMAT_R32G32_FLOAT,
-            0,
-            offsetof(VertexData, uv),
-            D3D11_INPUT_PER_VERTEX_DATA,
-            0
-        }
-    };
-
-    hr = g_d3dDevice->CreateInputLayout(
-        vertexLayoutDesc,                           // input layout description
-        _countof(vertexLayoutDesc),                 // amount of the elements
-        vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
-        vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
-        &g_d3dInputLayout                           // pointer to the input-layout object
-    );
-    AssertIfFailed(hr, "Load Content", "Unable to create input layout");
-
-    // After creating input layouy, the shader blob is no longer needed
-    SafeRelease(vertexShaderBlob);
-
-    // Load and compile the pixel shader
-    ID3DBlob* pixelShaderBlob;
-    pixelShaderBlob = LoadShader<ID3D11PixelShader>(L"assets/simplePixelShader.hlsl", "main", "latest");
-    g_d3dPixelShader = CreateShader<ID3D11PixelShader>(g_d3dDevice, pixelShaderBlob, nullptr);
-    SafeRelease(pixelShaderBlob);
+    LoadShaderResources();
 
     // Setup the projection matrix.
     RECT clientRect;
@@ -1327,7 +1328,7 @@ void LoadContent()
     float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
     // Setup projection matrix in LH coordinates
-    g_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
+    g_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), nearPlane, farPlane);
 
     // DirectXTK default uses RH coordintate, don't use it
     // g_ApplicationConstantBuffer.projectionMatrix = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
@@ -1343,8 +1344,19 @@ void LoadContent()
     );
 
     // Setup light data
-    g_FrameConstantBuffer.lightData[0] = struct LightData(LightType::Point, Vector3(0, 0, 0), Vector3::Zero, 5.0f);
-    g_FrameConstantBuffer.lightData[1] = struct LightData(LightType::Directional, Vector3::Zero, Vector3(1.0, 0.5, 0.25), 0.5f);
+    struct Light point;
+    point.LightType = (int)LightType::Point;
+    point.Strength = 1.0f;
+    point.Enabled = true;
+
+    struct Light directional;
+    directional.LightType = (int)LightType::Directional;
+    directional.Direction = Vector4(1.0, 0.5, 0.25, 1.0f);
+    directional.Strength = 0.5f;
+    directional.Enabled = true;
+
+    g_FrameConstantBuffer.lights[0] = point;
+    g_FrameConstantBuffer.lights[1] = directional;
 
     // Prepare to setup Primitive Batcher
     g_d3dStates = new CommonStates(g_d3dDevice);
@@ -1419,6 +1431,8 @@ void RenderScene()
     const UINT offset = 0;
     for (auto entity : Scene)
     {
+        entity->ConstantBuffer.material = entity->Material;
+
         // bind ConstantBuffers at object level
         g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &entity->ConstantBuffer, 0, 0);
 
@@ -1477,19 +1491,19 @@ void UpdateScene(float deltaTime)
 {    
     // view matrix
     g_FrameConstantBuffer.viewMatrix = g_Camera->GetViewMatrix();
-    
+    g_FrameConstantBuffer.eyePosition = g_Camera->GetPosition_V4();
     g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_FrameConstantBuffer, 0, 0);
 
     for (auto entity : Scene)
     {
         // update angle
         // entity->RotationAngle += deltaTime * entity->RotateSpeed;
-        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), entity->rotateAxisSpeed.x);
-        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), entity->rotateAxisSpeed.y);
-        entity->rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->rotateAxisSpeed.z);
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), entity->RotateAxisSpeed.x);
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), entity->RotateAxisSpeed.y);
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->RotateAxisSpeed.z);
         
         auto model = Matrix::Identity;
-        model = Matrix::CreateFromYawPitchRoll(entity->rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
+        model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
         entity->ConstantBuffer.modelMatrix = model;
         entity->ConstantBuffer.normalMatrix = model.Transpose().Invert();
     }

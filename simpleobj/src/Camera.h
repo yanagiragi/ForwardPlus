@@ -18,6 +18,11 @@ public:
         return m_position;
     }
 
+    inline Vector4 GetPosition_V4()
+    {
+        return Vector4(m_position.x, m_position.y, m_position.z, 0.0f);
+    }
+
     inline Vector3 GetForward()
     {
         auto cosTheta = cos(ToRadians(m_theta));

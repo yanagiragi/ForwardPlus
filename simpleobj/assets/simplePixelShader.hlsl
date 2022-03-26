@@ -1,16 +1,212 @@
-#define LIGHT_COUNT 2
+#define MAX_LIGHTS 8
 
-struct LightParam
+// Light types.
+#define DIRECTIONAL_LIGHT 0
+#define POINT_LIGHT 1
+#define SPOT_LIGHT 2
+
+// ==============================================================
+//
+// Structures
+// 
+// ==============================================================
+struct Light
 {
-    float4 Param1; // position, type
-    float4 Param2; // direction, strength
+    float4      Position;               // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4      Direction;              // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4      Color;                  // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float       SpotAngle;              // 4 bytes
+    float       ConstantAttenuation;    // 4 bytes
+    float       LinearAttenuation;      // 4 bytes
+    float       QuadraticAttenuation;   // 4 bytes
+    //----------------------------------- (16 byte boundary)
+    int         LightType;              // 4 bytes
+    bool        Enabled;                // 4 bytes
+    float       Strength;               // 4 bytes
+    int         Padding;                // 4 bytes
+    //----------------------------------- (16 byte boundary)
+};  // Total:                           // 80 bytes (5 * 16)
+
+struct _Material
+{
+    float4  Emissive;       // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4  Ambient;        // 16 bytes
+    //------------------------------------(16 byte boundary)
+    float4  Diffuse;        // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4  Specular;       // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float   SpecularPower;  // 4 bytes
+    bool    UseTexture;     // 4 bytes
+    float2  Padding;        // 8 bytes
+    //----------------------------------- (16 byte boundary)
+};  // Total:               // 80 bytes ( 5 * 16 )
+
+struct LightingResult
+{
+    float3 Diffuse;
+    float3 Specular;
 };
+
+// ==============================================================
+//
+// Constant Buffers
+// 
+// ==============================================================
+
+cbuffer PerApplication : register(b0)
+{
+    matrix projectionMatrix;
+}
 
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    struct LightParam lightParams[LIGHT_COUNT];
+    float4 EyePosition;
+    struct Light Lights[MAX_LIGHTS];
 }
+
+cbuffer PerObject : register(b2)
+{
+    matrix modelMatrix;
+    matrix normalMatrix;
+    struct _Material Material;
+}
+
+// ==============================================================
+//
+// Functions
+// 
+// ==============================================================
+
+float4 DoDiffuse(Light light, float3 L, float3 N)
+{
+    float NdotL = max(0, dot(N, L));
+    return light.Color * NdotL;
+}
+
+float4 DoSpecular(Light light, float3 V, float3 L, float3 N)
+{
+    // Phong lighting.
+    float3 R = normalize(reflect(-L, N));
+    float RdotV = max(0, dot(R, V));
+
+    // Blinn-Phong lighting
+    // float3 H = normalize(L + V);
+    // float NdotH = max(0, dot(N, H));
+
+    return light.Color * pow(RdotV, Material.SpecularPower);
+}
+
+float DoAttenuation(Light light, float d)
+{
+    return 1.0f / (light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d);
+}
+
+float DoSpotCone(Light light, float3 L)
+{
+    float minCos = cos(light.SpotAngle);
+    float maxCos = (minCos + 1.0f) / 2.0f;
+    float cosAngle = dot(light.Direction.xyz, -L);
+    return smoothstep(minCos, maxCos, cosAngle);
+}
+
+LightingResult DoDirectionalLight(Light light, float3 V, float3 P, float3 N)
+{
+    LightingResult result;
+
+    float3 L = light.Direction.xyz;
+
+    result.Diffuse = DoDiffuse(light, L, N);
+    result.Specular = DoSpecular(light, V, L, N);
+
+    return result;
+}
+
+LightingResult DoPointLight(Light light, float3 V, float3 P, float3 N)
+{
+    LightingResult result;
+    
+    float3 L = (light.Position - P).xyz;
+    float distance = length(L);
+    L = L / distance;
+
+    float attenuation = DoAttenuation(light, distance);
+
+    result.Diffuse = DoDiffuse(light, L, N) * attenuation;
+    result.Specular = DoSpecular(light, V, L, N) * attenuation;
+
+    return result;
+}
+
+LightingResult DoSpotLight(Light light, float3 V, float3 P, float3 N)
+{
+    LightingResult result;
+
+    float3 L = (light.Position - P).xyz;
+    float distance = length(L);
+    L = L / distance;
+
+    float attenuation = DoAttenuation(light, distance);
+    float spotIntensity = DoSpotCone(light, -L);
+
+    result.Diffuse = DoDiffuse(light, L, N) * attenuation * spotIntensity;
+    result.Specular = DoSpecular(light, V, L, N) * attenuation * spotIntensity;
+
+    return result;
+}
+
+float3 CalculateLighting(float3 position, float3 normal)
+{
+    float3 view = normalize(EyePosition - position).xyz;
+    
+    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
+
+    //int i = 1;
+    //return float3(Lights[i].Enabled, 0, 0);
+    
+    [unroll]
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        if (!Lights[i].Enabled)
+        {
+            continue;
+        }
+
+        LightingResult result = { {0, 0, 0}, {0, 0, 0} };
+
+        switch ((int)Lights[i].LightType)
+        {
+        case DIRECTIONAL_LIGHT:
+            result = DoDirectionalLight(Lights[i], view, position, normal);
+            break;
+        case POINT_LIGHT:
+            result = DoPointLight(Lights[i], view, position, normal);
+            break;
+        case SPOT_LIGHT:
+            result = DoSpotLight(Lights[i], view, position, normal);
+            // result.Diffuse = result.Specular = float3(0, 0, 0);
+            // result = DoPointLight(Lights[i], view, position, normal);
+            break;
+        }
+
+        totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
+        totalResult.Specular += result.Specular * Lights[i].Strength;
+    }
+
+    return (totalResult.Diffuse + totalResult.Specular);
+}
+
+
+// ==============================================================
+//
+// Main Function
+// 
+// ==============================================================
 
 struct PixelShaderInput
 {
@@ -25,43 +221,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 normal = normalize(IN.worldNormal);
     float3 finalColor = float3(0, 0, 0);
 
-    float attentuation = 0;
-    float3 lightVector;
-
-    for (int i = 0; i < LIGHT_COUNT; ++i)
-    {
-        // unpack light params
-        float3 lightPosition = lightParams[i].Param1.xyz;
-        int lightType = lightParams[i].Param1.w;
-        float3 lightDirection = lightParams[i].Param2.xyz;
-        float lightStrengh = lightParams[i].Param2.w;
-
-        // None
-        if (lightType == 0)
-        {
-            attentuation = 0;
-        }
-
-        // directional light
-        else if (lightType == 1)
-        {
-            lightVector = -lightDirection;
-            attentuation = 1.0f;
-        }
-
-        // point light
-        else if (lightType == 2)
-        {
-            lightVector = IN.worldPosition - lightPosition;
-            attentuation = 1.0f / dot(lightVector, lightVector);
-        }
-
-        lightVector = normalize(lightVector);
-        float NdotL = dot(-lightVector, normal);
-        float c = attentuation * NdotL * lightStrengh;
-
-        finalColor += float3(c, c, c);
-    }
+    finalColor = CalculateLighting(IN.worldPosition, normal);
 
     return float4(finalColor, 1);
 }

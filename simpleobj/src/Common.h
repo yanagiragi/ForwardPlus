@@ -241,3 +241,15 @@ inline std::string format(const char* fmt, ...) {
     delete[] buffer;
     return ret;
 }
+
+inline __int64 GetFileSize(std::wstring const& path)
+{
+    WIN32_FIND_DATAW data;
+    HANDLE h = FindFirstFileW(path.c_str(), &data);
+    if (h == INVALID_HANDLE_VALUE)
+        return -1;
+
+    FindClose(h);
+
+    return data.nFileSizeLow | (__int64)data.nFileSizeHigh << 32;
+}
