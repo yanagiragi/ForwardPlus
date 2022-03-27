@@ -8,7 +8,7 @@ enum class LightType
 {
     Directional,
     Point,
-    SPOTLIGHT,
+    Spotlight,
     NumLightType
 };
 

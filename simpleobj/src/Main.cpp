@@ -90,6 +90,8 @@ void CreateRenderTarget(float, float);
 void ReleaseRenderTarget();
 void LoadShaderResources();
 void LoadLight();
+void LoadTexture();
+void LoadEffect();
 
 #pragma endregion
 
@@ -135,6 +137,12 @@ BasicEffect* g_d3dEffect;
 PrimitiveBatch<VertexPositionColor>* g_d3dPrimitiveBatch;
 ID3D11InputLayout* g_d3dPrimitiveBatchInputLayout;
 
+
+// Texture data
+EffectFactory* g_d3dEffectFactory = nullptr;
+ID3D11SamplerState* g_d3dSamplerState = nullptr;
+ID3D11ShaderResourceView* g_GridTexture = nullptr;
+
 // Shader resources
 enum ConstantBuffer
 {
@@ -177,11 +185,19 @@ struct Material diffuseMaterial = {
     Vector4::Zero, // Specular
 };
 
+struct Material boxMaterial = {
+    Vector4::Zero, // Emissive
+    Vector4::One, // Ambient
+    Vector4::One, // Diffuse
+    Vector4::Zero, // Specular
+    true // use texture
+};
+
 struct Entity* Scene[] =
 {
-    new Entity("CornelBox", "assets/CornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), diffuseMaterial),
-    new Entity("bunny", "assets/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial),
-    new Entity("bunny", "assets/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial),
+    new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial),
+    new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial),
+    new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial),
 };
 
 // Camera Params
@@ -243,7 +259,7 @@ void RenderDebug()
                 DX::Draw(g_d3dPrimitiveBatch, sphere, DirectX::Colors::White);
             }
 
-            else if (type == LightType::Directional || type == LightType::SPOTLIGHT)
+            else if (type == LightType::Directional || type == LightType::Spotlight)
             {
                 auto direction = Vector3(light->Direction.x, light->Direction.y, light->Direction.z);
                 direction.Normalize();
@@ -443,7 +459,7 @@ void RenderImgui()
                 ImGui::Checkbox("Enabled", &enabled);
                 light->Enabled = enabled ? 1 : 0;
 
-                if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::SPOTLIGHT)
+                if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::Spotlight)
                 {
                     ImGui::SameLine();
                     if (ImGui::Button("Direction"))
@@ -463,6 +479,13 @@ void RenderImgui()
                             light->Direction.z = value.z;
                         };
                     }
+                }
+
+                if ((LightType)light->LightType == LightType::Spotlight)
+                {
+                    float spotAngle = light->SpotAngle;
+                    ImGui::DragFloat("SpotAngle", &spotAngle, dragSpeed, 0.0f, 60.0f);
+                    light->SpotAngle = spotAngle;
                 }
 
                 float position[3] = { light->Position.x, light->Position.y, light->Position.z };
@@ -1203,7 +1226,7 @@ void LoadShaderResources()
 
     // Load and compile the vertex shader
     ID3DBlob* vertexShaderBlob;
-    std::wstring filename = L"assets/simpleVertexShader.hlsl";
+    std::wstring filename = L"assets/Shaders/SimpleVS.hlsl";
     _int64 size = GetFileSize(filename);
     if (size != g_d3dVertexShaderSize)
     {
@@ -1258,7 +1281,7 @@ void LoadShaderResources()
 
     // Load and compile the pixel shader
     ID3DBlob* pixelShaderBlob;
-    filename = L"assets/simplePixelShader.hlsl";
+    filename = L"assets/Shaders/SimplePS.hlsl";
     size = GetFileSize(filename);
     if (size != g_d3dPixelShaderSize)
     {
@@ -1367,19 +1390,63 @@ void LoadContent()
 
     LoadLight();
 
+    LoadEffect();
+
+    LoadTexture();
+
+   // Create Primitive Batcher
+    g_d3dPrimitiveBatch = new PrimitiveBatch<VertexPositionColor>(g_d3dDeviceContext);
+}
+
+void LoadEffect()
+{
+    HRESULT hr;
+
     // Prepare to setup Primitive Batcher
     g_d3dStates = new CommonStates(g_d3dDevice);
     g_d3dEffect = new BasicEffect(g_d3dDevice);
     g_d3dEffect->SetVertexColorEnabled(true);
-    
+
     hr = CreateInputLayoutFromEffect<VertexPositionColor>(g_d3dDevice, g_d3dEffect, &g_d3dPrimitiveBatchInputLayout);
     AssertIfFailed(hr, "Create Primitive Batch Failed", "Unable to call CreateInputLayoutFromEffect()");
 
-    // Create Primitive Batcher
-    g_d3dPrimitiveBatch = new PrimitiveBatch<VertexPositionColor>(g_d3dDeviceContext);
-
     // setup projection matrix for effect
     g_d3dEffect->SetProjection(g_ApplicationConstantBuffer.projectionMatrix);
+
+    g_d3dEffectFactory = new EffectFactory(g_d3dDevice);
+}
+
+void LoadTexture()
+{
+    try
+    {
+        g_d3dEffectFactory->CreateTexture(L"assets\\Textures\\grid.png", g_d3dDeviceContext, &g_GridTexture);
+
+        // Create a sampler state for texture sampling in the pixel shader
+        D3D11_SAMPLER_DESC samplerDesc;
+        ZeroMemory(&samplerDesc, sizeof(D3D11_SAMPLER_DESC));
+
+        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.MipLODBias = 0.0f;
+        samplerDesc.MaxAnisotropy = 1;
+        samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        samplerDesc.BorderColor[0] = 1.0f;
+        samplerDesc.BorderColor[1] = 1.0f;
+        samplerDesc.BorderColor[2] = 1.0f;
+        samplerDesc.BorderColor[3] = 1.0f;
+        samplerDesc.MinLOD = -FLT_MAX;
+        samplerDesc.MaxLOD = FLT_MAX;
+
+        HRESULT hr = g_d3dDevice->CreateSamplerState(&samplerDesc, &g_d3dSamplerState);
+        AssertIfFailed(hr, "Load Texture", "Failed to create texture sampler.");
+    }
+    catch (std::exception&)
+    {
+        DisplayError("Failed to load texture: Textures\\grid.png");
+    }
 }
 
 /// <summary>
@@ -1400,8 +1467,17 @@ void LoadLight()
     directional.Strength = 0.5f;
     directional.Enabled = true;
 
+    struct Light spotlight;
+    spotlight.LightType = (int)LightType::Spotlight;
+    spotlight.Position = Vector4(0.0, 6.0, 0.0, 1.0f);
+    spotlight.Direction = Vector4(0, 0, 0.0, 1.0f);
+    spotlight.SpotAngle = 45.0f;
+    spotlight.Strength = 1.0f;
+    spotlight.Enabled = true;
+
     g_FrameConstantBuffer.lights[0] = point;
     g_FrameConstantBuffer.lights[1] = directional;
+    g_FrameConstantBuffer.lights[2] = spotlight;
 }
 
 /// <summary>
@@ -1445,6 +1521,18 @@ void RenderScene()
         0,                                      // start slot
         3,                                      // number of buffers
         g_d3dConstantBuffers                    // array of constant buffers
+    );
+
+    g_d3dDeviceContext->PSSetSamplers(
+        0,                                      // start slot
+        1,                                      // number of sampler states
+        &g_d3dSamplerState                      // array of sampler states
+    );
+
+    g_d3dDeviceContext->PSSetShaderResources(
+        0,                                      // start slot
+        1,                                      // number of resources
+        &g_GridTexture                          // array of resources
     );
 
     // Setup the output merger stage
@@ -1497,6 +1585,7 @@ void UnloadContent()
     delete g_d3dStates;
     delete g_d3dEffect;
     delete g_d3dPrimitiveBatch;
+    delete g_d3dEffectFactory;
 }
 
 /// <summary>
