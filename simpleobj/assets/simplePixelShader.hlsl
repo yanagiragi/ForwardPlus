@@ -86,7 +86,7 @@ cbuffer PerObject : register(b2)
 float4 DoDiffuse(Light light, float3 L, float3 N)
 {
     float NdotL = max(0, dot(N, L));
-    return light.Color * NdotL;
+    return light.Color * NdotL * Material.Diffuse;
 }
 
 float4 DoSpecular(Light light, float3 V, float3 L, float3 N)
@@ -99,7 +99,7 @@ float4 DoSpecular(Light light, float3 V, float3 L, float3 N)
     // float3 H = normalize(L + V);
     // float NdotH = max(0, dot(N, H));
 
-    return light.Color * pow(RdotV, Material.SpecularPower);
+    return light.Color * pow(RdotV, Material.SpecularPower) * Material.Specular;
 }
 
 float DoAttenuation(Light light, float d)
@@ -165,9 +165,6 @@ float3 CalculateLighting(float3 position, float3 normal)
     float3 view = normalize(EyePosition - position).xyz;
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
-
-    //int i = 1;
-    //return float3(Lights[i].Enabled, 0, 0);
     
     [unroll]
     for (int i = 0; i < MAX_LIGHTS; ++i)
@@ -189,8 +186,6 @@ float3 CalculateLighting(float3 position, float3 normal)
             break;
         case SPOT_LIGHT:
             result = DoSpotLight(Lights[i], view, position, normal);
-            // result.Diffuse = result.Specular = float3(0, 0, 0);
-            // result = DoPointLight(Lights[i], view, position, normal);
             break;
         }
 
@@ -200,7 +195,6 @@ float3 CalculateLighting(float3 position, float3 normal)
 
     return (totalResult.Diffuse + totalResult.Specular);
 }
-
 
 // ==============================================================
 //

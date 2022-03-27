@@ -89,6 +89,8 @@ void RenderImgui();
 void CreateRenderTarget(float, float);
 void ReleaseRenderTarget();
 void LoadShaderResources();
+void LoadLight();
+
 #pragma endregion
 
 #pragma region Global Variables
@@ -160,16 +162,23 @@ struct FrameConstantBuffer g_FrameConstantBuffer;
 ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
 struct Material defaultMaterial;
+struct Material diffuseMaterial = {
+    Vector4::One, // Emissive
+    Vector4::One, // Ambient
+    Vector4::One, // Diffuse
+    Vector4::Zero, // Specular
+};
 
 struct Entity* Scene[] =
 {
-    new Entity("bunny", "assets/bunny.obj", Vector3(5, 0, 0), Quaternion::Identity, defaultMaterial),
-    new Entity("bunny", "assets/bunny.obj", Vector3(-3, 0, 0), Quaternion::CreateFromYawPitchRoll(0.7, 0, 0), defaultMaterial)
+    new Entity("CornelBox", "assets/CornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), diffuseMaterial),
+    new Entity("bunny", "assets/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial),
+    new Entity("bunny", "assets/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial),
 };
 
 // Camera Params
 Camera* g_Camera = new Camera(
-    Vector3(-2.5, 1.0, 14.5),
+    Vector3(-1.5, 3.5, 14.0),
     0,      // theta in degree
     -90     // phi in degree
 );
@@ -1348,20 +1357,7 @@ void LoadContent()
         0                                               // size of one depth slice of source data
     );
 
-    // Setup light data
-    struct Light point;
-    point.LightType = (int)LightType::Point;
-    point.Strength = 1.0f;
-    point.Enabled = true;
-
-    struct Light directional;
-    directional.LightType = (int)LightType::Directional;
-    directional.Direction = Vector4(1.0, 0.5, 0.25, 1.0f);
-    directional.Strength = 0.5f;
-    directional.Enabled = true;
-
-    g_FrameConstantBuffer.lights[0] = point;
-    g_FrameConstantBuffer.lights[1] = directional;
+    LoadLight();
 
     // Prepare to setup Primitive Batcher
     g_d3dStates = new CommonStates(g_d3dDevice);
@@ -1376,6 +1372,27 @@ void LoadContent()
 
     // setup projection matrix for effect
     g_d3dEffect->SetProjection(g_ApplicationConstantBuffer.projectionMatrix);
+}
+
+/// <summary>
+/// Setup light data
+/// </summary>
+void LoadLight()
+{
+    struct Light point;
+    point.LightType = (int)LightType::Point;
+    point.Position = Vector4(-0.5, 3.0, 0.0, 1.0f);
+    point.Strength = 1.0f;
+    point.Enabled = true;
+
+    struct Light directional;
+    directional.LightType = (int)LightType::Directional;
+    directional.Direction = Vector4(1.0, 0.5, 0.25, 1.0f);
+    directional.Strength = 0.5f;
+    directional.Enabled = true;
+
+    g_FrameConstantBuffer.lights[0] = point;
+    g_FrameConstantBuffer.lights[1] = directional;
 }
 
 /// <summary>
