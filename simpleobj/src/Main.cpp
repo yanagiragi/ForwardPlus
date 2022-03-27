@@ -332,150 +332,155 @@ void RenderImgui()
 
     ImGui::Text(format("Fps: %f (%f ms)", 1.0f / g_DeltaTime, g_DeltaTime).c_str());
 
-    auto sceneCount = _countof(Scene);
-    for (int i = 0; i < sceneCount; ++i)
+    if (ImGui::CollapsingHeader("Scene List"))
     {
-        auto entity = Scene[i];
-        auto name = entity->Name.c_str();
-
-        ImGui::PushID(format("##Entity:%d-%s", i, name).c_str());
-        ImGui::Text(name);
-        
-        ImGui::SameLine();
-        if (ImGui::Button("Reset"))
+        auto sceneCount = _countof(Scene);
+        for (int i = 0; i < sceneCount; ++i)
         {
-            entity->Rotation.x = 0;
-            entity->Rotation.y = 0;
-            entity->Rotation.z = 0;
-            entity->Rotation.w = 0;
+            auto entity = Scene[i];
+            auto name = entity->Name.c_str();
 
-            entity->RotateAxisSpeed.x = 0;
-            entity->RotateAxisSpeed.y = 0;
-            entity->RotateAxisSpeed.z = 0;
+            ImGui::PushID(format("##Entity:%d-%s", i, name).c_str());
+
+            if (ImGui::TreeNode(name))
+            {
+                if (ImGui::Button("Reset"))
+                {
+                    entity->Rotation.x = 0;
+                    entity->Rotation.y = 0;
+                    entity->Rotation.z = 0;
+                    entity->Rotation.w = 0;
+
+                    entity->RotateAxisSpeed.x = 0;
+                    entity->RotateAxisSpeed.y = 0;
+                    entity->RotateAxisSpeed.z = 0;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Gizmo"))
+                {
+                    g_ShowGizmoWindow = true;
+
+                    g_GizmoWindowNameGetter = [&entity]()
+                    {
+                        return entity->Name.c_str();
+                    };
+
+                    g_GizmoWindowQuaternionGetter = [&entity]()
+                    {
+                        return quat(entity->Rotation.w, entity->Rotation.x, entity->Rotation.y, entity->Rotation.z);
+                    };
+
+                    g_GizmoWindowQuaternionSetter = [&entity](quat value)
+                    {
+                        entity->Rotation.x = value.x;
+                        entity->Rotation.y = value.y;
+                        entity->Rotation.z = value.z;
+                        entity->Rotation.w = value.w;
+                    };
+                }
+
+                float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
+                ImGui::DragFloat3("Position", position, dragSpeed);
+                entity->Position.x = position[0];
+                entity->Position.y = position[1];
+                entity->Position.z = position[2];
+
+                Vector3 v_rotation = entity->Rotation.ToEuler();
+                float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
+                ImGui::DragFloat3("Rotation", rotation, dragSpeed);
+                entity->Rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
+
+                Vector3 v_rotationAxisSpeed = entity->RotateAxisSpeed;
+                float rotationAxisSpeed[3] = { v_rotationAxisSpeed.x, v_rotationAxisSpeed.y, v_rotationAxisSpeed.z };
+                ImGui::DragFloat3("Rotate Axis Speed", rotationAxisSpeed, slowDragSpeed);
+                entity->RotateAxisSpeed.x = rotationAxisSpeed[0];
+                entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
+                entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
+
+                float specularPower = entity->Material.SpecularPower;
+                ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
+                entity->Material.SpecularPower = specularPower;
+
+                ImGui::TreePop();
+            }
+            
+            ImGui::PopID();
         }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Gizmo"))
-        {
-            g_ShowGizmoWindow = true;
-            
-            g_GizmoWindowNameGetter = [&entity]()
-            {
-                return entity->Name.c_str();
-            };
-            
-            g_GizmoWindowQuaternionGetter = [&entity]()
-            {
-                return quat(entity->Rotation.w, entity->Rotation.x, entity->Rotation.y, entity->Rotation.z);
-            };
-            
-            g_GizmoWindowQuaternionSetter = [&entity](quat value)
-            {
-                entity->Rotation.x = value.x;
-                entity->Rotation.y = value.y;
-                entity->Rotation.z = value.z;
-                entity->Rotation.w = value.w;
-            };
-        }
-
-        float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
-        ImGui::DragFloat3("Position", position, dragSpeed);
-        entity->Position.x = position[0];
-        entity->Position.y = position[1];
-        entity->Position.z = position[2];
-
-        Vector3 v_rotation = entity->Rotation.ToEuler();
-        float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
-        ImGui::DragFloat3("Rotation", rotation, dragSpeed);
-        entity->Rotation = Quaternion::CreateFromYawPitchRoll(Vector3(rotation));
-
-        Vector3 v_rotationAxisSpeed = entity->RotateAxisSpeed;
-        float rotationAxisSpeed[3] = { v_rotationAxisSpeed.x, v_rotationAxisSpeed.y, v_rotationAxisSpeed.z };
-        ImGui::DragFloat3("Rotate Axis Speed", rotationAxisSpeed, slowDragSpeed);
-        entity->RotateAxisSpeed.x = rotationAxisSpeed[0];
-        entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
-        entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
-
-        float specularPower = entity->Material.SpecularPower;
-        ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
-        entity->Material.SpecularPower = specularPower;
-
-        ImGui::PopID();
     }
     
-    for (int i = 0; i < MAX_LIGHTS; ++i)
+    if (ImGui::CollapsingHeader("Light List"))
     {
-        auto light = &g_FrameConstantBuffer.lights[i];
-        auto lightName = format("Light (%d)", i);
-        auto name = lightName.c_str();
-        
-        auto id = format("##Light:%d", i);
-        ImGui::PushID(id.c_str());
-
-        bool enabled = light->Enabled;
-        ImGui::Checkbox("", &enabled);
-        light->Enabled = enabled;
-
-        ImGui::SameLine();
-        ImGui::Text(name);
-
-        /*if (!light->Enabled)
+        for (int i = 0; i < MAX_LIGHTS; ++i)
         {
+            auto light = &g_FrameConstantBuffer.lights[i];
+            auto lightName = format("Light (%d)", i);
+            auto name = lightName.c_str();
+
+            auto id = format("##Light:%d", i);
+            ImGui::PushID(id.c_str());
+
+            if (ImGui::TreeNode(name))
+            {
+                bool enabled = light->Enabled == 1;
+                ImGui::Checkbox("Enabled", &enabled);
+                light->Enabled = enabled ? 1 : 0;
+
+                if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::SPOTLIGHT)
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Direction"))
+                    {
+                        g_ShowDirectionWindow = true;
+                        g_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
+                        g_DirectionWindowVec3Getter = [i]()
+                        {
+                            auto light = &g_FrameConstantBuffer.lights[i];
+                            return vec3(light->Direction.x, light->Direction.y, light->Direction.z);
+                        };
+                        g_DirectionWindowVec3Setter = [i](vec3 value)
+                        {
+                            auto light = &g_FrameConstantBuffer.lights[i];
+                            light->Direction.x = value.x;
+                            light->Direction.y = value.y;
+                            light->Direction.z = value.z;
+                        };
+                    }
+                }
+
+                float position[3] = { light->Position.x, light->Position.y, light->Position.z };
+                ImGui::DragFloat3("Position", position, dragSpeed);
+                light->Position.x = position[0];
+                light->Position.y = position[1];
+                light->Position.z = position[2];
+
+                float rotation[3] = { light->Direction.x, light->Direction.y, light->Direction.z };
+                ImGui::DragFloat3("Rotation", rotation, dragSpeed);
+                light->Direction.x = rotation[0];
+                light->Direction.y = rotation[1];
+                light->Direction.z = rotation[2];
+
+                float strength = light->Strength;
+                ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
+                light->Strength = strength;
+
+                int style_idx = light->LightType;
+                if (ImGui::Combo("Type", &style_idx, "Directional\0Point\0SpotLight\0"))
+                {
+                    switch (style_idx)
+                    {
+                    case 0: light->LightType = 0; break;
+                    case 1: light->LightType = 1; break;
+                    case 2: light->LightType = 2; break;
+                    default: break;
+                    }
+                }
+
+                ImGui::TreePop();
+            }
+            
             ImGui::PopID();
-            continue;
-        }*/
-        
-        if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::SPOTLIGHT)
-        {
-            ImGui::SameLine();
-            if (ImGui::Button("Direction"))
-            {
-                g_ShowDirectionWindow = true;
-                g_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
-                g_DirectionWindowVec3Getter = [i]()
-                {
-                    auto light = &g_FrameConstantBuffer.lights[i];
-                    return vec3(light->Direction.x, light->Direction.y, light->Direction.z);
-                };
-                g_DirectionWindowVec3Setter = [i](vec3 value)
-                {
-                    auto light = &g_FrameConstantBuffer.lights[i];
-                    light->Direction.x = value.x;
-                    light->Direction.y = value.y;
-                    light->Direction.z = value.z;
-                };
-            }
         }
-
-        float position[3] = { light->Position.x, light->Position.y, light->Position.z };
-        ImGui::DragFloat3("Position", position, dragSpeed);
-        light->Position.x = position[0];
-        light->Position.y = position[1];
-        light->Position.z = position[2];
-
-        float rotation[3] = { light->Direction.x, light->Direction.y, light->Direction.z };
-        ImGui::DragFloat3("Rotation", rotation, dragSpeed);
-        light->Direction.x = rotation[0];
-        light->Direction.y = rotation[1];
-        light->Direction.z = rotation[2];
-
-        float strength = light->Strength;
-        ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
-        light->Strength = strength;
-
-        int style_idx = light->LightType;
-        if (ImGui::Combo("Type", &style_idx, "Directional\0Point\0SpotLight\0"))
-        {
-            switch (style_idx)
-            {
-            case 0: light->LightType = 0; break;
-            case 1: light->LightType = 1; break;
-            case 2: light->LightType = 2; break;
-            default: break;
-            }
-        }
-
-        ImGui::PopID();
     }
 
     if (g_ShowGizmoWindow)
