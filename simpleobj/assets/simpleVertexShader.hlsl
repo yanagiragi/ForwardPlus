@@ -1,12 +1,36 @@
 #define MAX_LIGHTS 8
 
-struct LightParam
-{
-    float4 Param1; // position, type
-    float4 Param2; // direction, strength
-};
+// Light types.
+#define DIRECTIONAL_LIGHT 0
+#define POINT_LIGHT 1
+#define SPOT_LIGHT 2
 
-struct Material
+// ==============================================================
+//
+// Structures
+// 
+// ==============================================================
+struct Light
+{
+    float4      Position;               // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4      Direction;              // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4      Color;                  // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float       SpotAngle;              // 4 bytes
+    float       ConstantAttenuation;    // 4 bytes
+    float       LinearAttenuation;      // 4 bytes
+    float       QuadraticAttenuation;   // 4 bytes
+    //----------------------------------- (16 byte boundary)
+    int         LightType;              // 4 bytes
+    bool        Enabled;                // 4 bytes
+    float       Strength;               // 4 bytes
+    int         Padding;                // 4 bytes
+    //----------------------------------- (16 byte boundary)
+};  // Total:                           // 80 bytes (5 * 16)
+
+struct _Material
 {
     float4  Emissive;       // 16 bytes
     //----------------------------------- (16 byte boundary)
@@ -22,6 +46,18 @@ struct Material
     //----------------------------------- (16 byte boundary)
 };  // Total:               // 80 bytes ( 5 * 16 )
 
+struct LightingResult
+{
+    float3 Diffuse;
+    float3 Specular;
+};
+
+// ==============================================================
+//
+// Constant Buffers
+// 
+// ==============================================================
+
 cbuffer PerApplication : register(b0)
 {
     matrix projectionMatrix;
@@ -30,15 +66,22 @@ cbuffer PerApplication : register(b0)
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
-    struct LightParam lightParams[MAX_LIGHTS];
+    float4 EyePosition;
+    struct Light Lights[MAX_LIGHTS];
 }
 
 cbuffer PerObject : register(b2)
 {
     matrix modelMatrix;
     matrix normalMatrix;
-    struct Material material;
+    struct _Material Material;
 }
+
+// ==============================================================
+//
+// Main Functions
+// 
+// ==============================================================
 
 struct AppData
 {
@@ -49,19 +92,19 @@ struct AppData
 
 struct VertexShaderOutput
 {
-    float4 position : SV_POSITION;
+    float4 PositionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
-    float3 worldPosition : TEXCOORD1;
-    float3 worldNormal : TEXCOORD2;
+    float3 PositionWS : TEXCOORD1;
+    float3 NormalWS : TEXCOORD2;
 };
 
 VertexShaderOutput main(AppData IN)
 {
     VertexShaderOutput OUT;
     matrix mvp = mul(projectionMatrix, mul(viewMatrix, modelMatrix));
-    OUT.position = mul(mvp, float4(IN.position, 1.0f));
-    OUT.worldPosition = mul(modelMatrix, float4(IN.position, 1.0f));
-    OUT.worldNormal = mul(normalMatrix, float4(IN.normal, 1.0f));
+    OUT.PositionCS = mul(mvp, float4(IN.position, 1.0f));
+    OUT.PositionWS = mul(modelMatrix, float4(IN.position, 1.0f));
+    OUT.NormalWS = mul(normalMatrix, float4(IN.normal, 1.0f));
     OUT.uv = IN.uv;
     return OUT;
 }

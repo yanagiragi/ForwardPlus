@@ -156,6 +156,14 @@ struct FrameConstantBuffer
     struct Light lights[MAX_LIGHTS];
 };
 
+struct ObjectConstantBuffer
+{
+    Matrix WorldMatrix;
+    Matrix NormalMatrix;
+    struct Material Material;
+};
+
+struct ObjectConstantBuffer g_ObjectConstantBuffer;
 struct ApplicationConstantBuffer g_ApplicationConstantBuffer;
 struct FrameConstantBuffer g_FrameConstantBuffer;
 
@@ -163,7 +171,7 @@ ID3D11Buffer* g_d3dConstantBuffers[NumConstantBuffers];
 
 struct Material defaultMaterial;
 struct Material diffuseMaterial = {
-    Vector4::One, // Emissive
+    Vector4::Zero, // Emissive
     Vector4::One, // Ambient
     Vector4::One, // Diffuse
     Vector4::Zero, // Specular
@@ -241,7 +249,7 @@ void RenderDebug()
                 direction.Normalize();
                 // use negative direction to visual actual light dir calculation in shader
                 auto v1 = VertexPositionColor(position, Colors::Red);
-                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, Colors::PowderBlue);
+                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, Colors::RoyalBlue);
                 g_d3dPrimitiveBatch->DrawLine(v1, v2);
             }
         }
@@ -1387,6 +1395,7 @@ void LoadLight()
 
     struct Light directional;
     directional.LightType = (int)LightType::Directional;
+    directional.Position = Vector4(0.0, 6.0, 0.0, 1.0f);
     directional.Direction = Vector4(1.0, 0.5, 0.25, 1.0f);
     directional.Strength = 0.5f;
     directional.Enabled = true;
@@ -1453,10 +1462,11 @@ void RenderScene()
     const UINT offset = 0;
     for (auto entity : Scene)
     {
-        entity->ConstantBuffer.material = entity->Material;
-
         // bind ConstantBuffers at object level
-        g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &entity->ConstantBuffer, 0, 0);
+        g_ObjectConstantBuffer.Material = entity->Material;
+        g_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
+        g_ObjectConstantBuffer.NormalMatrix = entity->NormalMatrix;
+        g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Object], 0, nullptr, &g_ObjectConstantBuffer, 0, 0);
 
         g_d3dDeviceContext->IASetVertexBuffers(
             0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
@@ -1526,8 +1536,8 @@ void UpdateScene(float deltaTime)
         
         auto model = Matrix::Identity;
         model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
-        entity->ConstantBuffer.modelMatrix = model;
-        entity->ConstantBuffer.normalMatrix = model.Transpose().Invert();
+        entity->WorldMatrix = model;
+        entity->NormalMatrix = model.Transpose().Invert();
     }
 }
 
