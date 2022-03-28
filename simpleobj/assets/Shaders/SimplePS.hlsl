@@ -155,7 +155,5 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         texColor = Texture.Sample(Sampler, IN.uv);
     }
 
-    // return texColor;
-
     return float4((emissive + ambient + diffuse + specular) * texColor.rgb, 1.0);
 }

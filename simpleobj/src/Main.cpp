@@ -483,9 +483,9 @@ void RenderImgui()
 
                 if ((LightType)light->LightType == LightType::Spotlight)
                 {
-                    float spotAngle = light->SpotAngle;
+                    float spotAngle = XMConvertToDegrees(light->SpotAngle);
                     ImGui::DragFloat("SpotAngle", &spotAngle, dragSpeed, 0.0f, 60.0f);
-                    light->SpotAngle = spotAngle;
+                    light->SpotAngle = XMConvertToRadians(spotAngle);
                 }
 
                 float position[3] = { light->Position.x, light->Position.y, light->Position.z };
@@ -499,7 +499,6 @@ void RenderImgui()
                 light->Direction.x = rotation[0];
                 light->Direction.y = rotation[1];
                 light->Direction.z = rotation[2];
-
                 float strength = light->Strength;
                 ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
                 light->Strength = strength;
@@ -1469,9 +1468,9 @@ void LoadLight()
 
     struct Light spotlight;
     spotlight.LightType = (int)LightType::Spotlight;
-    spotlight.Position = Vector4(0.0, 6.0, 0.0, 1.0f);
-    spotlight.Direction = Vector4(0, 0, 0.0, 1.0f);
-    spotlight.SpotAngle = 45.0f;
+    spotlight.Position = Vector4(0.178, 4.0, 0.6, 1.0f);
+    spotlight.Direction = Vector4(0.079, -0.285, 0.976f, 1.0f);
+    spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Strength = 1.0f;
     spotlight.Enabled = true;
 

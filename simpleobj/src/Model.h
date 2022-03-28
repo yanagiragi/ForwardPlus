@@ -5,7 +5,7 @@
 struct VertexData
 {
     float vertex[3];
-    float normal[2];
+    float normal[3];
     float uv[2];
 };
 
