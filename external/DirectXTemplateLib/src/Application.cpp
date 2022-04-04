@@ -3,10 +3,15 @@
 
 #include <Window.h>
 
+// use imgui by default
+#define USE_IMGUI
+
+#ifdef USE_IMGUI
 // imgui includes
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#endif
 
 #define WINDOW_CLASS_NAME "DX11RenderWindowClass"
 
@@ -20,8 +25,10 @@ static Application* gs_pSingelton = nullptr;
 static WindowMap gs_Windows;
 static WindowNameMap gs_WindowByName;
 
+#ifdef USE_IMGUI
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#endif
 
 static LRESULT CALLBACK WndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -230,6 +237,8 @@ MouseButtonEventArgs::MouseButton DecodeMouseButton( UINT messageID )
 
 static LRESULT CALLBACK WndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+
+#ifdef USE_IMGUI
     // Check if Imgui context is been created. Since re-draw event will be called before we setup Imgui
     if (ImGui::GetCurrentContext() != NULL)
     {
@@ -241,6 +250,7 @@ static LRESULT CALLBACK WndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
             return TRUE;
         }
     }
+#endif
 
     PAINTSTRUCT paintStruct;
     HDC hDC;

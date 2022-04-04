@@ -57,6 +57,11 @@ set(BUILD_XAUDIO_WIN7 OFF)
 add_subdirectory(external/DirectXTK)
 set_property(TARGET DirectXTK PROPERTY FOLDER "Dependencies")
 
+# DirectXTK Debug Draw
+message(STATUS "Installing DirectXTK-DebugDraw")
+file(COPY ../external/DirectXTK-DebugDraw DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+
+# Imgui
 message(STATUS "Installing Dear Imgui")
 file(GLOB IMGUI_FILES
   "../external/imgui/*.h"
@@ -66,11 +71,18 @@ file(GLOB IMGUI_FILES
 )
 file(COPY ${IMGUI_FILES} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 
-message(STATUS "Installing DirectXTK-DebugDraw")
-file(COPY ../external/DirectXTK-DebugDraw DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
-
+# imGuIZMO.quat
 message(STATUS "Installing imGuIZMO.quat")
 file(COPY ../external/imGuIZMO.quat/imGuIZMO.quat DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+
+# DirectXTemplateLib
+message(STATUS "Installing DirectXTemplateLib")
+file(COPY ../external/DirectXTemplateLib DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+INCLUDE_EXTERNAL_MSPROJECT(
+    DirectXTemplateLib
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DirectXTemplateLib/DirectXTemplateLib.vcxproj
+)
+set_property(TARGET DirectXTemplateLib PROPERTY FOLDER "Dependencies")
 
 # =============================================================
 
@@ -142,11 +154,13 @@ target_include_directories(
     PUBLIC external/Imgui
     PUBLIC external/imGuIZMO.quat
     PUBLIC external # for imGuIZMO.quat/imGuIZMOquat.cpp
+    PUBLIC external/DirectXTemplateLib/inc
 )
 
 add_dependencies(
     ${PROJECT_NAME}
     DirectXTK
+    DirectXTemplateLib
 )
 
 # =============================================================
