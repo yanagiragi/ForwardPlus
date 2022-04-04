@@ -20,42 +20,16 @@
 #define VGM_USES_LEFT_HAND_AXES
 #include "imGuIZMOquat.h"
 
+// DirectXTemplateLib includes
 #include "Game.h"
 #include "Camera.h"
 #include "Mesh.h"
 
+// our includes
+#include "Scene.h"
 #include "Material.h"
 #include "Light.h"
 #include "Entity.h"
-
-#define MAX_LIGHTS 8
-
-enum ConstantBuffer
-{
-    CB_Application,
-    CB_Frame,
-    CB_Object,
-    NumConstantBuffers
-};
-
-struct ApplicationConstantBuffer
-{
-    DirectX::SimpleMath::Matrix projectionMatrix;
-};
-
-struct FrameConstantBuffer
-{
-    DirectX::SimpleMath::Matrix viewMatrix;
-    DirectX::SimpleMath::Vector4 eyePosition;
-    struct Light lights[MAX_LIGHTS];
-};
-
-struct ObjectConstantBuffer
-{
-    DirectX::SimpleMath::Matrix WorldMatrix;
-    DirectX::SimpleMath::Matrix NormalMatrix;
-    struct Material Material;
-};
 
 class SimpleObj : public Game
 {
@@ -124,14 +98,21 @@ private:
 
     DirectX::XMINT2 m_PreviousMousePosition = {0, 0};
 
-    // Vertex buffer data
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dInputLayout = nullptr;
-
+    
     // Shader data
     __int64 m_d3dVertexShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dInputLayout = nullptr;
+
     __int64 m_d3dPixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dPixelShader = nullptr;
+    
+    __int64 m_d3dInstancedVertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dInstancedVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dInstancedInputLayout = nullptr;
+
+    __int64 m_d3dInstancedPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dInstancedPixelShader = nullptr;
 
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
@@ -166,7 +147,7 @@ private:
         true // use texture
     };
 
-    std::vector<Entity*> m_Scene;
+    Scene m_Scene;
 
     const float fov = DirectX::XM_PI / 4.f;
     const float nearPlane = 0.1f;

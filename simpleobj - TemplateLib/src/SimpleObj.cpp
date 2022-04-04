@@ -87,6 +87,66 @@ void SimpleObj::LoadShaderResources()
         // SafeRelease(pixelShaderBlob);
         m_d3dPixelShaderSize = size;
     }
+
+    // Load and compile the vertex shader
+    filename = L"assets/Shaders/InstancedVS.hlsl";
+    size = GetFileSize(filename);
+    if (size != m_d3dInstancedVertexShaderSize)
+    {
+        vertexShaderBlob = LoadShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, filename, "main", "latest");
+        m_d3dInstancedVertexShader = CreateShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, vertexShaderBlob, nullptr);
+        m_d3dInstancedVertexShaderSize = size;
+
+        // Create the input layout for the vertex shader.
+        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+        {
+            // Per-vertex data.
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            // Per-instance data.
+            { "WORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "WORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "WORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "WORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            
+            { "NORMALMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "NORMALMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "NORMALMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "NORMALMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+            { "MATERIAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Emissive
+            { "MATERIAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Ambient
+            { "MATERIAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Diffuse
+            { "MATERIAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Specular
+            { "MATERIAL", 4, DXGI_FORMAT_R32_UINT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },             // UseTexture
+            { "MATERIAL", 5, DXGI_FORMAT_R32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },            // SpecularPower
+            { "MATERIAL", 6, DXGI_FORMAT_R32G32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },         // Padding
+        };
+
+        hr = m_d3dDevice->CreateInputLayout(
+            vertexLayoutDesc,                           // input layout description
+            _countof(vertexLayoutDesc),                 // amount of the elements
+            vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+            vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+            &m_d3dInstancedInputLayout                           // pointer to the input-layout object
+        );
+        AssertIfFailed(hr, "Load Content", "Unable to create instanced input layout");
+
+        // After creating input layout, the shader blob is no longer needed
+        // SafeRelease(vertexShaderBlob);
+    }
+
+    pixelShaderBlob = nullptr;
+    filename = L"assets/Shaders/InstancedPS.hlsl";
+    size = GetFileSize(filename);
+    if (size != m_d3dInstancedPixelShaderSize)
+    {
+        pixelShaderBlob = LoadShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, filename, "main", "latest");
+        m_d3dInstancedPixelShader = CreateShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, pixelShaderBlob, nullptr);
+        // SafeRelease(pixelShaderBlob);
+        m_d3dInstancedPixelShaderSize = size;
+    }
 }
 
 /// <summary>
@@ -242,27 +302,69 @@ void SimpleObj::RenderScene()
         1                                       // stencil reference
     );
 
-    const UINT vertexStride = sizeof(VertexData);
-    const UINT offset = 0;
-    for (auto entity : m_Scene)
+    // Draw Regular Entities
     {
-        // bind ConstantBuffers at object level
-        m_ObjectConstantBuffer.Material = entity->Material;
-        m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-        m_ObjectConstantBuffer.NormalMatrix = entity->NormalMatrix;
-        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+        UINT vertexStride = sizeof(VertexData);
+        UINT offset = 0;
+        for (auto entity : m_Scene.Entities)
+        {
+            if (entity->Instanced)
+                continue;
 
-        m_d3dDeviceContext->IASetVertexBuffers(
-            0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-            1,                                      // number of vertex buffers in the array
-            &entity->VertexBuffer,                  // pointer to an array of vertex buffers
-            &vertexStride,                          // pointer to stride values
-            &offset                                 // pointer to offset values
-        );
-        m_d3dDeviceContext->Draw(
-            entity->Model->Vertices()->size(),
-            0
-        );
+            // bind ConstantBuffers at object level
+            m_ObjectConstantBuffer = entity->ConstantBuffer;
+            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+
+            auto vertexBuffer = entity->Model->VertexBuffer();
+            m_d3dDeviceContext->IASetVertexBuffers(
+                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+                1,                                      // number of vertex buffers in the array
+                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &vertexStride,                          // pointer to stride values
+                &offset                                 // pointer to offset values
+            );
+            m_d3dDeviceContext->Draw(
+                entity->Model->VertexCount(),
+                0
+            );
+        }
+    }
+    
+    // Draw Instanced Entities
+    {
+        m_d3dDeviceContext->VSSetShader(m_d3dInstancedVertexShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->IASetInputLayout(m_d3dInstancedInputLayout.Get());
+
+        m_d3dDeviceContext->PSSetShader(m_d3dInstancedPixelShader.Get(), nullptr, 0);
+
+        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(ObjectConstantBuffer) };
+        const UINT offset[2] = { 0, 0 };
+        std::vector<ObjectConstantBuffer> instanceData;
+        for (auto const& pair : m_Scene.InstancedEntity)
+        {
+            auto key = pair.first;
+            auto verticesCount = Model::GetVertexCount(key);
+            auto size = pair.second.size();
+
+            instanceData.clear();
+            for (auto const& instancedEntity : pair.second)
+            {
+                instanceData.emplace_back(instancedEntity->ConstantBuffer);
+            }
+
+            // update perInstanceBuffer
+            m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
+
+            ID3D11Buffer* buffers[2] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
+            m_d3dDeviceContext->IASetVertexBuffers(0, 2, buffers, vertexStride, offset);
+
+            m_d3dDeviceContext->DrawInstanced(
+                verticesCount,
+                size,
+                0,
+                0
+            );
+        }
     }
 }
 
@@ -353,10 +455,10 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
     if (ImGui::CollapsingHeader("Scene List"))
     {
-        auto sceneCount = m_Scene.size();
+        auto sceneCount = m_Scene.Count();
         for (int i = 0; i < sceneCount; ++i)
         {
-            auto entity = m_Scene.at(i);
+            auto entity = m_Scene.Entities.at(i);
             auto name = entity->Name.c_str();
 
             ImGui::PushID(format("##Entity:%d-%s", i, name).c_str());
@@ -414,9 +516,9 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
                 entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
 
-                float specularPower = entity->Material.SpecularPower;
+                float specularPower = entity->ConstantBuffer.Material.SpecularPower;
                 ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
-                entity->Material.SpecularPower = specularPower;
+                entity->ConstantBuffer.Material.SpecularPower = specularPower;
 
                 ImGui::TreePop();
             }
@@ -547,9 +649,9 @@ SimpleObj::SimpleObj(Window& window)
     , m_Pitch(0.0f)
     , m_Yaw(0.0f)
 {
-    m_Scene.emplace_back(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
-    m_Scene.emplace_back(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial));
-    m_Scene.emplace_back(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial));
+    m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial, true));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial, true));
 
     XMVECTOR cameraPos = XMVectorSet(0, 7.5, 25, 1);
     XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
@@ -588,7 +690,7 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
     XMStoreFloat4(&m_FrameConstantBuffer.eyePosition, m_Camera.get_Translation());
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
 
-    for (auto entity : m_Scene)
+    for (auto entity : m_Scene.Entities)
     {
         // update angle
         // entity->RotationAngle += deltaTime * entity->RotateSpeed;
@@ -598,8 +700,8 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
 
         auto model = Matrix::Identity;
         model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
-        entity->WorldMatrix = model;
-        entity->NormalMatrix = model.Transpose().Invert();
+        entity->ConstantBuffer.WorldMatrix = model;
+        entity->ConstantBuffer.NormalMatrix = model.Transpose().Invert();
     }
 }
 
@@ -808,34 +910,91 @@ bool SimpleObj::LoadContent()
 
     HRESULT hr;
 
-    for (auto entity : m_Scene)
+    for (auto entity : m_Scene.Entities)
     {
         entity->Model = new Model();
         entity->Model->Load(entity->ModelPath.c_str());
 
-        // Create an initialize the vertex buffer.
-        D3D11_BUFFER_DESC vertexBufferDesc;
-        ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        vertexBufferDesc.ByteWidth = sizeof(VertexData) * entity->Model->Vertices()->size();    // size of the buffer in bytes
-        vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
-        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
-        vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+        auto key = entity->Model->Key();
+        if (!Model::ContainsVertexBuffer(key))
+        {
+            // Create an initialize the vertex buffer.
+            D3D11_BUFFER_DESC vertexBufferDesc;
+            ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+            vertexBufferDesc.ByteWidth = sizeof(VertexData) * entity->Model->VertexCount();    // size of the buffer in bytes
+            vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+            vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+            vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+
+            D3D11_SUBRESOURCE_DATA resourceData;
+            ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+            resourceData.pSysMem = entity->Model->Head();                                   // pointer to the data to initialize the buffer with
+            resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
+                                                                                            // No used for now.
+            resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
+                                                                                            // no used for now.
+            ID3D11Buffer* buffer = nullptr;
+            hr = m_d3dDevice->CreateBuffer(
+                &vertexBufferDesc,                                                          // buffer description
+                &resourceData,                                                              // pointer to the initialization data
+                &buffer                                                                     // pointer to the created buffer object
+            );
+            std::string message = "Unable to create vertex buffer of " + entity->ModelPath;
+            AssertIfFailed(hr, "Load Content", message.c_str());
+
+            Model::AddVertexBuffer(key, buffer);
+        }
+    }
+
+    // update initial object cb for debugging, should bind buffer each frame
+    for (auto entity : m_Scene.Entities)
+    {
+        if (!entity->Instanced) continue;
+
+        // update angle
+        // entity->RotationAngle += deltaTime * entity->RotateSpeed;
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), entity->RotateAxisSpeed.x);
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), entity->RotateAxisSpeed.y);
+        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->RotateAxisSpeed.z);
+
+        auto model = Matrix::Identity;
+        model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
+        entity->ConstantBuffer.WorldMatrix = model;
+        entity->ConstantBuffer.NormalMatrix = model.Transpose().Invert();
+
+        entity->ConstantBuffer.Material.SpecularPower = 512.0f;
+    }
+
+    for (auto pair : m_Scene.InstancedEntity)
+    {
+        auto key = pair.first;
+
+        std::vector<ObjectConstantBuffer> instanceData;
+        for (auto const& instancedEntity : pair.second)
+        {
+            instanceData.emplace_back(instancedEntity->ConstantBuffer);
+        }
+
+        // Create the per-instance vertex buffer.
+        D3D11_BUFFER_DESC instanceBufferDesc;
+        ZeroMemory(&instanceBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+        instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        instanceBufferDesc.ByteWidth = sizeof(ObjectConstantBuffer) * pair.second.size();
+        instanceBufferDesc.CPUAccessFlags = 0;
+        instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        
 
         D3D11_SUBRESOURCE_DATA resourceData;
         ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-        resourceData.pSysMem = entity->Model->Head();                                   // pointer to the data to initialize the buffer with
-        resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
-                                                                                        // No used for now.
-        resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
-                                                                                        // no used for now.
+        resourceData.pSysMem = instanceData.data();
+        resourceData.SysMemPitch = 0;
+        resourceData.SysMemSlicePitch = 0;
 
-        hr = m_d3dDevice->CreateBuffer(
-            &vertexBufferDesc,                                                          // buffer description
-            &resourceData,                                                              // pointer to the initialization data
-            &entity->VertexBuffer                                                       // pointer to the created buffer object
-        );
-        std::string message = "Unable to create vertex buffer of " + entity->ModelPath;
-        AssertIfFailed(hr, "Load Content", message.c_str());
+        ID3D11Buffer* d3dPlaneInstanceBuffer;
+        hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &d3dPlaneInstanceBuffer);
+
+        Model::AddInstancedVertexBuffer(key, d3dPlaneInstanceBuffer);
     }
 
     // Create the constant buffers for the variables defined in the vertex shader.
