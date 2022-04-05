@@ -2,6 +2,12 @@
 
 Modified from [jpvanoosten/LearningDirectX11](https://github.com/jpvanoosten/LearningDirectX11/tree/v1.0.0) from [this article](https://www.3dgep.com/introduction-to-directx-11/#DirectX_11_Pipeline)
 
+- This version supports:
+
+    - Draw Simple Cube using shader
+
+    - Use glm as math library
+
 ## Setup
 
 First install:
@@ -12,15 +18,11 @@ First install:
 
 - [Visual Studio](https://visualstudio.microsoft.com/downloads/)
 
-- [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/)
-    
-    - Use Windows SDK version 11 if you are win11, or use version 10 for win10.
-
 Then type the following in your [terminal](https://hyper.is/).
 
 ```bash
 # Clone the repo
-git clone https://github.com/yanagiragi/ForwardPlus --recurse-submodules
+git clone https://github.com/yanagiragi/ForwardPlus
 
 # go inside the folder
 cd "template"
@@ -46,9 +48,3 @@ cmake --build .
 ├─ 📄 license.md                   # Your License (Unlicense)
 └─ 📃readme.md                     # Readme
 ```
-
-## Math Library
-
-We use [glm](https://github.com/g-truc/glm) for early development, and switch to [DirectXTK](https://github.com/microsoft/DirectXTK) after `simpleobj`.
-
-Remove `glm` is leave as a todo at the moment.

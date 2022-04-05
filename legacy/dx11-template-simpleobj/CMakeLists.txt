@@ -36,13 +36,6 @@ endif()
 
 # Dependencies
 
-# GLM
-# message(STATUS "Installing glm via COPY")
-# file(COPY ../external/glm DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
-# set(BUILD_STATIC_LIBS ON)
-# add_subdirectory(external/glm/glm)
-# set_property(TARGET glm_static PROPERTY FOLDER "Dependencies")
-
 # TinyObjLoader
 message(STATUS "Installing TinyObjLoader")
 file(COPY ../external/tinyobjloader/tiny_obj_loader.h DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/tinyobjloader)

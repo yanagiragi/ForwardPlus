@@ -1,6 +1,18 @@
 # DirectX 11 Seed
 
-Modified from [jpvanoosten/LearningDirectX11](https://github.com/jpvanoosten/LearningDirectX11/tree/v1.0.0) from [this article](https://www.3dgep.com/introduction-to-directx-11/#DirectX_11_Pipeline)
+- Modified from [jpvanoosten/LearningDirectX11](https://github.com/jpvanoosten/LearningDirectX11/tree/v1.0.0) from [this article](https://www.3dgep.com/texturing-lighting-directx-11/)
+
+- This version supports:
+
+    - Integrate template from `jpvanoosten/LearningDirectX11`
+
+    - UI to control model & lights & materials
+
+    - Blinn-Phong lighting
+
+    - Support Instance Draw
+
+    - Use DirectXTK::SimpleMath as math library
 
 ## Setup
 
@@ -46,9 +58,3 @@ cmake --build .
 ├─ 📄 license.md                   # Your License (Unlicense)
 └─ 📃readme.md                     # Readme
 ```
-
-## Math Library
-
-We use [glm](https://github.com/g-truc/glm) for early development, and switch to [DirectXTK](https://github.com/microsoft/DirectXTK) after `simpleobj`.
-
-Remove `glm` is leave as a todo at the moment.

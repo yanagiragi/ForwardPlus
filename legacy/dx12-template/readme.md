@@ -1,3 +1,6 @@
+> This project is wip when refactor.
+> No longer supported for now.
+
 ![Cover Art](https://alain.xyz/blog/raw-directx12/assets/cover.jpg)
 
 # DirectX 12 Seed
