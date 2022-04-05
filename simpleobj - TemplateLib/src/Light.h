@@ -33,3 +33,17 @@ struct Light
     int         Padding = 0;                            // 4 bytes
     //--------------------------------------------------------- (16 byte boundary)
 };  // Total:                                       // 80 bytes (5 * 16)
+
+struct LightProperties
+{
+    LightProperties()
+        : EyePosition(0.0f, 0.0f, 0.0f, 1.0f)
+        , GlobalAmbient(0.2f, 0.2f, 0.8f, 1.0f)
+    {}
+
+    Vector4   EyePosition;
+    //----------------------------------- (16 byte boundary)
+    Vector4   GlobalAmbient;
+    //----------------------------------- (16 byte boundary)
+    Light     Lights[MAX_LIGHTS]; // 80 * 8 bytes
+};  // Total:                                  672 bytes (42 * 16)

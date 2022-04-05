@@ -5,6 +5,7 @@
 #include <map>
 
 #include "Entity.h"
+#include "Light.h"
 
 struct InstancedEntity
 {
@@ -38,6 +39,7 @@ public:
         return Entities.size();
     }
 
+    Light Lights[MAX_LIGHTS];
     std::vector<Entity*> Entities;
     std::map<std::string, std::vector<Entity*>> InstancedEntity;
 };

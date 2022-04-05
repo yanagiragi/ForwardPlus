@@ -1,5 +1,9 @@
-#include "Structures.hlsli"
-#include "ConstrantBuffers.hlsli"
+cbuffer PerObject : register(b0)
+{
+    matrix WorldMatrix;
+    matrix InverseTransposeWorldMatrix;
+    matrix WorldViewProjectionMatrix;
+}
 
 // ==============================================================
 //
@@ -25,10 +29,9 @@ struct VertexShaderOutput
 VertexShaderOutput main(AppData IN)
 {
     VertexShaderOutput OUT;
-    matrix mvp = mul(projectionMatrix, mul(viewMatrix, modelMatrix));
-    OUT.PositionCS = mul(mvp, float4(IN.position, 1.0f));
-    OUT.PositionWS = mul(modelMatrix, float4(IN.position, 1.0f));
-    OUT.NormalWS = mul(normalMatrix, float4(IN.normal, 1.0f));
+    OUT.PositionCS = mul(WorldViewProjectionMatrix, float4(IN.position, 1.0f));
+    OUT.PositionWS = mul(WorldMatrix, float4(IN.position, 1.0f));
+    OUT.NormalWS = mul(InverseTransposeWorldMatrix, float4(IN.normal, 1.0f));
     OUT.uv = IN.uv;
     return OUT;
 }

@@ -70,7 +70,7 @@ private:
 
     // Functions
     void LoadShaderResources();
-    void LoadEffect();
+    void LoadDebugDraw();
     void LoadTexture();
     void LoadLight();
 
@@ -126,9 +126,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_GridTexture = nullptr;
 
     struct ObjectConstantBuffer m_ObjectConstantBuffer;
-    struct ApplicationConstantBuffer m_ApplicationConstantBuffer;
     struct FrameConstantBuffer m_FrameConstantBuffer;
-
+    struct MaterialProperties m_MaterialPropertiesConstantBuffer;
+    struct LightProperties m_LightPropertiesConstantBuffer;
+    
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
     struct Material defaultMaterial;
@@ -149,7 +150,7 @@ private:
 
     Scene m_Scene;
 
-    const float fov = DirectX::XM_PI / 4.f;
+    const float fovInDegree = 45.0f;
     const float nearPlane = 0.1f;
     const float farPlane = 100.f;
 

@@ -1,5 +1,19 @@
 #include "Structures.hlsli"
-#include "ConstrantBuffers.hlsli"
+
+cbuffer MaterialProperties : register(b0)
+{
+    struct _Material Material;
+};
+
+cbuffer LightProperties : register(b1)
+{
+    float4 EyePosition;                 // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    float4 GlobalAmbient;               // 16 bytes
+    //----------------------------------- (16 byte boundary)
+    struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
+};  // Total:                           // 672 bytes (42 * 16 byte boundary)
+
 
 Texture2D Texture : register(t0);
 sampler Sampler : register(s0);
@@ -139,8 +153,6 @@ struct PixelShaderInput
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    float GlobalAmbient = 0.05f;
-
     LightingResult lit = ComputeLighting(IN.PositionWS, normalize(IN.NormalWS));
 
     float3 emissive = Material.Emissive;

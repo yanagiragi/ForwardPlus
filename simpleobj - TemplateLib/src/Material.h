@@ -14,3 +14,8 @@ struct Material
     float SpecularPower = 128.0f;
     Vector2 Padding;
 };
+
+struct MaterialProperties
+{
+    struct Material Material;
+};

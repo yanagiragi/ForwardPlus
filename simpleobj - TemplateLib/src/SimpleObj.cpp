@@ -152,7 +152,7 @@ void SimpleObj::LoadShaderResources()
 /// <summary>
 /// Setup DirextXTK Effect
 /// </summary>
-void SimpleObj::LoadEffect()
+void SimpleObj::LoadDebugDraw()
 {
     HRESULT hr;
 
@@ -164,10 +164,10 @@ void SimpleObj::LoadEffect()
     hr = CreateInputLayoutFromEffect<VertexPositionColor>(m_d3dDevice.Get(), m_d3dEffect.get(), &m_d3dPrimitiveBatchInputLayout);
     AssertIfFailed(hr, "Create Primitive Batch Failed", "Unable to call CreateInputLayoutFromEffect()");
 
-    // setup projection matrix for effect
-    m_d3dEffect->SetProjection(m_ApplicationConstantBuffer.projectionMatrix);
-
     m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
+
+    // Create Primitive Batcher
+    m_d3dPrimitiveBatch = std::make_unique<PrimitiveBatch<VertexPositionColor>>(m_d3dDeviceContext.Get());
 }
 
 /// <summary>
@@ -232,9 +232,9 @@ void SimpleObj::LoadLight()
     spotlight.Strength = 1.0f;
     spotlight.Enabled = true;
 
-    m_FrameConstantBuffer.lights[0] = point;
-    m_FrameConstantBuffer.lights[1] = directional;
-    m_FrameConstantBuffer.lights[2] = spotlight;
+    m_Scene.Lights[0] = point;
+    m_Scene.Lights[1] = directional;
+    m_Scene.Lights[2] = spotlight;
 }
 
 /// <summary>
@@ -244,6 +244,20 @@ void SimpleObj::RenderScene()
 {
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
+
+    // Setup Frame CB
+    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
+    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
+
+    // Setup Light CB
+    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
+    m_LightPropertiesConstantBuffer.GlobalAmbient = Vector4(0.05f, 0.05f, 0.05f, 1.0f);
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
+    }
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
 
     // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(m_d3dInputLayout.Get());
@@ -256,9 +270,9 @@ void SimpleObj::RenderScene()
         0                                       // number of class-instance interfaces of previous param
     );
     m_d3dDeviceContext->VSSetConstantBuffers(
-        0,                                      // start slot
-        3,                                      // number of buffers
-        m_d3dConstantBuffers->GetAddressOf()    // array of constant buffers
+        0,                                               // start slot
+        1,                                               // number of buffers
+        m_d3dConstantBuffers[CB_Object].GetAddressOf()   // array of constant buffers
     );
 
     // Setup the rasterizer stage
@@ -271,10 +285,11 @@ void SimpleObj::RenderScene()
 
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dPixelShader.Get(), nullptr, 0);
+    ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Material].Get(), m_d3dConstantBuffers[CB_Light].Get() };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,                                      // start slot
-        3,                                      // number of buffers
-        m_d3dConstantBuffers->GetAddressOf()    // array of constant buffers
+        2,                                      // number of buffers
+        pixelShaderConstantBuffers              // array of constant buffers
     );
 
     ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
@@ -311,8 +326,14 @@ void SimpleObj::RenderScene()
             if (entity->Instanced)
                 continue;
 
-            // bind ConstantBuffers at object level
-            m_ObjectConstantBuffer = entity->ConstantBuffer;
+            // Setup Material CB
+            m_MaterialPropertiesConstantBuffer.Material = entity->Material;
+            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
+
+            // Setup Object CB
+            m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
+            m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
             auto vertexBuffer = entity->Model->VertexBuffer();
@@ -332,14 +353,24 @@ void SimpleObj::RenderScene()
     
     // Draw Instanced Entities
     {
-        m_d3dDeviceContext->VSSetShader(m_d3dInstancedVertexShader.Get(), nullptr, 0);
         m_d3dDeviceContext->IASetInputLayout(m_d3dInstancedInputLayout.Get());
+        m_d3dDeviceContext->VSSetShader(m_d3dInstancedVertexShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->VSSetConstantBuffers(
+            0,                                               // start slot
+            1,                                               // number of buffers
+            m_d3dConstantBuffers[CB_Frame].GetAddressOf()    // array of constant buffers
+        );
 
         m_d3dDeviceContext->PSSetShader(m_d3dInstancedPixelShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->PSSetConstantBuffers(
+            0,                                               // start slot
+            1,                                               // number of buffers
+            m_d3dConstantBuffers[CB_Light].GetAddressOf()    // array of constant buffers
+        );
 
-        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(ObjectConstantBuffer) };
+        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
         const UINT offset[2] = { 0, 0 };
-        std::vector<ObjectConstantBuffer> instanceData;
+        std::vector<InstancedObjectConstantBuffer> instanceData;
         for (auto const& pair : m_Scene.InstancedEntity)
         {
             auto key = pair.first;
@@ -349,7 +380,11 @@ void SimpleObj::RenderScene()
             instanceData.clear();
             for (auto const& instancedEntity : pair.second)
             {
-                instanceData.emplace_back(instancedEntity->ConstantBuffer);
+                instanceData.push_back({
+                    instancedEntity->WorldMatrix,
+                    instancedEntity->InverseTransposeWorldMatrix,
+                    instancedEntity->Material
+                });
             }
 
             // update perInstanceBuffer
@@ -387,7 +422,7 @@ void SimpleObj::RenderDebug()
         float directionalLightDebugLength = 2.0f;
         for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
-            auto light = &m_FrameConstantBuffer.lights[i];
+            auto light = &m_Scene.Lights[i];
             auto position = Vector3(light->Position.x, light->Position.y, light->Position.z);
             auto type = (LightType)light->LightType;
             auto strength = light->Strength;
@@ -516,9 +551,9 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
                 entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
 
-                float specularPower = entity->ConstantBuffer.Material.SpecularPower;
+                float specularPower = entity->Material.SpecularPower;
                 ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
-                entity->ConstantBuffer.Material.SpecularPower = specularPower;
+                entity->Material.SpecularPower = specularPower;
 
                 ImGui::TreePop();
             }
@@ -531,7 +566,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     {
         for (int i = 0; i < MAX_LIGHTS; ++i)
         {
-            auto light = &m_FrameConstantBuffer.lights[i];
+            auto light = &m_Scene.Lights[i];
             auto lightName = format("Light (%d)", i);
             auto name = lightName.c_str();
 
@@ -685,11 +720,7 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
     XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
     m_Camera.set_Rotation(cameraRotation);
 
-    // view matrix
-    m_FrameConstantBuffer.viewMatrix = m_Camera.get_ViewMatrix();
-    XMStoreFloat4(&m_FrameConstantBuffer.eyePosition, m_Camera.get_Translation());
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
-
+    Matrix viewProjectionMatrix = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
     for (auto entity : m_Scene.Entities)
     {
         // update angle
@@ -700,8 +731,9 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
 
         auto model = Matrix::Identity;
         model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
-        entity->ConstantBuffer.WorldMatrix = model;
-        entity->ConstantBuffer.NormalMatrix = model.Transpose().Invert();
+        entity->WorldMatrix = model;
+        entity->InverseTransposeWorldMatrix = model.Transpose().Invert();
+        entity->WorldViewProjectionMatrix = model * viewProjectionMatrix;
     }
 }
 
@@ -888,7 +920,8 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
 
     float aspectRatio = e.Width / (float)e.Height;
 
-    m_Camera.set_Projection(fov, aspectRatio, nearPlane, farPlane);
+    m_Camera.set_Projection(fovInDegree, aspectRatio, nearPlane, farPlane);
+    m_d3dEffect->SetProjection(m_Camera.get_ProjectionMatrix());
 
     // Setup the viewports for the camera.
     D3D11_VIEWPORT viewport;
@@ -946,33 +979,19 @@ bool SimpleObj::LoadContent()
         }
     }
 
-    // update initial object cb for debugging, should bind buffer each frame
-    for (auto entity : m_Scene.Entities)
-    {
-        if (!entity->Instanced) continue;
-
-        // update angle
-        // entity->RotationAngle += deltaTime * entity->RotateSpeed;
-        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), entity->RotateAxisSpeed.x);
-        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), entity->RotateAxisSpeed.y);
-        entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->RotateAxisSpeed.z);
-
-        auto model = Matrix::Identity;
-        model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
-        entity->ConstantBuffer.WorldMatrix = model;
-        entity->ConstantBuffer.NormalMatrix = model.Transpose().Invert();
-
-        entity->ConstantBuffer.Material.SpecularPower = 512.0f;
-    }
-
     for (auto pair : m_Scene.InstancedEntity)
     {
         auto key = pair.first;
+        auto instanceCount = pair.second.size();
 
-        std::vector<ObjectConstantBuffer> instanceData;
+        std::vector<InstancedObjectConstantBuffer> instanceData;
         for (auto const& instancedEntity : pair.second)
         {
-            instanceData.emplace_back(instancedEntity->ConstantBuffer);
+            instanceData.push_back({
+                instancedEntity->WorldMatrix,
+                instancedEntity->InverseTransposeWorldMatrix,
+                instancedEntity->Material
+                });
         }
 
         // Create the per-instance vertex buffer.
@@ -980,10 +999,9 @@ bool SimpleObj::LoadContent()
         ZeroMemory(&instanceBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
         instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        instanceBufferDesc.ByteWidth = sizeof(ObjectConstantBuffer) * pair.second.size();
+        instanceBufferDesc.ByteWidth = sizeof(InstancedObjectConstantBuffer) * instanceCount;
         instanceBufferDesc.CPUAccessFlags = 0;
         instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        
 
         D3D11_SUBRESOURCE_DATA resourceData;
         ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
@@ -997,72 +1015,54 @@ bool SimpleObj::LoadContent()
         Model::AddInstancedVertexBuffer(key, d3dPlaneInstanceBuffer);
     }
 
-    // Create the constant buffers for the variables defined in the vertex shader.
-    D3D11_BUFFER_DESC applicationConstantBufferDesc;
-    ZeroMemory(&applicationConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    applicationConstantBufferDesc.ByteWidth = sizeof(struct ApplicationConstantBuffer);
-    applicationConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    applicationConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    applicationConstantBufferDesc.CPUAccessFlags = 0;
+    {
+        D3D11_BUFFER_DESC frameConstantBufferDesc;
+        ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        frameConstantBufferDesc.ByteWidth = sizeof(struct FrameConstantBuffer);
+        frameConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        frameConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        frameConstantBufferDesc.CPUAccessFlags = 0;
 
-    hr = m_d3dDevice->CreateBuffer(&applicationConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Application]);
-    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Application");
+        hr = m_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Frame]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Frame");
 
-    D3D11_BUFFER_DESC frameConstantBufferDesc;
-    ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    frameConstantBufferDesc.ByteWidth = sizeof(struct FrameConstantBuffer);
-    frameConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    frameConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    frameConstantBufferDesc.CPUAccessFlags = 0;
+        D3D11_BUFFER_DESC objectConstantBufferDesc;
+        ZeroMemory(&objectConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        objectConstantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
+        objectConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        objectConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        objectConstantBufferDesc.CPUAccessFlags = 0;
 
-    hr = m_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Frame]);
-    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Frame");
+        hr = m_d3dDevice->CreateBuffer(&objectConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Object]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
 
-    D3D11_BUFFER_DESC objectConstantBufferDesc;
-    ZeroMemory(&objectConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-    objectConstantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
-    objectConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    objectConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    objectConstantBufferDesc.CPUAccessFlags = 0;
+        D3D11_BUFFER_DESC materialConstantBufferDesc;
+        ZeroMemory(&materialConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        materialConstantBufferDesc.ByteWidth = sizeof(struct MaterialProperties);
+        materialConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        materialConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        materialConstantBufferDesc.CPUAccessFlags = 0;
 
-    hr = m_d3dDevice->CreateBuffer(&objectConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Object]);
-    AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
+        hr = m_d3dDevice->CreateBuffer(&materialConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Material]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Material");
+
+        D3D11_BUFFER_DESC lightConstantBufferDesc;
+        ZeroMemory(&lightConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        lightConstantBufferDesc.ByteWidth = sizeof(struct LightProperties);
+        lightConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        lightConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        lightConstantBufferDesc.CPUAccessFlags = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&lightConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Light]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
+
+    }
 
     LoadShaderResources();
-
-    // Setup the projection matrix.
-    RECT clientRect;
-    GetClientRect(m_Window.get_WindowHandle(), &clientRect);
-
-    // Compute the exact client dimensions, which is required for a correct projection matrix.
-    float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
-    float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
-
-    // Setup projection matrix in LH coordinates
-    m_ApplicationConstantBuffer.projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), nearPlane, farPlane);
-
-    // DirectXTK default uses RH coordintate, don't use it
-    // m_ApplicationConstantBuffer.projectionMatrix = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PI / 4.f, float(clientWidth) / float(clientHeight), 0.1f, 100.f);
-
-    m_d3dDeviceContext->UpdateSubresource(
-        m_d3dConstantBuffers[CB_Application].Get(),     // pointer to the destination resource
-        0,                                              // zero-based index that identifies the destination subresource
-        nullptr,                                        // pointer to the box that defines the portion of the destination subresource
-                                                        // to copy the resource data into
-        &m_ApplicationConstantBuffer,                   // pointer to the source data in memory
-        0,                                              // size of one row of the source data
-        0                                               // size of one depth slice of source data
-    );
-
     LoadLight();
-
-    LoadEffect();
-
+    LoadDebugDraw();
     LoadTexture();
 
-    // Create Primitive Batcher
-    m_d3dPrimitiveBatch = std::make_unique<PrimitiveBatch<VertexPositionColor>>(m_d3dDeviceContext.Get());
-    
     // Force a resize event so the camera's projection matrix gets initialized.
     ResizeEventArgs resizeEventArgs(m_Window.get_ClientWidth(), m_Window.get_ClientHeight());
     OnResize(resizeEventArgs);

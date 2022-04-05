@@ -1,5 +1,11 @@
 #include "Structures.hlsli"
-#include "ConstrantBuffers.hlsli"
+
+cbuffer PerFrame : register(b0)
+{
+    matrix ViewMatrix;
+    matrix ProjectionMatrix;
+}
+
 
 // ==============================================================
 //
@@ -15,7 +21,7 @@ struct AppData
     float2 uv : TEXCOORD;
     // Per-instance data
     matrix WorldMatrix : WORLDMATRIX;
-    matrix NormalMatrix : NORMALMATRIX;
+    matrix InverseTransposeWorldMatrix : NORMALMATRIX;
     struct _Material Material : MATERIAL;
 };
 
@@ -31,10 +37,10 @@ struct VertexShaderOutput
 VertexShaderOutput main(AppData IN)
 {
     VertexShaderOutput OUT;
-    matrix mvp = mul(projectionMatrix, mul(viewMatrix, IN.WorldMatrix));
+    matrix mvp = mul(ProjectionMatrix, mul(ViewMatrix, IN.WorldMatrix));
     OUT.PositionCS = mul(mvp, float4(IN.position, 1.0f));
     OUT.PositionWS = mul(IN.WorldMatrix, float4(IN.position, 1.0f));
-    OUT.NormalWS = mul(IN.NormalMatrix, float4(IN.normal, 1.0f));
+    OUT.NormalWS = mul(IN.InverseTransposeWorldMatrix, float4(IN.normal, 1.0f));
     OUT.Material = IN.Material;
     OUT.uv = IN.uv;
     return OUT;
