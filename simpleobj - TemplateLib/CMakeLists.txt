@@ -88,10 +88,13 @@ set_property(TARGET DirectXTemplateLib PROPERTY FOLDER "Dependencies")
 
 # Sources
 
-file(GLOB_RECURSE FILE_SOURCES RELATIVE
+file(GLOB_RECURSE CPP_SOURCES RELATIVE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
+)
+
+file(GLOB_RECURSE HEADER_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/*.h
 )
 
 file(GLOB_RECURSE DEBUG_DRAW_SOURCES
@@ -107,16 +110,20 @@ file(GLOB_RECURSE IMGUI_SOURCES
 )
 
 # Solution Filters
-foreach(source IN LISTS FILE_SOURCES)
+foreach(source IN LISTS CPP_SOURCES)
     source_group("" FILES "${source}")
 endforeach()
 
+foreach(source IN LISTS HEADER_SOURCES)
+    source_group("Headers" FILES "${source}")
+endforeach()
+
 foreach(source IN LISTS IMGUI_SOURCES)
-    source_group("imgui" FILES "${source}")
+    source_group("Imgui" FILES "${source}")
 endforeach()
 
 foreach(source IN LISTS IMGUI_PLUGIN_SOURCES)
-    source_group("imgui" FILES "${source}")
+    source_group("Imgui" FILES "${source}")
 endforeach()
 
 foreach(source IN LISTS DEBUG_DRAW_SOURCES)
@@ -130,7 +137,8 @@ endforeach()
 add_executable(
     ${PROJECT_NAME}
     WIN32
-    "${FILE_SOURCES}"
+    "${CPP_SOURCES}"
+    "${HEADER_SOURCES}"
     "${IMGUI_SOURCES}"
     "${DEBUG_DRAW_SOURCES}"
     "${IMGUI_PLUGIN_SOURCES}"
@@ -147,6 +155,7 @@ target_link_libraries(
 
 target_include_directories(
     ${PROJECT_NAME}
+    PUBLIC inc
     PUBLIC external/tinyobjloader
     PUBLIC external/DirectXTK/Inc
     PUBLIC external/DirectXTK/Src # for pch.h
