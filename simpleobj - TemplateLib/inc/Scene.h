@@ -34,6 +34,7 @@ public:
         return Entities.size();
     }
 
+    Vector4 GlobalAmbient = Vector4(0.05, 0.05, 0.05, 1.0);
     Light Lights[MAX_LIGHTS];
     std::vector<Entity*> Entities;
     std::map<std::string, std::vector<Entity*>> InstancedEntity;

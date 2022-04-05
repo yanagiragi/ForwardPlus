@@ -248,7 +248,7 @@ void SimpleObj::RenderScene()
 
     // Setup Light CB
     m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
-    m_LightPropertiesConstantBuffer.GlobalAmbient = Vector4(0.05f, 0.05f, 0.05f, 1.0f);
+    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
     for (int i = 0; i < MAX_LIGHTS; ++i)
     {
         m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
@@ -484,6 +484,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
     ImGui::Text(format("Fps: %f (%f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
 
+    if (ImGui::CollapsingHeader("Global Properties"))
+    {
+        ImGui::PushID("##Global-Properties");
+
+        float ambient[3] = { m_Scene.GlobalAmbient.x, m_Scene.GlobalAmbient.y, m_Scene.GlobalAmbient.z };
+        ImGui::ColorEdit3("Ambient", ambient);
+        m_Scene.GlobalAmbient.x = ambient[0];
+        m_Scene.GlobalAmbient.y = ambient[1];
+        m_Scene.GlobalAmbient.z = ambient[2];
+
+        ImGui::PopID();
+    }
+
     if (ImGui::CollapsingHeader("Scene List"))
     {
         auto sceneCount = m_Scene.Count();
@@ -547,8 +560,36 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
                 entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
 
+                float emissive[3] = { entity->Material.Emissive.x, entity->Material.Emissive.y, entity->Material.Emissive.z };
+                ImGui::ColorEdit3("Emissive", emissive);
+                entity->Material.Emissive.x = emissive[0];
+                entity->Material.Emissive.y = emissive[1];
+                entity->Material.Emissive.z = emissive[2];
+
+                float ambient[3] = { entity->Material.Ambient.x, entity->Material.Ambient.y, entity->Material.Ambient.z };
+                ImGui::ColorEdit3("Ambient", ambient);
+                entity->Material.Ambient.x = ambient[0];
+                entity->Material.Ambient.y = ambient[1];
+                entity->Material.Ambient.z = ambient[2];
+
+                float diffuse[3] = { entity->Material.Diffuse.x, entity->Material.Diffuse.y, entity->Material.Diffuse.z };
+                ImGui::ColorEdit3("Diffuse", diffuse);
+                entity->Material.Diffuse.x = diffuse[0];
+                entity->Material.Diffuse.y = diffuse[1];
+                entity->Material.Diffuse.z = diffuse[2];
+
+                float specular[3] = { entity->Material.Specular.x, entity->Material.Specular.y, entity->Material.Specular.z };
+                ImGui::ColorEdit3("Specular", specular);
+                entity->Material.Specular.x = specular[0];
+                entity->Material.Specular.y = specular[1];
+                entity->Material.Specular.z = specular[2];
+
+                bool UseTexture = entity->Material.UseTexture == 1;
+                ImGui::Checkbox("UseTexture", &UseTexture);
+                entity->Material.UseTexture = UseTexture ? 1 : 0;
+
                 float specularPower = entity->Material.SpecularPower;
-                ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 512.0f);
+                ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 128.0f);
                 entity->Material.SpecularPower = specularPower;
 
                 ImGui::TreePop();
