@@ -6,12 +6,7 @@
 
 #include "Entity.h"
 #include "Light.h"
-
-struct InstancedEntity
-{
-    Entity* Entity;
-    ID3D11Buffer* InstancedBuffer;
-};
+#include "Common.h"
 
 class Scene
 {

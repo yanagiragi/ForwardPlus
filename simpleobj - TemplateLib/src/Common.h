@@ -114,6 +114,22 @@ inline void SafeRelease(Microsoft::WRL::ComPtr<T> ptr)
 }
 
 /// <summary>
+/// Safely release a COM object
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="ptr"></param>
+template<class T>
+inline void SafeRelease(T* ptr)
+{
+    if (ptr != NULL)
+    {
+        ptr->Release();
+        ptr = NULL;
+    }
+}
+
+
+/// <summary>
 /// Display last error from Win32api in message box
 /// </summary>
 /// <param name="messagePrefix"></param>

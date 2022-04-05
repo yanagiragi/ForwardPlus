@@ -1070,5 +1070,5 @@ bool SimpleObj::LoadContent()
 
 void SimpleObj::UnloadContent()
 {
-
+    Model::UnloadStaticResources();
 }

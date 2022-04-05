@@ -5,6 +5,8 @@
 #include <map>
 #include <d3d11.h>
 
+#include "Common.h"
+
 struct VertexData
 {
     float vertex[3];
@@ -80,6 +82,22 @@ public:
             return m_Resources[key].size();
         }
         return -1;
+    }
+
+    static void UnloadStaticResources()
+    {
+        m_Resources.clear();
+        m_RefCount.clear();
+        
+        for (auto& pair : m_VertexBuffers) {
+            SafeRelease(pair.second);
+        }
+        m_VertexBuffers.clear();
+
+        for (auto& pair : m_PerInstanceVertexBuffers) {
+            SafeRelease(pair.second);
+        }
+        m_PerInstanceVertexBuffers.clear();
     }
 
 private:
