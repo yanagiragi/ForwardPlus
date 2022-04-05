@@ -22,131 +22,127 @@ void SimpleObj::LoadShaderResources()
     // and buffers that are created with the D3D11_USAGE_DEFAULT flag must have their CPU AccessFlags set to 0.
 
     // Load and compile the vertex shader
-    ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-    std::wstring filename = L"assets/Shaders/SimpleVS.hlsl";
-    _int64 size = GetFileSize(filename);
-    if (size != m_d3dVertexShaderSize)
     {
-        vertexShaderBlob = LoadShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, filename, "main", "latest");
-        m_d3dVertexShader = CreateShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, vertexShaderBlob, nullptr);
-        m_d3dVertexShaderSize = size;
-
-        // Create the input layout for the vertex shader.
-        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/SimpleVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dVertexShaderSize)
         {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dVertexShader);
+            m_d3dVertexShaderSize = size;
+
+            // Create the input layout for the vertex shader.
+            D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
             {
-                "POSITION",                             // semantic name
-                0,                                      // semantic index
-                DXGI_FORMAT_R32G32B32_FLOAT,            // format
-                0,                                      // input slot (used for packed vertex buffers)
-                offsetof(VertexData, vertex),           // aligned byte offset
-                D3D11_INPUT_PER_VERTEX_DATA,            // input slot class
-                0                                       // additional param for slot class: D3D11_INPUT_PER_INSTANCE_DATA
-            },
-            {
-                "NORMAL",
-                0,
-                DXGI_FORMAT_R32G32B32_FLOAT,
-                0,
-                offsetof(VertexData, normal),
-                D3D11_INPUT_PER_VERTEX_DATA,
-                0
-            },
-            {
-                "TEXCOORD",
-                0,
-                DXGI_FORMAT_R32G32_FLOAT,
-                0,
-                offsetof(VertexData, uv),
-                D3D11_INPUT_PER_VERTEX_DATA,
-                0
-            }
-        };
+                {
+                    "POSITION",                             // semantic name
+                    0,                                      // semantic index
+                    DXGI_FORMAT_R32G32B32_FLOAT,            // format
+                    0,                                      // input slot (used for packed vertex buffers)
+                    offsetof(VertexData, vertex),           // aligned byte offset
+                    D3D11_INPUT_PER_VERTEX_DATA,            // input slot class
+                    0                                       // additional param for slot class: D3D11_INPUT_PER_INSTANCE_DATA
+                },
+                {
+                    "NORMAL",
+                    0,
+                    DXGI_FORMAT_R32G32B32_FLOAT,
+                    0,
+                    offsetof(VertexData, normal),
+                    D3D11_INPUT_PER_VERTEX_DATA,
+                    0
+                },
+                {
+                    "TEXCOORD",
+                    0,
+                    DXGI_FORMAT_R32G32_FLOAT,
+                    0,
+                    offsetof(VertexData, uv),
+                    D3D11_INPUT_PER_VERTEX_DATA,
+                    0
+                }
+            };
 
-        hr = m_d3dDevice->CreateInputLayout(
-            vertexLayoutDesc,                           // input layout description
-            _countof(vertexLayoutDesc),                 // amount of the elements
-            vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
-            vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
-            &m_d3dInputLayout                           // pointer to the input-layout object
-        );
-        AssertIfFailed(hr, "Load Content", "Unable to create input layout");
+            hr = m_d3dDevice->CreateInputLayout(
+                vertexLayoutDesc,                           // input layout description
+                _countof(vertexLayoutDesc),                 // amount of the elements
+                vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+                vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+                &m_d3dInputLayout                           // pointer to the input-layout object
+            );
+            AssertIfFailed(hr, "Load Content", "Unable to create input layout");
+        }
 
-        // After creating input layouy, the shader blob is no longer needed
-        // SafeRelease(vertexShaderBlob);
-    }
-
-    // Load and compile the pixel shader
-    ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-    filename = L"assets/Shaders/SimplePS.hlsl";
-    size = GetFileSize(filename);
-    if (size != m_d3dPixelShaderSize)
-    {
-        pixelShaderBlob = LoadShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, filename, "main", "latest");
-        m_d3dPixelShader = CreateShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, pixelShaderBlob, nullptr);
-        // SafeRelease(pixelShaderBlob);
-        m_d3dPixelShaderSize = size;
-    }
-
-    // Load and compile the vertex shader
-    filename = L"assets/Shaders/InstancedVS.hlsl";
-    size = GetFileSize(filename);
-    if (size != m_d3dInstancedVertexShaderSize)
-    {
-        vertexShaderBlob = LoadShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, filename, "main", "latest");
-        m_d3dInstancedVertexShader = CreateShader<ComPtr<ID3D11VertexShader>>(m_d3dDevice, vertexShaderBlob, nullptr);
-        m_d3dInstancedVertexShaderSize = size;
-
-        // Create the input layout for the vertex shader.
-        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        filename = L"assets/Shaders/SimplePS.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dPixelShaderSize)
         {
-            // Per-vertex data.
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            // Per-instance data.
-            { "WORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "WORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "WORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "WORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            
-            { "NORMALMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "NORMALMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "NORMALMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "NORMALMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-
-            { "MATERIAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Emissive
-            { "MATERIAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Ambient
-            { "MATERIAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Diffuse
-            { "MATERIAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Specular
-            { "MATERIAL", 4, DXGI_FORMAT_R32_UINT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },             // UseTexture
-            { "MATERIAL", 5, DXGI_FORMAT_R32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },            // SpecularPower
-            { "MATERIAL", 6, DXGI_FORMAT_R32G32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },         // Padding
-        };
-
-        hr = m_d3dDevice->CreateInputLayout(
-            vertexLayoutDesc,                           // input layout description
-            _countof(vertexLayoutDesc),                 // amount of the elements
-            vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
-            vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
-            &m_d3dInstancedInputLayout                           // pointer to the input-layout object
-        );
-        AssertIfFailed(hr, "Load Content", "Unable to create instanced input layout");
-
-        // After creating input layout, the shader blob is no longer needed
-        // SafeRelease(vertexShaderBlob);
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dPixelShader);
+            m_d3dPixelShaderSize = size;
+        }
     }
-
-    pixelShaderBlob = nullptr;
-    filename = L"assets/Shaders/InstancedPS.hlsl";
-    size = GetFileSize(filename);
-    if (size != m_d3dInstancedPixelShaderSize)
+    
     {
-        pixelShaderBlob = LoadShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, filename, "main", "latest");
-        m_d3dInstancedPixelShader = CreateShader<ComPtr<ID3D11PixelShader>>(m_d3dDevice, pixelShaderBlob, nullptr);
-        // SafeRelease(pixelShaderBlob);
-        m_d3dInstancedPixelShaderSize = size;
-    }
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/InstancedVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dInstancedVertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dInstancedVertexShader);
+            m_d3dInstancedVertexShaderSize = size;
+
+            // Create the input layout for the vertex shader.
+            D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+            {
+                // Per-vertex data.
+                { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                // Per-instance data.
+                { "WORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "WORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "WORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "WORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+                { "NORMALMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+                { "MATERIAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Emissive
+                { "MATERIAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Ambient
+                { "MATERIAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Diffuse
+                { "MATERIAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Specular
+                { "MATERIAL", 4, DXGI_FORMAT_R32_UINT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },             // UseTexture
+                { "MATERIAL", 5, DXGI_FORMAT_R32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },            // SpecularPower
+                { "MATERIAL", 6, DXGI_FORMAT_R32G32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },         // Padding
+            };
+
+            hr = m_d3dDevice->CreateInputLayout(
+                vertexLayoutDesc,                           // input layout description
+                _countof(vertexLayoutDesc),                 // amount of the elements
+                vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+                vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+                &m_d3dInstancedInputLayout                           // pointer to the input-layout object
+            );
+            AssertIfFailed(hr, "Load Content", "Unable to create instanced input layout");
+        }
+
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        filename = L"assets/Shaders/InstancedPS.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dInstancedPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dInstancedPixelShader);
+            m_d3dInstancedPixelShaderSize = size;
+        }
+    }    
 }
 
 /// <summary>
@@ -390,8 +386,8 @@ void SimpleObj::RenderScene()
             // update perInstanceBuffer
             m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
 
-            ID3D11Buffer* buffers[2] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-            m_d3dDeviceContext->IASetVertexBuffers(0, 2, buffers, vertexStride, offset);
+            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
+            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
 
             m_d3dDeviceContext->DrawInstanced(
                 verticesCount,
@@ -1009,10 +1005,10 @@ bool SimpleObj::LoadContent()
         resourceData.SysMemPitch = 0;
         resourceData.SysMemSlicePitch = 0;
 
-        ID3D11Buffer* d3dPlaneInstanceBuffer;
-        hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &d3dPlaneInstanceBuffer);
+        ID3D11Buffer* buffer;
+        hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &buffer);
 
-        Model::AddInstancedVertexBuffer(key, d3dPlaneInstanceBuffer);
+        Model::AddInstancedVertexBuffer(key, buffer);
     }
 
     {

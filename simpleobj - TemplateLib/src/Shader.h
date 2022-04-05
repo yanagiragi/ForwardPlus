@@ -12,13 +12,13 @@ template<class ShaderClass>
 std::string GetLatestProfile(ComPtr<ID3D11Device> device);
 
 template<>
-std::string GetLatestProfile<ComPtr<ID3D11VertexShader>>(ComPtr<ID3D11Device> device);
+std::string GetLatestProfile<ID3D11VertexShader>(ComPtr<ID3D11Device> device);
 
 template<>
-std::string GetLatestProfile<ComPtr<ID3D11PixelShader>>(ComPtr<ID3D11Device> device);
+std::string GetLatestProfile<ID3D11PixelShader>(ComPtr<ID3D11Device> device);
 
 template<class ShaderClass>
-ShaderClass CreateShader(ComPtr<ID3D11Device> device, ComPtr<ID3DBlob> pShaderBlob, ID3D11ClassLinkage* pClassLinkage);
+void CreateShader(ComPtr<ID3D11Device> device, ComPtr<ID3DBlob> pShaderBlob, ID3D11ClassLinkage* pClassLinkage, ComPtr<ShaderClass> &ret);
 
 /// <summary>
 /// Get latest d3d profile of vertex shader
@@ -26,7 +26,7 @@ ShaderClass CreateShader(ComPtr<ID3D11Device> device, ComPtr<ID3DBlob> pShaderBl
 /// <param name="device"></param>
 /// <returns></returns>
 template<>
-std::string GetLatestProfile<ComPtr<ID3D11VertexShader>>(ComPtr<ID3D11Device> device)
+std::string GetLatestProfile<ID3D11VertexShader>(ComPtr<ID3D11Device> device)
 {
     AssertIfNull(device, "GetLatestProfile", "Device is null");
 
@@ -73,7 +73,7 @@ std::string GetLatestProfile<ComPtr<ID3D11VertexShader>>(ComPtr<ID3D11Device> de
 /// <param name="device"></param>
 /// <returns></returns>
 template<>
-std::string GetLatestProfile<ComPtr<ID3D11PixelShader>>(ComPtr<ID3D11Device> device)
+std::string GetLatestProfile<ID3D11PixelShader>(ComPtr<ID3D11Device> device)
 {
     AssertIfNull(device, "GetLatestProfile", "Device is null");
 
@@ -118,21 +118,19 @@ std::string GetLatestProfile<ComPtr<ID3D11PixelShader>>(ComPtr<ID3D11Device> dev
 /// <param name="device"></param>
 /// <param name="pShaderBlob"></param>
 /// <param name="pClassLinkage"></param>
-/// <returns>pointer to ID3D11VertexShader instance</returns>
+/// <param name="ret"></param>
 template<>
-ComPtr<ID3D11VertexShader> CreateShader<ComPtr<ID3D11VertexShader>>(
+void CreateShader<ID3D11VertexShader>(
     ComPtr<ID3D11Device> device, 
     ComPtr<ID3DBlob> pShaderBlob, 
-    ID3D11ClassLinkage* pClassLinkage
+    ID3D11ClassLinkage* pClassLinkage,
+    ComPtr<ID3D11VertexShader> &ret
     )
 {
     AssertIfNull(device, "GetLatestProfile", "Device is null");
     AssertIfNull(pShaderBlob, "GetLatestProfile", "shader plob is null");
 
-    ComPtr<ID3D11VertexShader> pVertexShader = nullptr;
-    device->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader);
-
-    return pVertexShader;
+    device->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &ret);
 }
 
 /// <summary>
@@ -141,21 +139,19 @@ ComPtr<ID3D11VertexShader> CreateShader<ComPtr<ID3D11VertexShader>>(
 /// <param name="device"></param>
 /// <param name="pShaderBlob"></param>
 /// <param name="pClassLinkage"></param>
-/// <returns>pointer to ID3D11VertexShader instance</returns>
+/// <param name="ret"></param>
 template<>
-ComPtr<ID3D11PixelShader> CreateShader<ComPtr<ID3D11PixelShader>>(
+void CreateShader<ID3D11PixelShader>(
     ComPtr<ID3D11Device> device,
     ComPtr<ID3DBlob> pShaderBlob,
-    ID3D11ClassLinkage* pClassLinkage
+    ID3D11ClassLinkage* pClassLinkage,
+    ComPtr<ID3D11PixelShader> &ret
     )
 {
     AssertIfNull(device, "GetLatestProfile", "Device is null");
     AssertIfNull(pShaderBlob, "GetLatestProfile", "shader plob is null");
 
-    ComPtr<ID3D11PixelShader> pPixelShader = nullptr;
-    device->CreatePixelShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pPixelShader);
-
-    return pPixelShader;
+    device->CreatePixelShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &ret);
 }
 
 /// <summary>
