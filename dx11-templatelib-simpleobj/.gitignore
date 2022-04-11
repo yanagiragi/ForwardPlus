@@ -359,7 +359,7 @@ assets/*.dxbc
 [Dd]ev[Ll]og.md
 
 # include obj files in assets
-!assets/*
+!assets/**
 
 # local imgui setting
 imgui.ini
