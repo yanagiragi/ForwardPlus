@@ -51,7 +51,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>D:\_Repository\GitHub\ForwardPlus\simpleobj\external\imgui;inc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\imgui;inc</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>DirectXTemplateLibPCH.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
