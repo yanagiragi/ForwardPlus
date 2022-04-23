@@ -1,7 +1,7 @@
 #include "SimpleObj.h"
 using namespace Microsoft::WRL;
 
-void SimpleObj::RenderScene_Deferred()
+void SimpleObj::RenderScene_Deferred_GeometryPass()
 {
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
@@ -56,8 +56,15 @@ void SimpleObj::RenderScene_Deferred()
         textures->GetAddressOf()                // array of resources
     );
 
-    // Setup the output merger stage
-    m_d3dDeviceContext->OMSetRenderTargets(1, m_d3dRenderTargetView.GetAddressOf(), m_d3dDepthStencilView.Get());
+    // Setup the output merger 
+    ID3D11RenderTargetView* renderTargetViews[] = {
+        m_d3dRenderTargetView_lightAccumulation.Get(),
+        m_d3dRenderTargetView_diffuse.Get(),
+        m_d3dRenderTargetView_specular.Get(),
+        m_d3dRenderTargetView_normal.Get()
+    };
+
+    m_d3dDeviceContext->OMSetRenderTargets(_countof(renderTargetViews), renderTargetViews, m_d3dDepthStencilView.Get());
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
 
     // Draw Regular Entities
@@ -95,6 +102,10 @@ void SimpleObj::RenderScene_Deferred()
     }
 
     // Draw Instanced Entities
+    // 
+    // [Note] 
+    // Since our geomery does not support instancing at the moment,
+    // the draw call is not reduced for now
     UINT vertexStride = sizeof(VertexData);
     UINT offset = 0;
     for (auto const& pair : m_Scene.InstancedEntity)
@@ -123,4 +134,62 @@ void SimpleObj::RenderScene_Deferred()
             );
         }
     }
+}
+
+void SimpleObj::RenderScene_Deferred_DebugPass()
+{
+    // set target view to main RTV
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
+
+    // Setup the rasterizer stage
+    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+    m_d3dDeviceContext->RSSetViewports(1, &viewport);
+
+    // Setup the vertex shader stage
+    m_d3dDeviceContext->VSSetShader(m_d3dDebugVertexShader.Get(), nullptr, 0);
+    
+    // Setup the pixel stage stage
+    m_d3dDeviceContext->PSSetShader(m_d3dDebugPixelShader.Get(), nullptr, 0);
+
+    // Setup the input assembler stage
+    m_d3dDeviceContext->IASetInputLayout(nullptr);
+    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    // setup textures
+    ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
+    m_d3dDeviceContext->PSSetSamplers(
+        0,                                      // start slot
+        1,                                      // number of sampler states
+        samplerStates->GetAddressOf()           // array of sampler states
+    );
+
+    ComPtr<ID3D11ShaderResourceView> textures[] = { m_d3dRenderTargetView_normal_view };
+    m_d3dDeviceContext->PSSetShaderResources(
+        0,                                      // start slot
+        1,                                      // number of resources
+        textures->GetAddressOf()                // array of resources
+    );
+
+    m_d3dDeviceContext->Draw(4, 0);
+}
+
+// not implemented
+void SimpleObj::RenderScene_Deferred_LightingPass()
+{
+
+}
+
+void SimpleObj::RenderScene_Deferred()
+{
+    RenderScene_Deferred_GeometryPass();
+    RenderScene_Deferred_DebugPass();
 }

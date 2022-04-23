@@ -38,7 +38,7 @@ enum class RenderMode
     LEN_RENDER_MODE
 };
 
-class SimpleObj : public Game
+class SimpleObj final : public Game
 {
 public:
     typedef Game base;
@@ -72,6 +72,7 @@ protected:
     virtual void OnMouseWheel(MouseWheelEventArgs& e);
 
     virtual void OnResize(ResizeEventArgs& e);
+    virtual void Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil);
 
 private:
 
@@ -89,6 +90,12 @@ private:
 
     void RenderScene_Forward();
     void RenderScene_Deferred();
+
+    void RenderScene_Deferred_GeometryPass();
+    void RenderScene_Deferred_DebugPass();
+    void RenderScene_Deferred_LightingPass();
+
+    bool ResizeSwapChain(int width, int height);
 
     // Variables
     Camera m_Camera;
@@ -130,6 +137,11 @@ private:
     __int64 m_d3dDeferredGeometryPixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredGeometryPixelShader = nullptr;
 
+    __int64 m_d3dDebugVertexShaderSize = 0;
+    __int64 m_d3dDebugPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDebugVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDebugPixelShader = nullptr;
+
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
     std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -147,6 +159,23 @@ private:
     struct LightProperties m_LightPropertiesConstantBuffer;
     
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
+
+    // Deferred Render target views
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_lightAccumulation;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_lightAccumulation_view;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_lightAccumulation_tex;
+
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_diffuse;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_diffuse_view;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_diffuse_tex;
+
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_specular;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_specular_view;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_specular_tex;
+
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_normal;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_normal_view;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
 
     struct Material defaultMaterial;
     struct Material diffuseMaterial = {

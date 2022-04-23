@@ -146,7 +146,7 @@ void SimpleObj::LoadShaderResources()
 
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/DeferredGeometry_VS.hlsl";
+        std::wstring filename = L"assets/Shaders/DeferredGeometryVS.hlsl";
         _int64 size = GetFileSize(filename);
         if (size != m_d3dDeferredGeometryVertexShaderSize)
         {
@@ -198,13 +198,36 @@ void SimpleObj::LoadShaderResources()
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/DeferredGeometry_PS.hlsl";
+        filename = L"assets/Shaders/DeferredGeometryPS.hlsl";
         size = GetFileSize(filename);
         if (size != m_d3dDeferredGeometryPixelShaderSize)
         {
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
             CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredGeometryPixelShader);
             m_d3dDeferredGeometryPixelShaderSize = size;
+        }
+    }
+
+    {
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/DebugVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDebugVertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDebugVertexShader);
+            m_d3dDebugVertexShaderSize = size;
+        }
+
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        filename = L"assets/Shaders/DebugPS.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dDebugPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDebugPixelShader);
+            m_d3dDebugPixelShaderSize = size;
         }
     }
 }
@@ -318,6 +341,17 @@ void SimpleObj::RenderScene()
 /// </summary>
 void SimpleObj::RenderDebug()
 {
+    // set target view to main RTV
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
+
     m_d3dDeviceContext->OMSetBlendState(m_d3dStates->Opaque(), nullptr, 0xFFFFFFFF);
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dStates->DepthNone(), 0);
     m_d3dDeviceContext->RSSetState(m_d3dStates->CullNone());
@@ -387,6 +421,17 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
+
+    // always set render target to main render target
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
 
     // Setup UI state
     bool show_demo_window = true;
@@ -696,6 +741,23 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
     }
 }
 
+void SimpleObj::Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil)
+{
+    base::Clear(clearColor, clearDepth, clearStencil);
+
+    ID3D11RenderTargetView* renderTargetViews[] =
+    {
+        m_d3dRenderTargetView_lightAccumulation.Get(),
+        m_d3dRenderTargetView_diffuse.Get(),
+        m_d3dRenderTargetView_specular.Get(),
+        m_d3dRenderTargetView_normal.Get(),
+    };
+
+    for (auto rtv : renderTargetViews) {
+        m_d3dDeviceContext->ClearRenderTargetView(rtv, clearColor);
+    }
+}
+
 void SimpleObj::OnRender(RenderEventArgs& e)
 {
     Clear(DirectX::Colors::CornflowerBlue, 1.0f, 0);
@@ -871,6 +933,7 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     // Don't forget to call the base class's resize method.
     // The base class handles resizing of the swap chain.
     base::OnResize(e);
+    ResizeSwapChain(e.Width, e.Height);
 
     if (e.Height < 1)
     {
@@ -894,6 +957,131 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     m_Camera.set_Viewport(viewport);
 
     m_d3dDeviceContext->RSSetViewports(1, &viewport);
+}
+
+bool SimpleObj::ResizeSwapChain(int width, int height)
+{
+    // Don't allow for 0 size swap chain buffers.
+    if (width <= 0) width = 1;
+    if (height <= 0) height = 1;
+
+    HRESULT hr;
+
+    m_d3dDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+
+    // First release the render target and depth/stencil views.
+    m_d3dRenderTargetView_lightAccumulation.Reset();
+    m_d3dRenderTargetView_diffuse.Reset();
+    m_d3dRenderTargetView_specular.Reset();
+    m_d3dRenderTargetView_normal.Reset();
+
+    D3D11_TEXTURE2D_DESC textureDesc;
+    ZeroMemory(&textureDesc, sizeof(textureDesc));
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.MipLevels = 1;
+    textureDesc.ArraySize = 1;
+    textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Usage = D3D11_USAGE_DEFAULT;
+    textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    textureDesc.CPUAccessFlags = 0;
+    textureDesc.MiscFlags = 0;
+
+    D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc;
+    ZeroMemory(&renderTargetViewDesc, sizeof(renderTargetViewDesc));
+    renderTargetViewDesc.Format = textureDesc.Format;
+    renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+    ZeroMemory(&shaderResourceViewDesc, sizeof(shaderResourceViewDesc));
+    shaderResourceViewDesc.Format = textureDesc.Format;
+    shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+    shaderResourceViewDesc.Texture2D.MipLevels = 1;
+
+    {
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_lightAccumulation_tex);
+        AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_lightAccumulation_tex");
+
+        hr = m_d3dDevice->CreateShaderResourceView(
+            m_d3dRenderTargetView_lightAccumulation_tex.Get(),
+            &shaderResourceViewDesc,
+            &m_d3dRenderTargetView_lightAccumulation_view
+        );
+        AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_lightAccumulation_view");
+
+        hr = m_d3dDevice->CreateRenderTargetView(
+            m_d3dRenderTargetView_lightAccumulation_tex.Get(),
+            &renderTargetViewDesc,
+            &m_d3dRenderTargetView_lightAccumulation
+        );
+        AssertIfFailed(hr, "Failed to create render target view", "m_d3dRenderTargetView_lightAccumulation");
+    }
+
+    {
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_diffuse_tex);
+        AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_diffuse_tex");
+
+        hr = m_d3dDevice->CreateShaderResourceView(
+            m_d3dRenderTargetView_diffuse_tex.Get(),
+            &shaderResourceViewDesc,
+            &m_d3dRenderTargetView_diffuse_view
+        );
+        AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_diffuse_view");
+
+        hr = m_d3dDevice->CreateRenderTargetView(
+            m_d3dRenderTargetView_diffuse_tex.Get(),
+            &renderTargetViewDesc,
+            &m_d3dRenderTargetView_diffuse
+        );
+        AssertIfFailed(hr, "Failed to create render target view", "m_d3dRenderTargetView_diffuse");
+    }
+
+    {
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_specular_tex);
+        AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_specular_tex");
+
+        hr = m_d3dDevice->CreateShaderResourceView(
+            m_d3dRenderTargetView_specular_tex.Get(),
+            &shaderResourceViewDesc,
+            &m_d3dRenderTargetView_specular_view
+        );
+        AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_specular_view");
+
+        hr = m_d3dDevice->CreateRenderTargetView(
+            m_d3dRenderTargetView_specular_tex.Get(),
+            &renderTargetViewDesc,
+            &m_d3dRenderTargetView_specular
+        );
+        AssertIfFailed(hr, "Failed to create render target view", "m_d3dRenderTargetView_specular");
+    }
+
+    {
+        textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        renderTargetViewDesc.Format = textureDesc.Format;
+        shaderResourceViewDesc.Format = textureDesc.Format;
+
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_normal_tex);
+        AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_normal_tex");
+
+        hr = m_d3dDevice->CreateShaderResourceView(
+            m_d3dRenderTargetView_normal_tex.Get(),
+            &shaderResourceViewDesc,
+            &m_d3dRenderTargetView_normal_view
+        );
+        AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_normal_view");
+
+        hr = m_d3dDevice->CreateRenderTargetView(
+            m_d3dRenderTargetView_normal_tex.Get(),
+            &renderTargetViewDesc,
+            &m_d3dRenderTargetView_normal
+        );
+        AssertIfFailed(hr, "Failed to create render target view", "m_d3dRenderTargetView_normal");
+    }
+    
+    return true;
 }
 
 bool SimpleObj::LoadContent()
