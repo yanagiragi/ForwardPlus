@@ -1,7 +1,7 @@
-#define LIGHT_ACCUMULATION 0
-#define DIFFUSE 1
-#define SPECULAR 2
-#define NORMAL 3
+#define LIGHT_ACCUMULATION 1
+#define DIFFUSE 2
+#define SPECULAR 3
+#define NORMAL 4
 
 cbuffer DebugProperties : register(b0)
 {
@@ -30,19 +30,20 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     switch(mode)
     {
     case LIGHT_ACCUMULATION:
-        color = GBuffer_LightAccumulation.Sample(Sampler, IN.uv); 
+        color = GBuffer_LightAccumulation.Sample(Sampler, IN.uv);
         break;
 
     case DIFFUSE:
-        color = GBuffer_Diffuse.Sample(Sampler, IN.uv); 
+        color = GBuffer_Diffuse.Sample(Sampler, IN.uv);
         break;
 
     case SPECULAR:
-        color = GBuffer_Specular.Sample(Sampler, IN.uv); 
+        color = GBuffer_Specular.Sample(Sampler, IN.uv);
+        //color.rgb *= color.a;
         break;
 
     case NORMAL:
-        color = GBuffer_Normal.Sample(Sampler, IN.uv); 
+        color = GBuffer_Normal.Sample(Sampler, IN.uv) * 2.0 - 1.0;
         break;
     }
 

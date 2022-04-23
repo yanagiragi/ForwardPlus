@@ -6,20 +6,6 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
-    // Setup Frame CB
-    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
-    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
-
-    // Setup Light CB
-    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
-    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
-    for (int i = 0; i < MAX_LIGHTS; ++i)
-    {
-        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
-    }
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
-
     // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometryInputLayout.Get());
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -203,14 +189,92 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
-// not implemented
+// simpled version for now
 void SimpleObj::RenderScene_Deferred_LightingPass()
-{
+{    
+    // set target view to main RTV
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
 
+    // Setup the rasterizer stage
+    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+    m_d3dDeviceContext->RSSetViewports(1, &viewport);
+
+    // Setup the vertex shader stage
+    m_d3dDeviceContext->VSSetShader(m_d3dDeferredLightingVertexShader.Get(), nullptr, 0);
+    
+    // Setup the pixel stage stage
+    m_d3dDeviceContext->PSSetShader(m_d3dDeferredLightingPixelShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->PSSetConstantBuffers(
+        0,
+        1,
+        m_d3dConstantBuffers[CB_Light].GetAddressOf()
+    );
+   
+    // Setup the input assembler stage
+    m_d3dDeviceContext->IASetInputLayout(nullptr);
+    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    // setup textures
+    ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
+    m_d3dDeviceContext->PSSetSamplers(
+        0,                                      // start slot
+        1,                                      // number of sampler states
+        samplerStates->GetAddressOf()           // array of sampler states
+    );
+
+    ComPtr<ID3D11ShaderResourceView> textures[] =
+    {
+        m_d3dRenderTargetView_lightAccumulation_view,
+        m_d3dRenderTargetView_diffuse_view,
+        m_d3dRenderTargetView_specular_view,
+        m_d3dRenderTargetView_normal_view,
+    };
+    m_d3dDeviceContext->PSSetShaderResources(
+        0,                                      // start slot
+        _countof(textures),                     // number of resources
+        textures->GetAddressOf()                // array of resources
+    );
+
+    m_d3dDeviceContext->Draw(4, 0);
+
+    // Unbind SRVs
+    ID3D11ShaderResourceView* const pSRV[4] = { NULL, NULL, NULL, NULL };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
 void SimpleObj::RenderScene_Deferred()
 {
+    // Setup Frame CB
+    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
+    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
+
+    // Setup Light CB
+    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
+    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
+    }
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
+
+    // Call render passes
     RenderScene_Deferred_GeometryPass();
-    RenderScene_Deferred_DebugPass();
+    if (m_DeferredDebugMode == Deferred_DebugMode::None)
+    {
+        RenderScene_Deferred_LightingPass();
+    }
+    else 
+    {
+        RenderScene_Deferred_DebugPass();
+    }
 }

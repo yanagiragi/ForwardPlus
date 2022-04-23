@@ -230,6 +230,29 @@ void SimpleObj::LoadShaderResources()
             m_d3dDebugPixelShaderSize = size;
         }
     }
+
+    {
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/DeferredLightingSimpleVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDeferredLightingVertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredLightingVertexShader);
+            m_d3dDeferredLightingVertexShaderSize = size;
+        }
+
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        filename = L"assets/Shaders/DeferredLightingSimplePS.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dDeferredLightingPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLightingPixelShader);
+            m_d3dDeferredLightingPixelShaderSize = size;
+        }
+    }
 }
 
 /// <summary>
@@ -453,7 +476,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         
         int debugMode = (int)m_DeferredDebugMode;
         if (m_RenderMode == RenderMode::Deferred && 
-            ImGui::Combo("Debug Mode", &debugMode, "LightAccumulation\0Diffuse\0Specular\0Normal\0"))
+            ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0"))
         {
             m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
         }
@@ -754,16 +777,19 @@ void SimpleObj::Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearSt
 {
     base::Clear(clearColor, clearDepth, clearStencil);
 
+    // GBuffer lightAccumulation is clear using clearColor, while others clear with pure black
+    m_d3dDeviceContext->ClearRenderTargetView(m_d3dRenderTargetView_lightAccumulation.Get(), clearColor);
+
     ID3D11RenderTargetView* renderTargetViews[] =
     {
-        m_d3dRenderTargetView_lightAccumulation.Get(),
         m_d3dRenderTargetView_diffuse.Get(),
         m_d3dRenderTargetView_specular.Get(),
         m_d3dRenderTargetView_normal.Get(),
     };
 
+    const FLOAT black[4] = { 0, 0, 0, 1 };
     for (auto rtv : renderTargetViews) {
-        m_d3dDeviceContext->ClearRenderTargetView(rtv, clearColor);
+        m_d3dDeviceContext->ClearRenderTargetView(rtv, black);
     }
 }
 
@@ -990,7 +1016,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     textureDesc.Height = height;
     textureDesc.MipLevels = 1;
     textureDesc.ArraySize = 1;
-    textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     textureDesc.SampleDesc.Count = 1;
     textureDesc.Usage = D3D11_USAGE_DEFAULT;
     textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;

@@ -40,6 +40,7 @@ enum class RenderMode
 
 enum class Deferred_DebugMode
 {
+    None,
     LightAccumulation,
     Diffuse,
     Specular,
@@ -157,6 +158,11 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDebugVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDebugPixelShader = nullptr;
 
+    __int64 m_d3dDeferredLightingVertexShaderSize = 0;
+    __int64 m_d3dDeferredLightingPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLightingVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLightingPixelShader = nullptr;
+
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
     std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -230,7 +236,7 @@ private:
     const float farPlane = 100.f;
 
     RenderMode m_RenderMode = RenderMode::Forward;
-    Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::LightAccumulation;
+    Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
 
     // UI Flags
     bool m_ShowGizmoWindow = false;

@@ -57,16 +57,13 @@ PixelShaderOutput main(PixelShaderInput IN) : SV_TARGET
         texColor = Texture.Sample(Sampler, IN.uv);
     }
 
-    OUT.LightAccumulation = float4(emissive + ambient, 1.0);
-    OUT.Diffuse = float4(diffuse, 1.0);
+    OUT.LightAccumulation = float4((emissive + ambient) * texColor.rgb, 1.0);
+    OUT.Diffuse = float4(diffuse * texColor.rgb, 1.0);
     OUT.Specular = specular;
-    OUT.NormalWS = float4(IN.NormalWS, 1.0);
+
+    // map [-1, 1] to [0, 1]
+    float3 normal = normalize(IN.NormalWS) * 0.5 + 0.5;
+    OUT.NormalWS = float4(normal, 1.0);
 
     return OUT;
-    /*return specular;
-    return float4(diffuse, 1.0);
-    return float4(texColor.rgb * diffuse, 1.0);
-    return float4(emissive + ambient, 1.0);
-    return float4(IN.PositionWS, 1.0);
-    return float4(IN.NormalWS, 1.0);*/
 }
