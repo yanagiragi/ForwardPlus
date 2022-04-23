@@ -38,6 +38,21 @@ enum class RenderMode
     LEN_RENDER_MODE
 };
 
+enum class Deferred_DebugMode
+{
+    LightAccumulation,
+    Diffuse,
+    Specular,
+    Normal,
+    LEN_DEFERRED_DEBUGMODE
+};
+
+struct DebugProperties
+{
+    int deferredDebugMode = 0;
+    float padding[3];
+};
+
 class SimpleObj final : public Game
 {
 public:
@@ -157,6 +172,7 @@ private:
     struct FrameConstantBuffer m_FrameConstantBuffer;
     struct MaterialProperties m_MaterialPropertiesConstantBuffer;
     struct LightProperties m_LightPropertiesConstantBuffer;
+    struct DebugProperties m_DebugPropertiesConstantBuffer;
     
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
@@ -185,6 +201,20 @@ private:
         Vector4::Zero, // Specular
     };
 
+    struct Material bunny1Material = {
+        Vector4::Zero, // Emissive
+        Vector4::One, // Ambient
+        Vector4(115, 165, 245, 255) / 255.0, // Diffuse
+        Vector4::One, // Specular
+    };
+
+    struct Material bunny2Material = {
+        Vector4::Zero, // Emissive
+        Vector4::One, // Ambient
+        Vector4(245, 197, 115, 255) / 255.0, // Diffuse
+        Vector4::One, // Specular
+    };
+
     struct Material boxMaterial = {
         Vector4::Zero, // Emissive
         Vector4::One, // Ambient
@@ -200,6 +230,7 @@ private:
     const float farPlane = 100.f;
 
     RenderMode m_RenderMode = RenderMode::Forward;
+    Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::LightAccumulation;
 
     // UI Flags
     bool m_ShowGizmoWindow = false;

@@ -17,6 +17,7 @@ enum ConstantBuffer
     CB_Object,
     CB_Material,
     CB_Light,
+    CB_Debug,
     NumConstantBuffers
 };
 

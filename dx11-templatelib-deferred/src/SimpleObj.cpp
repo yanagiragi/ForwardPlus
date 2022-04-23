@@ -221,7 +221,7 @@ void SimpleObj::LoadShaderResources()
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/DebugPS.hlsl";
+        filename = L"assets/Shaders/DebugDeferredPS.hlsl";
         size = GetFileSize(filename);
         if (size != m_d3dDebugPixelShaderSize)
         {
@@ -444,10 +444,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     ImGui::Text(format("Fps: %f (%f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
 
     ImGui::PushID("Render Techniques");
-    int renderMode = (int)m_RenderMode;
-    if (ImGui::Combo("", &renderMode, "Forward\0Deferred\0"))
     {
-        m_RenderMode = (RenderMode)renderMode;
+        int renderMode = (int)m_RenderMode;
+        if (ImGui::Combo("", &renderMode, "Forward\0Deferred\0"))
+        {
+            m_RenderMode = (RenderMode)renderMode;
+        }
+        
+        int debugMode = (int)m_DeferredDebugMode;
+        if (m_RenderMode == RenderMode::Deferred && 
+            ImGui::Combo("Debug Mode", &debugMode, "LightAccumulation\0Diffuse\0Specular\0Normal\0"))
+        {
+            m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
+        }
     }
     ImGui::PopID();
 
@@ -689,8 +698,8 @@ SimpleObj::SimpleObj(Window& window)
     , m_Yaw(0.0f)
 {
     m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, defaultMaterial, true));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), defaultMaterial, true));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
 
     XMVECTOR cameraPos = XMVectorSet(0, 7.5, 25, 1);
     XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
@@ -1203,6 +1212,15 @@ bool SimpleObj::LoadContent()
         hr = m_d3dDevice->CreateBuffer(&lightConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Light]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
 
+        D3D11_BUFFER_DESC debugConstantBufferDesc;
+        ZeroMemory(&debugConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        debugConstantBufferDesc.ByteWidth = sizeof(struct DebugProperties);
+        debugConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        debugConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        debugConstantBufferDesc.CPUAccessFlags = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&debugConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Debug]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
     }
 
     LoadShaderResources();

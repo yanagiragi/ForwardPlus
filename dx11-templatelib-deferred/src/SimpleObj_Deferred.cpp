@@ -138,6 +138,10 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
 
 void SimpleObj::RenderScene_Deferred_DebugPass()
 {
+    // update cb
+    m_DebugPropertiesConstantBuffer.deferredDebugMode = (int)m_DeferredDebugMode;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
+
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
         1,                                      // number of render target to bind
@@ -160,6 +164,13 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dDebugPixelShader.Get(), nullptr, 0);
 
+    // Setup pixel shader cb
+    m_d3dDeviceContext->PSSetConstantBuffers(
+        0,
+        1,
+        m_d3dConstantBuffers[CB_Debug].GetAddressOf()
+    );
+
     // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(nullptr);
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -172,14 +183,24 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
         samplerStates->GetAddressOf()           // array of sampler states
     );
 
-    ComPtr<ID3D11ShaderResourceView> textures[] = { m_d3dRenderTargetView_normal_view };
+    ComPtr<ID3D11ShaderResourceView> textures[] =
+    {
+        m_d3dRenderTargetView_lightAccumulation_view,
+        m_d3dRenderTargetView_diffuse_view,
+        m_d3dRenderTargetView_specular_view,
+        m_d3dRenderTargetView_normal_view,
+    };
     m_d3dDeviceContext->PSSetShaderResources(
         0,                                      // start slot
-        1,                                      // number of resources
+        _countof(textures),                     // number of resources
         textures->GetAddressOf()                // array of resources
     );
 
     m_d3dDeviceContext->Draw(4, 0);
+
+    // Unbind SRVs
+    ID3D11ShaderResourceView* const pSRV[4] = { NULL, NULL, NULL, NULL };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
 // not implemented
