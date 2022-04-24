@@ -2,44 +2,12 @@
 
 #include <string>
 
-#include <d3d11.h>
+#include "Type.h"
+#include "Model.h"
 
 #include "SimpleMath.h"
 
-#include "Material.h"
-#include "Model.h"
-
 using namespace DirectX::SimpleMath;
-
-enum ConstantBuffer
-{
-    CB_Frame,
-    CB_Object,
-    CB_Material,
-    CB_Light,
-    CB_Debug,
-    NumConstantBuffers
-};
-
-struct FrameConstantBuffer
-{
-    Matrix ViewMatrix;
-    Matrix ProjectionMatrix;
-};
-
-struct ObjectConstantBuffer
-{
-    Matrix WorldMatrix;
-    Matrix InverseTransposeWorldMatrix;
-    Matrix WorldViewProjectionMatrix;
-};
-
-struct InstancedObjectConstantBuffer
-{
-    Matrix WorldMatrix;
-    Matrix InverseTransposeWorldMatrix;
-    struct Material Material;
-};
 
 // Entities
 class Entity

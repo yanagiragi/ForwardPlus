@@ -476,9 +476,16 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         
         int debugMode = (int)m_DeferredDebugMode;
         if (m_RenderMode == RenderMode::Deferred && 
-            ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0"))
+            ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0"))
         {
             m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
+        }
+
+        if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
+        {
+            float scale = m_DeferredDepthPower;
+            ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
+            m_DeferredDepthPower = scale;
         }
     }
     ImGui::PopID();
@@ -736,11 +743,17 @@ SimpleObj::SimpleObj(Window& window)
     pData = (AlignedData*)_aligned_malloc(sizeof(AlignedData), 16);
     pData->m_InitialCameraPos = m_Camera.get_Translation();
     pData->m_InitialCameraRot = m_Camera.get_Rotation();
+
+    // debug 
+    m_RenderMode = RenderMode::Deferred;
+    // m_DeferredDebugMode = Deferred_DebugMode::Depth;
 }
 
 SimpleObj::~SimpleObj()
 {
     // ComPtr and smart pointer will automatically release itselves
+
+    _aligned_free(pData);
 }
 
 void SimpleObj::OnUpdate(UpdateEventArgs& e)
@@ -779,6 +792,8 @@ void SimpleObj::Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearSt
 
     // GBuffer lightAccumulation is clear using clearColor, while others clear with pure black
     m_d3dDeviceContext->ClearRenderTargetView(m_d3dRenderTargetView_lightAccumulation.Get(), clearColor);
+
+    m_d3dDeviceContext->ClearDepthStencilView(m_d3dDepthStencilView_depth.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clearDepth, clearStencil);
 
     ID3D11RenderTargetView* renderTargetViews[] =
     {
@@ -978,8 +993,11 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     float aspectRatio = e.Width / (float)e.Height;
 
     m_Camera.set_Projection(fovInDegree, aspectRatio, nearPlane, farPlane);
-    m_d3dEffect->SetProjection(m_Camera.get_ProjectionMatrix());
+    Matrix projectionMatrix = m_Camera.get_ProjectionMatrix();
+    m_d3dEffect->SetProjection(projectionMatrix);
 
+    m_ScreenDimensions = Vector2(e.Width, e.Height);
+    
     // Setup the viewports for the camera.
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0.0f;
@@ -1009,6 +1027,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     m_d3dRenderTargetView_diffuse.Reset();
     m_d3dRenderTargetView_specular.Reset();
     m_d3dRenderTargetView_normal.Reset();
+    m_d3dDepthStencilView_depth.Reset();
 
     D3D11_TEXTURE2D_DESC textureDesc;
     ZeroMemory(&textureDesc, sizeof(textureDesc));
@@ -1037,13 +1056,13 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     shaderResourceViewDesc.Texture2D.MipLevels = 1;
 
     {
-        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_lightAccumulation_tex);
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dRenderTargetView_lightAccumulation_tex);
         AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_lightAccumulation_tex");
 
         hr = m_d3dDevice->CreateShaderResourceView(
             m_d3dRenderTargetView_lightAccumulation_tex.Get(),
             &shaderResourceViewDesc,
-            &m_d3dRenderTargetView_lightAccumulation_view
+            &m_d3dRenderTargetView_lightAccumulation_SRV
         );
         AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_lightAccumulation_view");
 
@@ -1056,13 +1075,13 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     }
 
     {
-        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_diffuse_tex);
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dRenderTargetView_diffuse_tex);
         AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_diffuse_tex");
 
         hr = m_d3dDevice->CreateShaderResourceView(
             m_d3dRenderTargetView_diffuse_tex.Get(),
             &shaderResourceViewDesc,
-            &m_d3dRenderTargetView_diffuse_view
+            &m_d3dRenderTargetView_diffuse_SRV
         );
         AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_diffuse_view");
 
@@ -1075,13 +1094,13 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     }
 
     {
-        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_specular_tex);
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dRenderTargetView_specular_tex);
         AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_specular_tex");
 
         hr = m_d3dDevice->CreateShaderResourceView(
             m_d3dRenderTargetView_specular_tex.Get(),
             &shaderResourceViewDesc,
-            &m_d3dRenderTargetView_specular_view
+            &m_d3dRenderTargetView_specular_SRV
         );
         AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_specular_view");
 
@@ -1098,13 +1117,13 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
         renderTargetViewDesc.Format = textureDesc.Format;
         shaderResourceViewDesc.Format = textureDesc.Format;
 
-        hr = m_d3dDevice->CreateTexture2D(&textureDesc, NULL, &m_d3dRenderTargetView_normal_tex);
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dRenderTargetView_normal_tex);
         AssertIfFailed(hr, "Failed to create texture", "m_d3dRenderTargetView_normal_tex");
 
         hr = m_d3dDevice->CreateShaderResourceView(
             m_d3dRenderTargetView_normal_tex.Get(),
             &shaderResourceViewDesc,
-            &m_d3dRenderTargetView_normal_view
+            &m_d3dRenderTargetView_normal_SRV
         );
         AssertIfFailed(hr, "Failed to create shader resource view", "m_d3dRenderTargetView_normal_view");
 
@@ -1114,6 +1133,32 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             &m_d3dRenderTargetView_normal
         );
         AssertIfFailed(hr, "Failed to create render target view", "m_d3dRenderTargetView_normal");
+    }
+
+    {
+        textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        textureDesc.Format = DXGI_FORMAT_R24G8_TYPELESS; // compatable to DXGI_FORMAT_D24_UNORM_S8_UINT
+        textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+        
+        shaderResourceViewDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        
+        D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
+        ZeroMemory(&depthStencilViewDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+        depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        
+        hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dDepthStencilView_depth_tex);
+        AssertIfFailed(hr, "Failed to create the Depth/Stencil texture.", "m_d3dDepthStencilView_depth_tex");
+
+        hr = m_d3dDevice->CreateShaderResourceView(
+            m_d3dDepthStencilView_depth_tex.Get(),
+            &shaderResourceViewDesc,
+            &m_d3dDepthStencilView_depth_SRV
+        );
+        AssertIfFailed(hr, "Failed to create depth stencil view", "m_d3dDepthStencilView_depth_view");
+
+        hr = m_d3dDevice->CreateDepthStencilView(m_d3dDepthStencilView_depth_tex.Get(), &depthStencilViewDesc, &m_d3dDepthStencilView_depth);
+        AssertIfFailed(hr, "Failed to create DepthStencilView.", "m_d3dDepthStencilView_depth");
     }
     
     return true;
@@ -1247,6 +1292,16 @@ bool SimpleObj::LoadContent()
 
         hr = m_d3dDevice->CreateBuffer(&debugConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Debug]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
+
+        D3D11_BUFFER_DESC screenToViewParamsConstantBufferDesc;
+        ZeroMemory(&screenToViewParamsConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        screenToViewParamsConstantBufferDesc.ByteWidth = sizeof(struct ScreenToViewParams);
+        screenToViewParamsConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        screenToViewParamsConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        screenToViewParamsConstantBufferDesc.CPUAccessFlags = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&screenToViewParamsConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_ScreenToViewParams]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_ScreenToViewParams");
     }
 
     LoadShaderResources();

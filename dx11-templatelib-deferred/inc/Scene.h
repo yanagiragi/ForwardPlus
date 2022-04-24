@@ -5,7 +5,7 @@
 #include <map>
 
 #include "Entity.h"
-#include "Light.h"
+#include "Type.h"
 #include "Common.h"
 
 class Scene

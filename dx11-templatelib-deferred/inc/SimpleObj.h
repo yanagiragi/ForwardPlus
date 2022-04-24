@@ -27,32 +27,8 @@
 
 // our includes
 #include "Scene.h"
-#include "Material.h"
-#include "Light.h"
 #include "Entity.h"
-
-enum class RenderMode
-{
-    Forward,
-    Deferred,
-    LEN_RENDER_MODE
-};
-
-enum class Deferred_DebugMode
-{
-    None,
-    LightAccumulation,
-    Diffuse,
-    Specular,
-    Normal,
-    LEN_DEFERRED_DEBUGMODE
-};
-
-struct DebugProperties
-{
-    int deferredDebugMode = 0;
-    float padding[3];
-};
+#include "Type.h"
 
 class SimpleObj final : public Game
 {
@@ -179,24 +155,29 @@ private:
     struct MaterialProperties m_MaterialPropertiesConstantBuffer;
     struct LightProperties m_LightPropertiesConstantBuffer;
     struct DebugProperties m_DebugPropertiesConstantBuffer;
+    struct ScreenToViewParams m_ScreenToViewParamsConstantBuffer;
     
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
     // Deferred Render target views
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_lightAccumulation;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_lightAccumulation_view;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_lightAccumulation_SRV;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_lightAccumulation_tex;
 
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_d3dDepthStencilView_depth;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dDepthStencilView_depth_SRV;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dDepthStencilView_depth_tex;
+
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_diffuse;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_diffuse_view;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_diffuse_SRV;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_diffuse_tex;
 
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_specular;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_specular_view;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_specular_SRV;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_specular_tex;
 
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_normal;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_normal_view;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_normal_SRV;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
 
     struct Material defaultMaterial;
@@ -237,6 +218,9 @@ private:
 
     RenderMode m_RenderMode = RenderMode::Forward;
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
+    float m_DeferredDepthPower = 500.0f;
+
+    Vector2 m_ScreenDimensions;
 
     // UI Flags
     bool m_ShowGizmoWindow = false;

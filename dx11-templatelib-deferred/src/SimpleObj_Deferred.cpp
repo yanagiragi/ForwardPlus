@@ -50,7 +50,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
         m_d3dRenderTargetView_normal.Get()
     };
 
-    m_d3dDeviceContext->OMSetRenderTargets(_countof(renderTargetViews), renderTargetViews, m_d3dDepthStencilView.Get());
+    m_d3dDeviceContext->OMSetRenderTargets(_countof(renderTargetViews), renderTargetViews, m_d3dDepthStencilView_depth.Get());
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
 
     // Draw Regular Entities
@@ -125,7 +125,8 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
 void SimpleObj::RenderScene_Deferred_DebugPass()
 {
     // update cb
-    m_DebugPropertiesConstantBuffer.deferredDebugMode = (int)m_DeferredDebugMode;
+    m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
+    m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
 
     // set target view to main RTV
@@ -171,10 +172,11 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
 
     ComPtr<ID3D11ShaderResourceView> textures[] =
     {
-        m_d3dRenderTargetView_lightAccumulation_view,
-        m_d3dRenderTargetView_diffuse_view,
-        m_d3dRenderTargetView_specular_view,
-        m_d3dRenderTargetView_normal_view,
+        m_d3dRenderTargetView_lightAccumulation_SRV,
+        m_d3dRenderTargetView_diffuse_SRV,
+        m_d3dRenderTargetView_specular_SRV,
+        m_d3dRenderTargetView_normal_SRV,
+        m_d3dDepthStencilView_depth_SRV,
     };
     m_d3dDeviceContext->PSSetShaderResources(
         0,                                      // start slot
@@ -185,7 +187,7 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
     m_d3dDeviceContext->Draw(4, 0);
 
     // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[4] = { NULL, NULL, NULL, NULL };
+    ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
@@ -213,10 +215,14 @@ void SimpleObj::RenderScene_Deferred_LightingPass()
     
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dDeferredLightingPixelShader.Get(), nullptr, 0);
+    ID3D11Buffer* buffers[] = {
+        m_d3dConstantBuffers[CB_Light].Get(),
+        m_d3dConstantBuffers[CB_ScreenToViewParams].Get()
+    };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,
-        1,
-        m_d3dConstantBuffers[CB_Light].GetAddressOf()
+        _countof(buffers),
+        buffers
     );
    
     // Setup the input assembler stage
@@ -233,10 +239,11 @@ void SimpleObj::RenderScene_Deferred_LightingPass()
 
     ComPtr<ID3D11ShaderResourceView> textures[] =
     {
-        m_d3dRenderTargetView_lightAccumulation_view,
-        m_d3dRenderTargetView_diffuse_view,
-        m_d3dRenderTargetView_specular_view,
-        m_d3dRenderTargetView_normal_view,
+        m_d3dRenderTargetView_lightAccumulation_SRV,
+        m_d3dRenderTargetView_diffuse_SRV,
+        m_d3dRenderTargetView_specular_SRV,
+        m_d3dRenderTargetView_normal_SRV,
+        m_d3dDepthStencilView_depth_SRV
     };
     m_d3dDeviceContext->PSSetShaderResources(
         0,                                      // start slot
@@ -247,7 +254,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass()
     m_d3dDeviceContext->Draw(4, 0);
 
     // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[4] = { NULL, NULL, NULL, NULL };
+    ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
@@ -266,6 +273,11 @@ void SimpleObj::RenderScene_Deferred()
         m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
     }
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
+
+    m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
+    m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
+    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
 
     // Call render passes
     RenderScene_Deferred_GeometryPass();
