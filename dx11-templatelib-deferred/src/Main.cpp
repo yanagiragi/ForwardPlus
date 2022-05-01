@@ -21,6 +21,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, LPWSTR cmdLine,
 
 #ifdef _DEBUG
     RedirectIOToConsole();
+
+    // Check to see if a copy of WinPixGpuCapturer.dll has already been injected into the application.
+    // This may happen if the application is launched through the PIX UI. 
+    if (GetModuleHandle("WinPixGpuCapturer.dll") == 0)
+    {
+        LoadLibrary(GetLatestWinPixGpuCapturerPath().c_str());
+    }
 #endif
 
     Application::Create(hInstance);

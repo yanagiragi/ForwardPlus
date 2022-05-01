@@ -17,6 +17,55 @@
 #include <fcntl.h>
 #include <io.h>
 
+#include <shlobj.h>
+#include <strsafe.h>
+
+static std::string GetLatestWinPixGpuCapturerPath()
+{
+    PWSTR programFilesPath = NULL;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+
+    char programFilesPath_char[MAX_PATH];
+    wcstombs(programFilesPath_char, programFilesPath, MAX_PATH);
+
+    std::string pixSearchPath = programFilesPath_char + std::string("\\Microsoft PIX\\*");
+
+    WIN32_FIND_DATA findData;
+    bool foundPixInstallation = false;
+    char newestVersionFound[MAX_PATH];
+
+    HANDLE hFind = FindFirstFile(pixSearchPath.c_str(), &findData);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) &&
+                (findData.cFileName[0] != '.'))
+            {
+                if (!foundPixInstallation || strcmp(newestVersionFound, findData.cFileName) <= 0)
+                {
+                    foundPixInstallation = true;
+                    StringCchCopy(newestVersionFound, _countof(newestVersionFound), findData.cFileName);
+                }
+            }
+        }         while (FindNextFile(hFind, &findData) != 0);
+    }
+
+    FindClose(hFind);
+
+    if (!foundPixInstallation)
+    {
+        // TODO: Error, no PIX installation found
+    }
+
+    char output[MAX_PATH];
+    StringCchCopy(output, pixSearchPath.length(), pixSearchPath.data());
+    StringCchCat(output, MAX_PATH, &newestVersionFound[0]);
+    StringCchCat(output, MAX_PATH, "\\WinPixGpuCapturer.dll");
+
+    return &output[0];
+}
+
 /// <summary>
 /// Read file into lines of string
 /// </summary>
