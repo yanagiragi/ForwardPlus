@@ -1,26 +1,12 @@
 #include "SimpleObj.h"
 using namespace Microsoft::WRL;
 
-void SimpleObj::RenderScene_Forward()
+void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
 {
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
-    // Setup Frame CB
-    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
-    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
-
-    // Setup Light CB
-    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
-    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
-    for (int i = 0; i < MAX_LIGHTS; ++i)
-    {
-        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
-    }
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
-
-    // Setup the input assembler stage
+   // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(m_d3dInputLayout.Get());
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -30,10 +16,16 @@ void SimpleObj::RenderScene_Forward()
         nullptr,                                // pointer to an array of class-instance interfaces, NULL means shader does not use any interface
         0                                       // number of class-instance interfaces of previous param
     );
+
+    ID3D11Buffer* vertexShaderConstantBuffers[] = 
+    { 
+        m_d3dConstantBuffers[CB_Frame].Get(), 
+        m_d3dConstantBuffers[CB_Object].Get()
+    };
     m_d3dDeviceContext->VSSetConstantBuffers(
-        0,                                               // start slot
-        1,                                               // number of buffers
-        m_d3dConstantBuffers[CB_Object].GetAddressOf()   // array of constant buffers
+        0,                                      // start slot
+        _countof(vertexShaderConstantBuffers),  // number of buffers
+        vertexShaderConstantBuffers             // array of constant buffers
     );
 
     // Setup the rasterizer stage
@@ -46,10 +38,15 @@ void SimpleObj::RenderScene_Forward()
 
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dPixelShader.Get(), nullptr, 0);
-    ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Material].Get(), m_d3dConstantBuffers[CB_Light].Get() };
+    ID3D11Buffer* pixelShaderConstantBuffers[] = 
+    {
+        m_d3dConstantBuffers[CB_Material].Get(), 
+        m_d3dConstantBuffers[CB_Light].Get(),
+        m_d3dConstantBuffers[CB_Debug].Get(),
+    };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,                                      // start slot
-        2,                                      // number of buffers
+        _countof(pixelShaderConstantBuffers),   // number of buffers
         pixelShaderConstantBuffers              // array of constant buffers
     );
 
@@ -94,6 +91,7 @@ void SimpleObj::RenderScene_Forward()
             // Setup Object CB
             m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
             m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
@@ -116,17 +114,28 @@ void SimpleObj::RenderScene_Forward()
     {
         m_d3dDeviceContext->IASetInputLayout(m_d3dInstancedInputLayout.Get());
         m_d3dDeviceContext->VSSetShader(m_d3dInstancedVertexShader.Get(), nullptr, 0);
+
+        ID3D11Buffer* vertexShaderConstantBuffers[] =
+        {
+            m_d3dConstantBuffers[CB_Frame].Get()
+        };
         m_d3dDeviceContext->VSSetConstantBuffers(
-            0,                                               // start slot
-            1,                                               // number of buffers
-            m_d3dConstantBuffers[CB_Frame].GetAddressOf()    // array of constant buffers
+            0,                                      // start slot
+            _countof(vertexShaderConstantBuffers),  // number of buffers
+            vertexShaderConstantBuffers             // array of constant buffers
         );
 
         m_d3dDeviceContext->PSSetShader(m_d3dInstancedPixelShader.Get(), nullptr, 0);
+        
+        ID3D11Buffer* pixelShaderConstantBuffers[] =
+        {
+            m_d3dConstantBuffers[CB_Light].Get(),
+            m_d3dConstantBuffers[CB_Debug].Get(),
+        };
         m_d3dDeviceContext->PSSetConstantBuffers(
-            0,                                               // start slot
-            1,                                               // number of buffers
-            m_d3dConstantBuffers[CB_Light].GetAddressOf()    // array of constant buffers
+            0,                                      // start slot
+            _countof(pixelShaderConstantBuffers),   // number of buffers
+            pixelShaderConstantBuffers              // array of constant buffers
         );
 
         const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
@@ -144,6 +153,7 @@ void SimpleObj::RenderScene_Forward()
                 instanceData.push_back({
                     instancedEntity->WorldMatrix,
                     instancedEntity->InverseTransposeWorldMatrix,
+                    instancedEntity->InverseTransposeWorldViewMatrix,
                     instancedEntity->Material
                     });
             }

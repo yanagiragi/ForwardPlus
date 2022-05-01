@@ -36,6 +36,6 @@ public:
 
     Vector4 GlobalAmbient = Vector4(0.05, 0.05, 0.05, 1.0);
     Light Lights[MAX_LIGHTS];
-    std::vector<Entity*> Entities;
+    std::vector<Entity*> Entities; // contains all entity of the scene regardless it is instanced or not
     std::map<std::string, std::vector<Entity*>> InstancedEntity;
 };

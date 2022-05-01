@@ -28,8 +28,7 @@ struct PixelShaderInput
 {
     float4 PositionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
-    float3 PositionWS : TEXCOORD1;
-    float3 NormalWS : TEXCOORD2;
+    float3 NormalWS : TEXCOORD1;
 };
 
 struct PixelShaderOutput

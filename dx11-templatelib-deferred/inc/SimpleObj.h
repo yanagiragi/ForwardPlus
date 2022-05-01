@@ -74,14 +74,14 @@ private:
     void LoadTexture();
     void LoadLight();
 
-    void RenderScene();
-    void RenderDebug();
+    void RenderScene(RenderEventArgs& e);
+    void RenderDebug(RenderEventArgs& e);
 
     void SetupImgui();
     void RenderImgui(RenderEventArgs& e);
 
-    void RenderScene_Forward();
-    void RenderScene_Deferred();
+    void RenderScene_Forward(RenderEventArgs& e);
+    void RenderScene_Deferred(RenderEventArgs& e);
 
     void RenderScene_Deferred_GeometryPass();
     void RenderScene_Deferred_DebugPass();
@@ -219,6 +219,7 @@ private:
     RenderMode m_RenderMode = RenderMode::Forward;
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
+    int m_LightingSpace = 0; // World space
 
     Vector2 m_ScreenDimensions;
 

@@ -69,6 +69,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
             // Setup Object CB
             m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
             m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
@@ -108,6 +109,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
             // Setup Object CB
             m_ObjectConstantBuffer.WorldMatrix = instancedEntity->WorldMatrix;
             m_ObjectConstantBuffer.InverseTransposeWorldMatrix = instancedEntity->InverseTransposeWorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = instancedEntity->InverseTransposeWorldViewMatrix;
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = instancedEntity->WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
@@ -124,11 +126,6 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
 
 void SimpleObj::RenderScene_Deferred_DebugPass()
 {
-    // update cb
-    m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
-    m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
-
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
         1,                                      // number of render target to bind
@@ -258,29 +255,10 @@ void SimpleObj::RenderScene_Deferred_LightingPass()
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
-void SimpleObj::RenderScene_Deferred()
+void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
 {
-    // Setup Frame CB
-    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
-    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
-
-    // Setup Light CB
-    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
-    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
-    for (int i = 0; i < MAX_LIGHTS; ++i)
-    {
-        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
-    }
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
-
-    m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
-    m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
-    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
-
-    // Call render passes
     RenderScene_Deferred_GeometryPass();
+    
     if (m_DeferredDebugMode == Deferred_DebugMode::None)
     {
         RenderScene_Deferred_LightingPass();

@@ -103,16 +103,22 @@ void SimpleObj::LoadShaderResources()
                 { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
                 { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
                 { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                
                 // Per-instance data.
                 { "WORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
                 { "WORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
                 { "WORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
                 { "WORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 
-                { "NORMALMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-                { "NORMALMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-                { "NORMALMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-                { "NORMALMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALWORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALWORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALWORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALWORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+                { "NORMALVIEWMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALVIEWMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALVIEWMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+                { "NORMALVIEWMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 
                 { "MATERIAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Emissive
                 { "MATERIAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Ambient
@@ -319,21 +325,21 @@ void SimpleObj::LoadLight()
 {
     struct Light point;
     point.LightType = (int)LightType::Point;
-    point.Position = Vector4(-0.5, 3.0, 0.0, 1.0f);
+    point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
     point.Strength = 1.0f;
     point.Enabled = true;
 
     struct Light directional;
     directional.LightType = (int)LightType::Directional;
-    directional.Position = Vector4(0.0, 6.0, 0.0, 1.0f);
-    directional.Direction = Vector4(1.0, 0.5, 0.25, 1.0f);
+    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
+    directional.DirectionWS = Vector4(1.0, 0.5, 0.25, 1.0f);
     directional.Strength = 0.5f;
     directional.Enabled = true;
 
     struct Light spotlight;
     spotlight.LightType = (int)LightType::Spotlight;
-    spotlight.Position = Vector4(0.178, 4.0, 0.6, 1.0f);
-    spotlight.Direction = Vector4(0.079, -0.285, 0.976f, 1.0f);
+    spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
+    spotlight.DirectionWS = Vector4(0.079, -0.285, 0.976f, 1.0f);
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Strength = 1.0f;
     spotlight.Enabled = true;
@@ -346,15 +352,15 @@ void SimpleObj::LoadLight()
 /// <summary>
 /// Render render loop
 /// </summary>
-void SimpleObj::RenderScene()
+void SimpleObj::RenderScene(RenderEventArgs& e)
 {
     switch (m_RenderMode)
     {
     case RenderMode::Forward:
-        RenderScene_Forward();
+        RenderScene_Forward(e);
         break;
     case RenderMode::Deferred:
-        RenderScene_Deferred();
+        RenderScene_Deferred(e);
         break;
     }
 }
@@ -362,7 +368,7 @@ void SimpleObj::RenderScene()
 /// <summary>
 /// Draw wireframe for debugging
 /// </summary>
-void SimpleObj::RenderDebug()
+void SimpleObj::RenderDebug(RenderEventArgs& e)
 {
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
@@ -390,7 +396,7 @@ void SimpleObj::RenderDebug()
         for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
             auto light = &m_Scene.Lights[i];
-            auto position = Vector3(light->Position.x, light->Position.y, light->Position.z);
+            auto position = Vector3(light->PositionWS.x, light->PositionWS.y, light->PositionWS.z);
             auto type = (LightType)light->LightType;
             auto strength = light->Strength;
 
@@ -403,7 +409,7 @@ void SimpleObj::RenderDebug()
 
             else if (type == LightType::Directional || type == LightType::Spotlight)
             {
-                auto direction = Vector3(light->Direction.x, light->Direction.y, light->Direction.z);
+                auto direction = Vector3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
                 direction.Normalize();
                 // use negative direction to visual actual light dir calculation in shader
                 auto v1 = VertexPositionColor(position, Colors::Red);
@@ -469,11 +475,20 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     ImGui::PushID("Render Techniques");
     {
         int renderMode = (int)m_RenderMode;
-        if (ImGui::Combo("", &renderMode, "Forward\0Deferred\0"))
+        if (ImGui::Combo("Render Techniques", &renderMode, "Forward\0Deferred\0"))
         {
             m_RenderMode = (RenderMode)renderMode;
         }
         
+        if (m_RenderMode == RenderMode::Forward)
+        {
+            int lightingSpace = (int)m_LightingSpace;
+            if (ImGui::Combo("Lighting Space", &lightingSpace, "World Space\0View Space\0"))
+            {
+                m_LightingSpace = lightingSpace;
+            }
+        }
+
         int debugMode = (int)m_DeferredDebugMode;
         if (m_RenderMode == RenderMode::Deferred && 
             ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0"))
@@ -548,11 +563,11 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     };
                 }
 
-                float position[3] = { entity->Position.x , entity->Position.y , entity->Position.z };
+                float position[3] = { entity->PositionWS.x , entity->PositionWS.y , entity->PositionWS.z };
                 ImGui::DragFloat3("Position", position, dragSpeed);
-                entity->Position.x = position[0];
-                entity->Position.y = position[1];
-                entity->Position.z = position[2];
+                entity->PositionWS.x = position[0];
+                entity->PositionWS.y = position[1];
+                entity->PositionWS.z = position[2];
 
                 Vector3 v_rotation = entity->Rotation.ToEuler();
                 float rotation[3] = { v_rotation.x, v_rotation.y, v_rotation.z };
@@ -631,13 +646,13 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                         m_DirectionWindowNameGetter = [lightName]() { return lightName.c_str(); };
                         m_DirectionWindowVec3Getter = [i, light]()
                         {
-                            return vec3(light->Direction.x, light->Direction.y, light->Direction.z);
+                            return vec3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
                         };
                         m_DirectionWindowVec3Setter = [i, light](vec3 value)
                         {
-                            light->Direction.x = value.x;
-                            light->Direction.y = value.y;
-                            light->Direction.z = value.z;
+                            light->DirectionWS.x = value.x;
+                            light->DirectionWS.y = value.y;
+                            light->DirectionWS.z = value.z;
                         };
                     }
                 }
@@ -649,17 +664,17 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     light->SpotAngle = XMConvertToRadians(spotAngle);
                 }
 
-                float position[3] = { light->Position.x, light->Position.y, light->Position.z };
+                float position[3] = { light->PositionWS.x, light->PositionWS.y, light->PositionWS.z };
                 ImGui::DragFloat3("Position", position, dragSpeed);
-                light->Position.x = position[0];
-                light->Position.y = position[1];
-                light->Position.z = position[2];
+                light->PositionWS.x = position[0];
+                light->PositionWS.y = position[1];
+                light->PositionWS.z = position[2];
 
-                float rotation[3] = { light->Direction.x, light->Direction.y, light->Direction.z };
+                float rotation[3] = { light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z };
                 ImGui::DragFloat3("Rotation", rotation, dragSpeed);
-                light->Direction.x = rotation[0];
-                light->Direction.y = rotation[1];
-                light->Direction.z = rotation[2];
+                light->DirectionWS.x = rotation[0];
+                light->DirectionWS.y = rotation[1];
+                light->DirectionWS.z = rotation[2];
                 float strength = light->Strength;
                 ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
                 light->Strength = strength;
@@ -769,7 +784,8 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
     XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
     m_Camera.set_Rotation(cameraRotation);
 
-    Matrix viewProjectionMatrix = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
+    Matrix viewMatrix = m_Camera.get_ViewMatrix();
+    Matrix viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
     for (auto entity : m_Scene.Entities)
     {
         // update angle
@@ -779,10 +795,18 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
         entity->Rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), entity->RotateAxisSpeed.z);
 
         auto model = Matrix::Identity;
-        model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->Position);
+        model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->PositionWS);
+        auto modelView = viewMatrix * model;
         entity->WorldMatrix = model;
         entity->InverseTransposeWorldMatrix = model.Transpose().Invert();
+        entity->InverseTransposeWorldViewMatrix = modelView.Transpose().Invert();
         entity->WorldViewProjectionMatrix = model * viewProjectionMatrix;
+    }
+
+    for (auto light : m_Scene.Lights)
+    {
+        light.PositionVS = Vector4::Transform(light.PositionWS, viewMatrix);
+        light.DirectionVS = Vector4::Transform(light.DirectionWS, viewMatrix);
     }
 }
 
@@ -812,11 +836,35 @@ void SimpleObj::OnRender(RenderEventArgs& e)
 {
     Clear(DirectX::Colors::CornflowerBlue, 1.0f, 0);
 
-    RenderScene();
-    RenderDebug();
+    // Setup Frame CB
+    m_FrameConstantBuffer.ViewMatrix = m_Camera.get_ViewMatrix();
+    m_FrameConstantBuffer.ProjectionMatrix = m_Camera.get_ProjectionMatrix();
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame].Get(), 0, nullptr, &m_FrameConstantBuffer, 0, 0);
 
+    // Setup Light CB
+    m_LightPropertiesConstantBuffer.EyePosition = Vector4(m_Camera.get_Translation());
+    m_LightPropertiesConstantBuffer.GlobalAmbient = m_Scene.GlobalAmbient;
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        m_LightPropertiesConstantBuffer.Lights[i] = m_Scene.Lights[i];
+    }
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
+
+    // update Debug CB
+    m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
+    m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
+    m_DebugPropertiesConstantBuffer.LightingSpace = m_LightingSpace;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
+
+    // update ScreenToViewParams CB
+    m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
+    m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
+    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
+
+    RenderScene(e);
+    RenderDebug(e);
     RenderImgui(e);
-
     Present();
 }
 
@@ -1217,6 +1265,7 @@ bool SimpleObj::LoadContent()
             instanceData.push_back({
                 instancedEntity->WorldMatrix,
                 instancedEntity->InverseTransposeWorldMatrix,
+                instancedEntity->InverseTransposeWorldViewMatrix,
                 instancedEntity->Material
                 });
         }

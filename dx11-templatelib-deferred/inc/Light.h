@@ -16,9 +16,11 @@ enum class LightType
 
 struct Light
 {
-    Vector4     Position;                           // 16 bytes
+    Vector4     PositionWS;                           // 16 bytes
+    Vector4     PositionVS;                         // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
-    Vector4     Direction;                          // 16 bytes
+    Vector4     DirectionWS;                          // 16 bytes
+    Vector4     DirectionVS;                        // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
     Vector4     Color = Vector4(1, 1, 1, 1);        // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
@@ -32,7 +34,7 @@ struct Light
     float       Strength = 0.0f;                    // 4 bytes
     int         Padding = 0;                            // 4 bytes
     //--------------------------------------------------------- (16 byte boundary)
-};  // Total:                                       // 80 bytes (5 * 16)
+};  // Total:                                       // 112 bytes (7 * 16)
 
 struct LightProperties
 {

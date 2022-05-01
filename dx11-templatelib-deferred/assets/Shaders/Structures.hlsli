@@ -12,9 +12,11 @@
 // ==============================================================
 struct Light
 {
-    float4      Position;               // 16 bytes
+    float4      PositionWS;             // 16 bytes
+    float4      PositionVS;             // 16 bytes
     //----------------------------------- (16 byte boundary)
-    float4      Direction;              // 16 bytes
+    float4      DirectionWS;            // 16 bytes
+    float4      DirectionVS;            // 16 bytes
     //----------------------------------- (16 byte boundary)
     float4      Color;                  // 16 bytes
     //----------------------------------- (16 byte boundary)

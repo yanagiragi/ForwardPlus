@@ -24,31 +24,46 @@ float DoAttenuation(Light light, float d)
     return 1.0f / (light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d);
 }
 
-float DoSpotCone(Light light, float3 L)
+float DoSpotConeWS(Light light, float3 L)
 {
     float minCos = cos(light.SpotAngle);
     float maxCos = (minCos + 1.0f) / 2.0f;
-    float cosAngle = dot(light.Direction.xyz, -L);
+    float cosAngle = dot(light.DirectionWS.xyz, -L);
     return smoothstep(minCos, maxCos, cosAngle);
 }
 
-LightingResult DoDirectionalLight(Light light, float3 V, float3 N, float specularPower)
+float DoSpotConeVS(Light light, float3 L)
+{
+    float minCos = cos(light.SpotAngle);
+    float maxCos = (minCos + 1.0f) / 2.0f;
+    float cosAngle = dot(light.DirectionVS.xyz, -L);
+    return smoothstep(minCos, maxCos, cosAngle);
+}
+
+LightingResult _DoDirectionalLight(Light light, float3 V, float3 N, float specularPower, float3 L)
 {
     LightingResult result;
-
-    float3 L = light.Direction.xyz;
-
     result.Diffuse = DoDiffuse(light, L, N);
     result.Specular = DoSpecular(light, V, L, N, specularPower);
-
     return result;
 }
 
-LightingResult DoPointLight(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoDirectionalLightWS(Light light, float3 V, float3 N, float specularPower)
+{
+    float3 L = normalize(light.DirectionWS.xyz);
+    return _DoDirectionalLight(light, V, N, specularPower, L);
+}
+
+LightingResult DoDirectionalLightVS(Light light, float3 V, float3 N, float specularPower)
+{
+    float3 L = normalize(light.DirectionVS.xyz);
+    return _DoDirectionalLight(light, V, N, specularPower, L);
+}
+
+LightingResult _DoPointLight(Light light, float3 V, float3 P, float3 N, float specularPower, float3 L)
 {
     LightingResult result;
     
-    float3 L = (light.Position - P).xyz;
     float distance = length(L);
     L = L / distance;
 
@@ -60,16 +75,26 @@ LightingResult DoPointLight(Light light, float3 V, float3 P, float3 N, float spe
     return result;
 }
 
-LightingResult DoSpotLight(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoPointLightWS(Light light, float3 V, float3 P, float3 N, float specularPower)
+{
+    float3 L = (light.PositionWS - P).xyz;
+    return _DoPointLight(light, V, P, N, specularPower, L);
+}
+
+LightingResult DoPointLightVS(Light light, float3 V, float3 P, float3 N, float specularPower)
+{
+    float3 L = (light.PositionVS - P).xyz;
+    return _DoPointLight(light, V, P, N, specularPower, L);
+}
+
+LightingResult _DoSpotLight(Light light, float3 V, float3 P, float3 N, float specularPower, float3 L, float spotIntensity)
 {
     LightingResult result;
 
-    float3 L = (light.Position - P).xyz;
     float distance = length(L);
     L = L / distance;
 
     float attenuation = DoAttenuation(light, distance);
-    float spotIntensity = DoSpotCone(light, -L);
 
     result.Diffuse = DoDiffuse(light, L, N) * attenuation * spotIntensity;
     result.Specular = DoSpecular(light, V, L, N, specularPower) * attenuation * spotIntensity;
@@ -77,9 +102,23 @@ LightingResult DoSpotLight(Light light, float3 V, float3 P, float3 N, float spec
     return result;
 }
 
-LightingResult ComputeLighting(Light Lights[MAX_LIGHTS], float3 position, float3 normal, float specularPower, float3 eyePosition)
+LightingResult DoSpotLightWS(Light light, float3 V, float3 P, float3 N, float specularPower)
 {
-    float3 view = normalize(eyePosition - position).xyz;
+    float3 L = (light.PositionWS - P).xyz;
+    float spotIntensity = DoSpotConeWS(light, -normalize(L));
+    return _DoSpotLight(light, V, P, N, specularPower, L, spotIntensity);
+}
+
+LightingResult DoSpotLightVS(Light light, float3 V, float3 P, float3 N, float specularPower)
+{
+    float3 L = (light.PositionVS - P).xyz;
+    float spotIntensity = DoSpotConeVS(light, -normalize(L));
+    return _DoSpotLight(light, V, P, N, specularPower, L, spotIntensity);
+}
+
+LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, float3 normalVS, float specularPower)
+{
+    float3 view = normalize(positionVS);
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
@@ -96,19 +135,94 @@ LightingResult ComputeLighting(Light Lights[MAX_LIGHTS], float3 position, float3
         switch ((int)Lights[i].LightType)
         {
         case DIRECTIONAL_LIGHT:
-            result = DoDirectionalLight(Lights[i], view, normal, specularPower);
+            result = DoDirectionalLightVS(Lights[i], view, normalVS, specularPower);
             break;
         case POINT_LIGHT:
-            result = DoPointLight(Lights[i], view, position, normal, specularPower);
+            result = DoPointLightVS(Lights[i], view, positionVS, normalVS, specularPower);
             break;
         case SPOT_LIGHT:
-            result = DoSpotLight(Lights[i], view, position, normal, specularPower);
+            result = DoSpotLightVS(Lights[i], view, positionVS, normalVS, specularPower);
             break;
         }
 
         totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
         totalResult.Specular += result.Specular * Lights[i].Strength;
     }
+
+    return totalResult;
+}
+
+LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
+{
+    float3 view = normalize(eyePosition - positionWS);
+    
+    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
+    
+    [unroll]
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        if (!Lights[i].Enabled)
+        {
+            continue;
+        }
+
+        LightingResult result = { {0, 0, 0}, {0, 0, 0} };
+
+        switch ((int)Lights[i].LightType)
+        {
+        case DIRECTIONAL_LIGHT:
+            result = DoDirectionalLightWS(Lights[i], view, normalWS, specularPower);
+            break;
+        case POINT_LIGHT:
+            result = DoPointLightWS(Lights[i], view, positionWS, normalWS, specularPower);
+            break;
+        case SPOT_LIGHT:
+            result = DoSpotLightWS(Lights[i], view, positionWS, normalWS, specularPower);
+            break;
+        }
+
+        totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
+        totalResult.Specular += result.Specular * Lights[i].Strength;
+    }
+
+    return totalResult;
+}
+
+// debug function
+LightingResult MyComputeLighting(Light Lights[MAX_LIGHTS], float3 position, float3 normal, float specularPower, float3 eyePosition)
+{
+    float3 view = normalize(eyePosition - position);
+    
+    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
+    
+    [unroll]
+    for (int i = 0; i < MAX_LIGHTS; ++i)
+    {
+        if (!Lights[i].Enabled)
+        {
+            continue;
+        }
+
+        LightingResult result = { {0, 0, 0}, {0, 0, 0} };
+
+        switch ((int)Lights[i].LightType)
+        {
+        case DIRECTIONAL_LIGHT:
+            result = DoDirectionalLightWS(Lights[i], view, normal, specularPower);
+            break;
+        /*case POINT_LIGHT:
+            result = DoPointLight(Lights[i], view, position, normal, specularPower);
+            break;
+        case SPOT_LIGHT:
+            result = DoSpotLight(Lights[i], view, position, normal, specularPower);
+            break;*/
+        }
+
+        totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
+        totalResult.Specular += result.Specular * Lights[i].Strength;
+    }
+
+    totalResult.Specular = 0.0f;
 
     return totalResult;
 }

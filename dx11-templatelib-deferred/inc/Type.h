@@ -51,6 +51,7 @@ struct ObjectConstantBuffer
 {
     Matrix WorldMatrix;
     Matrix InverseTransposeWorldMatrix;
+    Matrix InverseTransposeWorldViewMatrix;
     Matrix WorldViewProjectionMatrix;
 };
 
@@ -58,9 +59,9 @@ struct InstancedObjectConstantBuffer
 {
     Matrix WorldMatrix;
     Matrix InverseTransposeWorldMatrix;
+    Matrix InverseTransposeWorldViewMatrix;
     struct Material Material;
 };
-
 
 struct ScreenToViewParams
 {
@@ -74,7 +75,8 @@ struct DebugProperties
 {
     int DeferredDebugMode = 0;
     float DeferredDepthPower = 0;
-    float padding[2];
+    int LightingSpace = 0;
+    float padding[1];
 };
 
 #pragma endregion
