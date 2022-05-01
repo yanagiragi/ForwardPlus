@@ -39,7 +39,6 @@ struct PixelShaderInput
 float4 ViewToWorld( float4 view )
 {
     float4 world = mul( InverseView, view );
-    world = world / world.z;
     return world;
 }
 
@@ -75,15 +74,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 normalRaw = GBuffer_Normal.Sample(Sampler, IN.uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
-    LightingResult lit = MyComputeLighting(Lights, positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
+    LightingResult lit = ComputeLightingWS(Lights, positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
 
     float3 color = accumulated.rgb + diffuse.rgb * lit.Diffuse + specular.rgb * lit.Specular;
-
-    depth = pow(depth, 500.0f);
-
-    //return float4( texCoord / ScreenDimensions, depth, 1.0f );
-
-    return float4(positionVS.xyz, 1);
 
     return float4(color, 1.0);
 }

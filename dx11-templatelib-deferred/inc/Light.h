@@ -16,10 +16,10 @@ enum class LightType
 
 struct Light
 {
-    Vector4     PositionWS;                           // 16 bytes
+    Vector4     PositionWS;                         // 16 bytes
     Vector4     PositionVS;                         // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
-    Vector4     DirectionWS;                          // 16 bytes
+    Vector4     DirectionWS;                        // 16 bytes
     Vector4     DirectionVS;                        // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
     Vector4     Color = Vector4(1, 1, 1, 1);        // 16 bytes

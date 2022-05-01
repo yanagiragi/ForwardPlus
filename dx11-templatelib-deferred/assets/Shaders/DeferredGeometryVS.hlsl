@@ -23,7 +23,7 @@ struct VertexShaderOutput
 {
     float4 PositionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
-    float3 NormalWS : TEXCOORD2;
+    float3 NormalWS : TEXCOORD1;
 };
 
 VertexShaderOutput main(AppData IN)

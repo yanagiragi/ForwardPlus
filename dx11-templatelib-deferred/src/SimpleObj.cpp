@@ -331,15 +331,24 @@ void SimpleObj::LoadLight()
 
     struct Light directional;
     directional.LightType = (int)LightType::Directional;
-    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
-    directional.DirectionWS = Vector4(1.0, 0.5, 0.25, 1.0f);
+    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);    
+    
+    auto directionV3 = Vector3(1.0, 0.5, 0.25);
+    directionV3.Normalize();
+    directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+
     directional.Strength = 0.5f;
     directional.Enabled = true;
 
     struct Light spotlight;
     spotlight.LightType = (int)LightType::Spotlight;
     spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
-    spotlight.DirectionWS = Vector4(0.079, -0.285, 0.976f, 1.0f);
+    
+    directionV3 = Vector3(0.079, -0.285, 0.976f);
+    directionV3.Normalize();
+    spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+
+    //spotlight.DirectionWS.Normalize();
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Strength = 1.0f;
     spotlight.Enabled = true;
@@ -760,7 +769,7 @@ SimpleObj::SimpleObj(Window& window)
     pData->m_InitialCameraRot = m_Camera.get_Rotation();
 
     // debug 
-    m_RenderMode = RenderMode::Deferred;
+    // m_RenderMode = RenderMode::Deferred;
     // m_DeferredDebugMode = Deferred_DebugMode::Depth;
 }
 
@@ -796,17 +805,35 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
 
         auto model = Matrix::Identity;
         model = Matrix::CreateFromYawPitchRoll(entity->Rotation.ToEuler()) * Matrix::CreateTranslation(entity->PositionWS);
-        auto modelView = viewMatrix * model;
+        auto modelView = model * viewMatrix;
         entity->WorldMatrix = model;
         entity->InverseTransposeWorldMatrix = model.Transpose().Invert();
         entity->InverseTransposeWorldViewMatrix = modelView.Transpose().Invert();
         entity->WorldViewProjectionMatrix = model * viewProjectionMatrix;
     }
 
-    for (auto light : m_Scene.Lights)
+    for (auto &light : m_Scene.Lights)
     {
-        light.PositionVS = Vector4::Transform(light.PositionWS, viewMatrix);
-        light.DirectionVS = Vector4::Transform(light.DirectionWS, viewMatrix);
+        auto PositionVS = Vector3(Vector4::Transform(light.PositionWS, viewMatrix));
+        light.PositionVS = Vector4(PositionVS.x, PositionVS.y, PositionVS.z, 1.0f);
+        
+        auto directionVS = Vector3(Vector4::Transform(light.DirectionWS, viewMatrix));
+        directionVS.Normalize();
+        light.DirectionVS = Vector4(directionVS.x, directionVS.y, directionVS.z, 1.0f);
+
+        /*
+        if (light.LightType != (int)LightType::Directional) continue;
+        if (!light.Enabled) continue;
+        std::cout << "light.DirectionWS = ("
+            << light.DirectionWS.x << ", "
+            << light.DirectionWS.y << ", "
+            << light.DirectionWS.z << ");" << std::endl;
+        std::cout << "light.DirectionVS = ("
+            << light.DirectionVS.x << ", "
+            << light.DirectionVS.y << ", "
+            << light.DirectionVS.z << ");" << std::endl;
+        std::cout << std::endl;
+        */
     }
 }
 

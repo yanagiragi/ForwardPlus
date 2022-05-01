@@ -56,7 +56,7 @@ LightingResult DoDirectionalLightWS(Light light, float3 V, float3 N, float specu
 
 LightingResult DoDirectionalLightVS(Light light, float3 V, float3 N, float specularPower)
 {
-    float3 L = normalize(light.DirectionVS.xyz);
+    float3 L = normalize(light.DirectionVS.xyz); // buggy! Note: negative direction gets lit but still wrong
     return _DoDirectionalLight(light, V, N, specularPower, L);
 }
 
@@ -118,6 +118,8 @@ LightingResult DoSpotLightVS(Light light, float3 V, float3 P, float3 N, float sp
 
 LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, float3 normalVS, float specularPower)
 {
+    // Still buggy!
+
     float3 view = normalize(positionVS);
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
@@ -184,45 +186,6 @@ LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], float3 positionWS, fl
         totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
         totalResult.Specular += result.Specular * Lights[i].Strength;
     }
-
-    return totalResult;
-}
-
-// debug function
-LightingResult MyComputeLighting(Light Lights[MAX_LIGHTS], float3 position, float3 normal, float specularPower, float3 eyePosition)
-{
-    float3 view = normalize(eyePosition - position);
-    
-    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
-    
-    [unroll]
-    for (int i = 0; i < MAX_LIGHTS; ++i)
-    {
-        if (!Lights[i].Enabled)
-        {
-            continue;
-        }
-
-        LightingResult result = { {0, 0, 0}, {0, 0, 0} };
-
-        switch ((int)Lights[i].LightType)
-        {
-        case DIRECTIONAL_LIGHT:
-            result = DoDirectionalLightWS(Lights[i], view, normal, specularPower);
-            break;
-        /*case POINT_LIGHT:
-            result = DoPointLight(Lights[i], view, position, normal, specularPower);
-            break;
-        case SPOT_LIGHT:
-            result = DoSpotLight(Lights[i], view, position, normal, specularPower);
-            break;*/
-        }
-
-        totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
-        totalResult.Specular += result.Specular * Lights[i].Strength;
-    }
-
-    totalResult.Specular = 0.0f;
 
     return totalResult;
 }
