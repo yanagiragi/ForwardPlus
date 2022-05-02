@@ -282,6 +282,7 @@ void SimpleObj::LoadShaderResources()
         }
     }
 
+    // Deferred Debug
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/DebugVS.hlsl";
@@ -305,6 +306,7 @@ void SimpleObj::LoadShaderResources()
         }
     }
 
+    // Deferred Lighting Loop
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/Deferred/DeferredLightingVS.hlsl";
@@ -564,12 +566,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             m_RenderMode = (RenderMode)renderMode;
         }
 
-        int lightingcalculation = (int)m_LightingCalculation;
-        if (ImGui::Combo("Lighting Calculation", &lightingcalculation, "Loop\0Single\0"))
-        {
-            m_LightingCalculation = (LightingCalculation)lightingcalculation;
-        }
-        
         if (m_RenderMode == RenderMode::Forward)
         {
             int lightingSpace = (int)m_LightingSpace;
@@ -845,20 +841,13 @@ SimpleObj::SimpleObj(Window& window)
     m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
 
     // Setup camera initlal position
-    pData = (AlignedData*)_aligned_malloc(sizeof(AlignedData), 16);
-    pData->m_InitialCameraPos = m_Camera.get_Translation();
-    pData->m_InitialCameraRot = m_Camera.get_Rotation();
-
-    // debug 
-    // m_RenderMode = RenderMode::Deferred;
-    // m_DeferredDebugMode = Deferred_DebugMode::Depth;
+    m_InitialCameraPos = m_Camera.get_Translation();
+    m_InitialCameraRot = m_Camera.get_Rotation();
 }
 
 SimpleObj::~SimpleObj()
 {
     // ComPtr and smart pointer will automatically release itselves
-
-    _aligned_free(pData);
 }
 
 void SimpleObj::OnUpdate(UpdateEventArgs& e)
@@ -961,14 +950,28 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     // update Debug CB
     m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
     m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
-    m_DebugPropertiesConstantBuffer.LightingSpace = (int)m_LightingSpace;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
+
+    // update LightCalculationOptions CB
+    m_LightingCalculationOptionsConstrantBuffer.LightIndex = 0;
+    m_LightingCalculationOptionsConstrantBuffer.LightingSpace = (int)m_LightingSpace;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
 
     // update ScreenToViewParams CB
     m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
     m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
+
+    // Set device context global settings
+
+    // Setup the rasterizer stage
+    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+    m_d3dDeviceContext->RSSetViewports(
+        1,                                      // numbers of the viewport to bind
+        &viewport                               // array of viewport
+    );
 
     RenderScene(e);
     RenderDebug(e);
@@ -1025,8 +1028,8 @@ void SimpleObj::OnKeyPressed(KeyEventArgs& e)
     case KeyCode::R:
     {
         // Reset camera position and orientation
-        m_Camera.set_Translation(pData->m_InitialCameraPos);
-        m_Camera.set_Rotation(pData->m_InitialCameraRot);
+        m_Camera.set_Translation(m_InitialCameraPos);
+        m_Camera.set_Rotation(m_InitialCameraRot);
         m_Pitch = 0.0f;
         m_Yaw = 0.0f;
     }
@@ -1459,7 +1462,31 @@ bool SimpleObj::LoadContent()
 
         hr = m_d3dDevice->CreateBuffer(&screenToViewParamsConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_ScreenToViewParams]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_ScreenToViewParams");
+
+        D3D11_BUFFER_DESC lightCalculationOptionsConstantBufferDesc;
+        ZeroMemory(&lightCalculationOptionsConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        lightCalculationOptionsConstantBufferDesc.ByteWidth = sizeof(struct LightingCalculationOptions);
+        lightCalculationOptionsConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        lightCalculationOptionsConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        lightCalculationOptionsConstantBufferDesc.CPUAccessFlags = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&lightCalculationOptionsConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_LightCalculationOptions]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_LightCalculationOptions");
     }
+
+    D3D11_BLEND_DESC blendStateDesc;
+    ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
+    blendStateDesc.IndependentBlendEnable = false;
+    blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+    blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_COLOR;
+    blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_DEST_COLOR;
+    blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
+    AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
 
     LoadShaderResources();
     LoadLight();

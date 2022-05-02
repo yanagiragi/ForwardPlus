@@ -15,12 +15,11 @@ cbuffer LightProperties : register(b1)
     struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:                           // 672 bytes (42 * 16 byte boundary)
 
-cbuffer DebugProperties : register(b2)
+cbuffer LightingCalculationOptions : register(b2)
 {
-    int mode;                 // 4 bytes
-    float depthPower;         // 4 bytes
     int lightingSpace;        // 4 bytes
-    float padding[1];         // 12 bytes
+    int lightIndex;           // 4 bytes
+    float padding[2];         // 8 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
 

@@ -8,8 +8,7 @@ cbuffer DebugProperties : register(b0)
 {
     int mode;                 // 4 bytes
     float depthPower;         // 4 bytes
-    int lightingSpace;        // 4 bytes
-    float padding[1];         // 12 bytes
+    float padding[2];         // 8 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
 

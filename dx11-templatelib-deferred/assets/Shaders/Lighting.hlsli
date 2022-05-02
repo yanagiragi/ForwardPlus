@@ -116,7 +116,7 @@ LightingResult DoSpotLightVS(Light light, float3 V, float3 P, float3 N, float sp
 
 LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, float3 normalVS, float specularPower)
 {
-    // Still buggy!
+    // view space calculation is still buggy!
 
     float3 view = normalize(positionVS);
     
@@ -148,6 +148,40 @@ LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, fl
         totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
         totalResult.Specular += result.Specular * Lights[i].Strength;
     }
+
+    return totalResult;
+}
+
+LightingResult ComputeLightingVS_Single(Light light, float3 positionVS, float3 normalVS, float specularPower)
+{
+    // view space calculation is still buggy!
+
+    float3 view = normalize(positionVS);
+    
+    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
+    
+    if (!light.Enabled)
+    {
+        return totalResult;
+    }
+
+    LightingResult result = { {0, 0, 0}, {0, 0, 0} };
+
+    switch ((int)light.LightType)
+    {
+    case DIRECTIONAL_LIGHT:
+        result = DoDirectionalLightVS(light, view, normalVS, specularPower);
+        break;
+    case POINT_LIGHT:
+        result = DoPointLightVS(light, view, positionVS, normalVS, specularPower);
+        break;
+    case SPOT_LIGHT:
+        result = DoSpotLightVS(light, view, positionVS, normalVS, specularPower);
+        break;
+    }
+
+    totalResult.Diffuse += result.Diffuse * light.Strength;
+    totalResult.Specular += result.Specular * light.Strength;
 
     return totalResult;
 }
@@ -184,6 +218,38 @@ LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], float3 positionWS, fl
         totalResult.Diffuse += result.Diffuse * Lights[i].Strength;
         totalResult.Specular += result.Specular * Lights[i].Strength;
     }
+
+    return totalResult;
+}
+
+LightingResult ComputeLightingWS_Single(Light light, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
+{
+    float3 view = normalize(eyePosition - positionWS);
+    
+    LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
+    
+    if (!light.Enabled)
+    {
+        return totalResult;
+    }
+
+    LightingResult result = { {0, 0, 0}, {0, 0, 0} };
+
+    switch ((int)light.LightType)
+    {
+    case DIRECTIONAL_LIGHT:
+        result = DoDirectionalLightWS(light, view, normalWS, specularPower);
+        break;
+    case POINT_LIGHT:
+        result = DoPointLightWS(light, view, positionWS, normalWS, specularPower);
+        break;
+    case SPOT_LIGHT:
+        result = DoSpotLightWS(light, view, positionWS, normalWS, specularPower);
+        break;
+    }
+
+    totalResult.Diffuse += result.Diffuse * light.Strength;
+    totalResult.Specular += result.Specular * light.Strength;
 
     return totalResult;
 }

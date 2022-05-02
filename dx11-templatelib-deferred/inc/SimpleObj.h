@@ -95,12 +95,8 @@ private:
     // Variables
     Camera m_Camera;
 
-    __declspec(align(16)) struct AlignedData
-    {
-        DirectX::XMVECTOR m_InitialCameraPos;
-        DirectX::XMVECTOR m_InitialCameraRot;
-    };
-    AlignedData* pData;
+    Vector4 m_InitialCameraPos;
+    Vector4 m_InitialCameraRot;
 
     // For panning the camera.
     int m_W, m_A, m_S, m_D;
@@ -166,6 +162,7 @@ private:
     struct LightProperties m_LightPropertiesConstantBuffer;
     struct DebugProperties m_DebugPropertiesConstantBuffer;
     struct ScreenToViewParams m_ScreenToViewParamsConstantBuffer;
+    struct LightingCalculationOptions m_LightingCalculationOptionsConstrantBuffer;
     
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
@@ -189,6 +186,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_d3dRenderTargetView_normal;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dRenderTargetView_normal_SRV;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
+
+    Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
 
     struct Material defaultMaterial;
     struct Material diffuseMaterial = {
@@ -230,7 +229,6 @@ private:
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
-    LightingCalculation m_LightingCalculation = LightingCalculation::Loop;
 
     Vector2 m_ScreenDimensions;
 

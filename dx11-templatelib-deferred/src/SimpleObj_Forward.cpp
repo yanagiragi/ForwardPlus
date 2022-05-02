@@ -12,7 +12,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
 
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(
-        m_d3dRegularVertexShader.Get(),                // pointer to vertex shader
+        m_d3dRegularVertexShader.Get(),         // pointer to vertex shader
         nullptr,                                // pointer to an array of class-instance interfaces, NULL means shader does not use any interface
         0                                       // number of class-instance interfaces of previous param
     );
@@ -28,27 +28,6 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         vertexShaderConstantBuffers             // array of constant buffers
     );
 
-    // Setup the rasterizer stage
-    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
-    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
-    m_d3dDeviceContext->RSSetViewports(
-        1,                                      // numbers of the viewport to bind
-        &viewport                               // array of viewport
-    );
-
-    // Setup the pixel stage stage
-    m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_PixelShader.Get(), nullptr, 0);
-    ID3D11Buffer* pixelShaderConstantBuffers[] = 
-    {
-        m_d3dConstantBuffers[CB_Material].Get(), 
-        m_d3dConstantBuffers[CB_Light].Get(),
-        m_d3dConstantBuffers[CB_Debug].Get(),
-    };
-    m_d3dDeviceContext->PSSetConstantBuffers(
-        0,                                      // start slot
-        _countof(pixelShaderConstantBuffers),   // number of buffers
-        pixelShaderConstantBuffers              // array of constant buffers
-    );
 
     ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
     m_d3dDeviceContext->PSSetSamplers(
@@ -75,8 +54,25 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         1                                       // stencil reference
     );
 
+    // set blend state to no blend
+    m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
+
     // Draw Regular Entities
     {
+        // Setup the pixel stage stage
+        m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_PixelShader.Get(), nullptr, 0);
+        ID3D11Buffer* pixelShaderConstantBuffers[] =
+        {
+            m_d3dConstantBuffers[CB_Material].Get(),
+            m_d3dConstantBuffers[CB_Light].Get(),
+            m_d3dConstantBuffers[CB_LightCalculationOptions].Get(),
+        };
+        m_d3dDeviceContext->PSSetConstantBuffers(
+            0,                                      // start slot
+            _countof(pixelShaderConstantBuffers),   // number of buffers
+            pixelShaderConstantBuffers              // array of constant buffers
+        );
+
         UINT vertexStride = sizeof(VertexData);
         UINT offset = 0;
         for (auto entity : m_Scene.Entities)
@@ -126,11 +122,11 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         );
 
         m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_InstancedPixelShader.Get(), nullptr, 0);
-        
+
         ID3D11Buffer* pixelShaderConstantBuffers[] =
         {
             m_d3dConstantBuffers[CB_Light].Get(),
-            m_d3dConstantBuffers[CB_Debug].Get(),
+            m_d3dConstantBuffers[CB_LightCalculationOptions].Get(),
         };
         m_d3dDeviceContext->PSSetConstantBuffers(
             0,                                      // start slot

@@ -16,6 +16,7 @@ enum ConstantBuffer
     CB_Light,
     CB_Debug,
     CB_ScreenToViewParams,
+    CB_LightCalculationOptions,
     NumConstantBuffers
 };
 
@@ -42,13 +43,6 @@ enum class LightingSpace
     World,
     View,
     LEN_LIGHTINGSPACE
-};
-
-enum class LightingCalculation
-{
-    Loop,
-    Single,
-    LEN_LIGHTING_CALCULATION
 };
 
 #pragma endregion
@@ -89,8 +83,14 @@ struct DebugProperties
 {
     int DeferredDebugMode = 0;
     float DeferredDepthPower = 0;
+    float padding[2];
+};
+
+struct LightingCalculationOptions
+{
     int LightingSpace = 0;
-    float padding[1];
+    int LightIndex;
+    float padding[2];
 };
 
 #pragma endregion

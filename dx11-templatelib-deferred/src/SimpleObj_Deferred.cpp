@@ -6,6 +6,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
+
     // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_RegularInputLayout.Get());
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -13,11 +14,6 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_RegularVertexShader.Get(), nullptr, 0);
     m_d3dDeviceContext->VSSetConstantBuffers(0, 1, m_d3dConstantBuffers[CB_Object].GetAddressOf());
-
-    // Setup the rasterizer stage
-    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
-    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
-    m_d3dDeviceContext->RSSetViewports(1, &viewport);
 
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometry_RegularPixelShader.Get(), nullptr, 0);
@@ -52,6 +48,9 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
 
     m_d3dDeviceContext->OMSetRenderTargets(_countof(renderTargetViews), renderTargetViews, m_d3dDepthStencilView_depth.Get());
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+
+    // set blend state to no blend
+    m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
 
     // Draw Regular Entities
     {
