@@ -26,8 +26,8 @@ struct Light
     //--------------------------------------------------------- (16 byte boundary)
     float       SpotAngle = 0.0f;                   // 4 bytes
     float       ConstantAttenuation = 1.0f;         // 4 bytes
-    float       LinearAttenuation = 0.08f;          // 4 bytes
-    float       QuadraticAttenuation = 0.0f;        // 4 bytes
+    float       LinearAttenuation = 0.7f;          // 4 bytes
+    float       QuadraticAttenuation = 1.8f;        // 4 bytes
     //--------------------------------------------------------- (16 byte boundary)
     int         LightType = 0;                      // 4 bytes
     int         Enabled = false;                    // 4 bytes

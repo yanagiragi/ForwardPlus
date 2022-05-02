@@ -326,7 +326,7 @@ void SimpleObj::LoadLight()
     struct Light point;
     point.LightType = (int)LightType::Point;
     point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
-    point.Strength = 1.0f;
+    point.Strength = 8.0f;
     point.Enabled = true;
 
     struct Light directional;
@@ -350,7 +350,7 @@ void SimpleObj::LoadLight()
 
     //spotlight.DirectionWS.Normalize();
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
-    spotlight.Strength = 1.0f;
+    spotlight.Strength = 75.0f;
     spotlight.Enabled = true;
 
     m_Scene.Lights[0] = point;
@@ -411,7 +411,14 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
 
             if (type == LightType::Point)
             {
-                auto radius = sqrtf(strength);
+                auto constant = light->ConstantAttenuation;
+                auto linear = light->LinearAttenuation;
+                auto quadratic = light->QuadraticAttenuation;
+                auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
+                
+                // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 15/256 as dark threshold
+                auto radius = (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 15.0) * lightMax))) / (2 * quadratic);
+                
                 auto sphere = BoundingSphere(position, radius);
                 DX::Draw(m_d3dPrimitiveBatch.get(), sphere, DirectX::Colors::White);
             }
@@ -685,7 +692,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 light->DirectionWS.y = rotation[1];
                 light->DirectionWS.z = rotation[2];
                 float strength = light->Strength;
-                ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 5.0f);
+                ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 100.0f);
                 light->Strength = strength;
 
                 int style_idx = light->LightType;
