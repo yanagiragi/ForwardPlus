@@ -1,4 +1,5 @@
-#include "Lighting.hlsli"
+#include "../Structures.hlsli"
+#include "../Lighting.hlsli"
 
 cbuffer LightProperties : register(b0)
 {

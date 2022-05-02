@@ -1,4 +1,4 @@
-#include "Structures.hlsli"
+#include "../Structures.hlsli"
 
 cbuffer MaterialProperties : register(b0)
 {

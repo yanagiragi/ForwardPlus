@@ -7,12 +7,12 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
    // Setup the input assembler stage
-    m_d3dDeviceContext->IASetInputLayout(m_d3dInputLayout.Get());
+    m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(
-        m_d3dVertexShader.Get(),                // pointer to vertex shader
+        m_d3dRegularVertexShader.Get(),                // pointer to vertex shader
         nullptr,                                // pointer to an array of class-instance interfaces, NULL means shader does not use any interface
         0                                       // number of class-instance interfaces of previous param
     );
@@ -37,7 +37,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
     );
 
     // Setup the pixel stage stage
-    m_d3dDeviceContext->PSSetShader(m_d3dPixelShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_PixelShader.Get(), nullptr, 0);
     ID3D11Buffer* pixelShaderConstantBuffers[] = 
     {
         m_d3dConstantBuffers[CB_Material].Get(), 
@@ -125,7 +125,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             vertexShaderConstantBuffers             // array of constant buffers
         );
 
-        m_d3dDeviceContext->PSSetShader(m_d3dInstancedPixelShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_InstancedPixelShader.Get(), nullptr, 0);
         
         ID3D11Buffer* pixelShaderConstantBuffers[] =
         {

@@ -87,6 +87,9 @@ private:
     void RenderScene_Deferred_DebugPass();
     void RenderScene_Deferred_LightingPass();
 
+    void RenderScene_Deferred_LightingPass_Loop();
+    void RenderScene_Deferred_LightingPass_Stencil();
+
     bool ResizeSwapChain(int width, int height);
 
     // Variables
@@ -108,26 +111,33 @@ private:
     DirectX::XMINT2 m_PreviousMousePosition = {0, 0};
 
     // Shader data
-    __int64 m_d3dVertexShaderSize = 0;
-    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dVertexShader = nullptr;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dInputLayout = nullptr;
+    __int64 m_d3dRegularVertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dRegularVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dRegularInputLayout = nullptr;
 
-    __int64 m_d3dPixelShaderSize = 0;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dPixelShader = nullptr;
+    __int64 m_d3dForward_LoopLight_PixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_LoopLight_PixelShader = nullptr;
     
     __int64 m_d3dInstancedVertexShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dInstancedVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dInstancedInputLayout = nullptr;
 
-    __int64 m_d3dInstancedPixelShaderSize = 0;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dInstancedPixelShader = nullptr;
+    __int64 m_d3dForward_LoopLight_InstancedPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_LoopLight_InstancedPixelShader = nullptr;
 
-    __int64 m_d3dDeferredGeometryVertexShaderSize = 0;
-    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometryVertexShader = nullptr;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometryInputLayout = nullptr;
+    __int64 m_d3dDeferredGeometry_RegularVertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometry_RegularVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometry_RegularInputLayout = nullptr;
 
-    __int64 m_d3dDeferredGeometryPixelShaderSize = 0;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredGeometryPixelShader = nullptr;
+    __int64 m_d3dDeferredGeometry_RegularPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredGeometry_RegularPixelShader = nullptr;
+
+    __int64 m_d3dDeferredGeometry_InstancedVertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometry_InstancedVertexShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometry_InstancedInputLayout = nullptr;
+
+    __int64 m_d3dDeferredGeometry_InstancedPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredGeometry_InstancedPixelShader = nullptr;
 
     __int64 m_d3dDebugVertexShaderSize = 0;
     __int64 m_d3dDebugPixelShaderSize = 0;
@@ -135,9 +145,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDebugPixelShader = nullptr;
 
     __int64 m_d3dDeferredLightingVertexShaderSize = 0;
-    __int64 m_d3dDeferredLightingPixelShaderSize = 0;
+    __int64 m_d3dDeferredLighting_LoopLight_PixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLightingVertexShader = nullptr;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLightingPixelShader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_LoopLight_PixelShader = nullptr;
 
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
@@ -219,7 +229,8 @@ private:
     RenderMode m_RenderMode = RenderMode::Forward;
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
-    int m_LightingSpace = 0; // World space
+    LightingSpace m_LightingSpace = LightingSpace::World;
+    LightingCalculation m_LightingCalculation = LightingCalculation::Loop;
 
     Vector2 m_ScreenDimensions;
 

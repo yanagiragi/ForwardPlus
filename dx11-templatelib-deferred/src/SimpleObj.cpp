@@ -21,16 +21,16 @@ void SimpleObj::LoadShaderResources()
     // which it expects constant buffers to be initialized with D3D11_USAGE_DEFAULT usage flag
     // and buffers that are created with the D3D11_USAGE_DEFAULT flag must have their CPU AccessFlags set to 0.
 
-    // Load and compile the vertex shader
+    // Forward Regular
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/SimpleVS.hlsl";
+        std::wstring filename = L"assets/Shaders/Forward/RegularVS.hlsl";
         _int64 size = GetFileSize(filename);
-        if (size != m_d3dVertexShaderSize)
+        if (size != m_d3dRegularVertexShaderSize)
         {
             vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dVertexShader);
-            m_d3dVertexShaderSize = size;
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dRegularVertexShader);
+            m_d3dRegularVertexShaderSize = size;
 
             // Create the input layout for the vertex shader.
             D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -69,26 +69,27 @@ void SimpleObj::LoadShaderResources()
                 _countof(vertexLayoutDesc),                 // amount of the elements
                 vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
                 vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
-                &m_d3dInputLayout                           // pointer to the input-layout object
+                &m_d3dRegularInputLayout                           // pointer to the input-layout object
             );
             AssertIfFailed(hr, "Load Content", "Unable to create input layout");
         }
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/SimplePS.hlsl";
+        filename = L"assets/Shaders/Forward/ForwardLighting_LoopLightPS.hlsl";
         size = GetFileSize(filename);
-        if (size != m_d3dPixelShaderSize)
+        if (size != m_d3dForward_LoopLight_PixelShaderSize)
         {
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dPixelShader);
-            m_d3dPixelShaderSize = size;
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dForward_LoopLight_PixelShader);
+            m_d3dForward_LoopLight_PixelShaderSize = size;
         }
     }
     
+    // Forward Instanced
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/InstancedVS.hlsl";
+        std::wstring filename = L"assets/Shaders/Forward/InstancedVS.hlsl";
         _int64 size = GetFileSize(filename);
         if (size != m_d3dInstancedVertexShaderSize)
         {
@@ -140,25 +141,26 @@ void SimpleObj::LoadShaderResources()
         }
 
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/InstancedPS.hlsl";
+        filename = L"assets/Shaders/Forward/ForwardLighting_LoopLightPS_Instanced.hlsl";
         size = GetFileSize(filename);
-        if (size != m_d3dInstancedPixelShaderSize)
+        if (size != m_d3dForward_LoopLight_InstancedPixelShaderSize)
         {
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dInstancedPixelShader);
-            m_d3dInstancedPixelShaderSize = size;
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dForward_LoopLight_InstancedPixelShader);
+            m_d3dForward_LoopLight_InstancedPixelShaderSize = size;
         }
     }    
 
+    // Deferred Geometry Regular
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/DeferredGeometryVS.hlsl";
+        std::wstring filename = L"assets/Shaders/Deferred/DeferredGeometryRegularVS.hlsl";
         _int64 size = GetFileSize(filename);
-        if (size != m_d3dDeferredGeometryVertexShaderSize)
+        if (size != m_d3dDeferredGeometry_RegularVertexShaderSize)
         {
             vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredGeometryVertexShader);
-            m_d3dDeferredGeometryVertexShaderSize = size;
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredGeometry_RegularVertexShader);
+            m_d3dDeferredGeometry_RegularVertexShaderSize = size;
 
             // Create the input layout for the vertex shader.
             D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -197,20 +199,86 @@ void SimpleObj::LoadShaderResources()
                 _countof(vertexLayoutDesc),                 // amount of the elements
                 vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
                 vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
-                &m_d3dDeferredGeometryInputLayout           // pointer to the input-layout object
+                &m_d3dDeferredGeometry_RegularInputLayout           // pointer to the input-layout object
             );
             AssertIfFailed(hr, "Load Content", "Unable to create input layout");
         }
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/DeferredGeometryPS.hlsl";
+        filename = L"assets/Shaders/Deferred/DeferredGeometryRegularPS.hlsl";
         size = GetFileSize(filename);
-        if (size != m_d3dDeferredGeometryPixelShaderSize)
+        if (size != m_d3dDeferredGeometry_RegularPixelShaderSize)
         {
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredGeometryPixelShader);
-            m_d3dDeferredGeometryPixelShaderSize = size;
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredGeometry_RegularPixelShader);
+            m_d3dDeferredGeometry_RegularPixelShaderSize = size;
+        }
+    }
+
+    // Deferred Geometry Instanced
+    {
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Deferred/DeferredGeometryInstancedVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDeferredGeometry_InstancedVertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredGeometry_InstancedVertexShader);
+            m_d3dDeferredGeometry_InstancedVertexShaderSize = size;
+
+            // Create the input layout for the vertex shader.
+            D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+            {
+                // Per-vertex data.
+               { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+               { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+               { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+               // Per-instance data.
+               { "WORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "WORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "WORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "WORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+               { "NORMALWORLDMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALWORLDMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALWORLDMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALWORLDMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+               { "NORMALVIEWMATRIX", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALVIEWMATRIX", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALVIEWMATRIX", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+               { "NORMALVIEWMATRIX", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+               { "MATERIAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Emissive
+               { "MATERIAL", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Ambient
+               { "MATERIAL", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Diffuse
+               { "MATERIAL", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },   // Specular
+               { "MATERIAL", 4, DXGI_FORMAT_R32_UINT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },             // UseTexture
+               { "MATERIAL", 5, DXGI_FORMAT_R32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },            // SpecularPower
+               { "MATERIAL", 6, DXGI_FORMAT_R32G32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            };
+
+            hr = m_d3dDevice->CreateInputLayout(
+                vertexLayoutDesc,                           // input layout description
+                _countof(vertexLayoutDesc),                 // amount of the elements
+                vertexShaderBlob->GetBufferPointer(),       // pointer to the compiled shader
+                vertexShaderBlob->GetBufferSize(),          // size in bytes of the compiled shader
+                &m_d3dDeferredGeometry_InstancedInputLayout // pointer to the input-layout object
+            );
+            AssertIfFailed(hr, "Load Content", "Unable to create input layout");
+        }
+
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        filename = L"assets/Shaders/Deferred/DeferredGeometryInstancedPS.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dDeferredGeometry_InstancedPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredGeometry_InstancedPixelShader);
+            m_d3dDeferredGeometry_InstancedPixelShaderSize = size;
         }
     }
 
@@ -227,7 +295,7 @@ void SimpleObj::LoadShaderResources()
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/DebugDeferredPS.hlsl";
+        filename = L"assets/Shaders/Deferred/DebugDeferredPS.hlsl";
         size = GetFileSize(filename);
         if (size != m_d3dDebugPixelShaderSize)
         {
@@ -239,7 +307,7 @@ void SimpleObj::LoadShaderResources()
 
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/DeferredLightingSimpleVS.hlsl";
+        std::wstring filename = L"assets/Shaders/Deferred/DeferredLightingVS.hlsl";
         _int64 size = GetFileSize(filename);
         if (size != m_d3dDeferredLightingVertexShaderSize)
         {
@@ -250,13 +318,13 @@ void SimpleObj::LoadShaderResources()
 
         // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
-        filename = L"assets/Shaders/DeferredLightingSimplePS.hlsl";
+        filename = L"assets/Shaders/Deferred/DeferredLighting_LoopLightPS.hlsl";
         size = GetFileSize(filename);
-        if (size != m_d3dDeferredLightingPixelShaderSize)
+        if (size != m_d3dDeferredLighting_LoopLight_PixelShaderSize)
         {
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLightingPixelShader);
-            m_d3dDeferredLightingPixelShaderSize = size;
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLighting_LoopLight_PixelShader);
+            m_d3dDeferredLighting_LoopLight_PixelShaderSize = size;
         }
     }
 }
@@ -495,13 +563,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         {
             m_RenderMode = (RenderMode)renderMode;
         }
+
+        int lightingcalculation = (int)m_LightingCalculation;
+        if (ImGui::Combo("Lighting Calculation", &lightingcalculation, "Loop\0Single\0"))
+        {
+            m_LightingCalculation = (LightingCalculation)lightingcalculation;
+        }
         
         if (m_RenderMode == RenderMode::Forward)
         {
             int lightingSpace = (int)m_LightingSpace;
             if (ImGui::Combo("Lighting Space", &lightingSpace, "World Space\0View Space\0"))
             {
-                m_LightingSpace = lightingSpace;
+                m_LightingSpace = (LightingSpace)lightingSpace;
             }
         }
 
@@ -887,7 +961,7 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     // update Debug CB
     m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
     m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
-    m_DebugPropertiesConstantBuffer.LightingSpace = m_LightingSpace;
+    m_DebugPropertiesConstantBuffer.LightingSpace = (int)m_LightingSpace;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
 
     // update ScreenToViewParams CB

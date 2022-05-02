@@ -7,11 +7,11 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
     // Setup the input assembler stage
-    m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometryInputLayout.Get());
+    m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_RegularInputLayout.Get());
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Setup the vertex shader stage
-    m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometryVertexShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_RegularVertexShader.Get(), nullptr, 0);
     m_d3dDeviceContext->VSSetConstantBuffers(0, 1, m_d3dConstantBuffers[CB_Object].GetAddressOf());
 
     // Setup the rasterizer stage
@@ -20,7 +20,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     m_d3dDeviceContext->RSSetViewports(1, &viewport);
 
     // Setup the pixel stage stage
-    m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometryPixelShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometry_RegularPixelShader.Get(), nullptr, 0);
     ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Material].Get(), m_d3dConstantBuffers[CB_Light].Get() };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,                                      // start slot
@@ -89,35 +89,54 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     }
 
     // Draw Instanced Entities
-    // 
-    // [Note] 
-    // Since our geomery does not support instancing at the moment,
-    // the draw call is not reduced for now
-    UINT vertexStride = sizeof(VertexData);
-    UINT offset = 0;
-    for (auto const& pair : m_Scene.InstancedEntity)
     {
-        auto key = pair.first;
-        auto verticesCount = Model::GetVertexCount(key);
+        m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_InstancedInputLayout.Get());
+        
+        m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_InstancedVertexShader.Get(), nullptr, 0);
+        ID3D11Buffer* vertexShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Frame].Get() };
+        m_d3dDeviceContext->VSSetConstantBuffers(
+            0,                                      // start slot
+            _countof(vertexShaderConstantBuffers),  // number of buffers
+            vertexShaderConstantBuffers             // array of constant buffers
+        );
 
-        for (auto const& instancedEntity : pair.second)
+        m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometry_InstancedPixelShader.Get(), nullptr, 0);
+        ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Light].Get() };
+        m_d3dDeviceContext->PSSetConstantBuffers(
+            0,                                      // start slot
+            _countof(pixelShaderConstantBuffers),   // number of buffers
+            pixelShaderConstantBuffers              // array of constant buffers
+        );
+
+        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
+        const UINT offset[2] = { 0, 0 };
+        std::vector<InstancedObjectConstantBuffer> instanceData;
+        for (auto const& pair : m_Scene.InstancedEntity)
         {
-            // Setup Material CB
-            m_MaterialPropertiesConstantBuffer.Material = instancedEntity->Material;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
+            auto key = pair.first;
+            auto verticesCount = Model::GetVertexCount(key);
+            auto size = pair.second.size();
 
-            // Setup Object CB
-            m_ObjectConstantBuffer.WorldMatrix = instancedEntity->WorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldMatrix = instancedEntity->InverseTransposeWorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = instancedEntity->InverseTransposeWorldViewMatrix;
-            m_ObjectConstantBuffer.WorldViewProjectionMatrix = instancedEntity->WorldViewProjectionMatrix;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+            instanceData.clear();
+            for (auto const& instancedEntity : pair.second)
+            {
+                instanceData.push_back({
+                    instancedEntity->WorldMatrix,
+                    instancedEntity->InverseTransposeWorldMatrix,
+                    instancedEntity->InverseTransposeWorldViewMatrix,
+                    instancedEntity->Material
+                    });
+            }
 
-            ID3D11Buffer* buffer = Model::GetVertexBuffer(key);
-            m_d3dDeviceContext->IASetVertexBuffers(0, 1, &buffer, &vertexStride, &offset);
+            m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
 
-            m_d3dDeviceContext->Draw(
+            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
+            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
+
+            m_d3dDeviceContext->DrawInstanced(
                 verticesCount,
+                size,
+                0,
                 0
             );
         }
@@ -189,7 +208,7 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
 }
 
 // simpled version for now
-void SimpleObj::RenderScene_Deferred_LightingPass()
+void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
 {    
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
@@ -211,7 +230,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass()
     m_d3dDeviceContext->VSSetShader(m_d3dDeferredLightingVertexShader.Get(), nullptr, 0);
     
     // Setup the pixel stage stage
-    m_d3dDeviceContext->PSSetShader(m_d3dDeferredLightingPixelShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->PSSetShader(m_d3dDeferredLighting_LoopLight_PixelShader.Get(), nullptr, 0);
     ID3D11Buffer* buffers[] = {
         m_d3dConstantBuffers[CB_Light].Get(),
         m_d3dConstantBuffers[CB_ScreenToViewParams].Get()
@@ -261,7 +280,7 @@ void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
     
     if (m_DeferredDebugMode == Deferred_DebugMode::None)
     {
-        RenderScene_Deferred_LightingPass();
+        RenderScene_Deferred_LightingPass_Loop();
     }
     else 
     {

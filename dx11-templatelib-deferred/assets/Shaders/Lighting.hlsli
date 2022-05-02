@@ -1,5 +1,3 @@
-#include "Structures.hlsli"
-
 float4 DoDiffuse(Light light, float3 L, float3 N)
 {
     float NdotL = max(0, dot(N, L));

@@ -37,6 +37,20 @@ enum class Deferred_DebugMode
     LEN_DEFERRED_DEBUGMODE
 };
 
+enum class LightingSpace
+{
+    World,
+    View,
+    LEN_LIGHTINGSPACE
+};
+
+enum class LightingCalculation
+{
+    Loop,
+    Single,
+    LEN_LIGHTING_CALCULATION
+};
+
 #pragma endregion
 
 #pragma region Structures
