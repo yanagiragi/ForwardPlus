@@ -84,9 +84,18 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 normalRaw = GBuffer_Normal.Sample(Sampler, IN.uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
-    LightingResult lit = ComputeLightingWS(Lights, lightCount, positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
+    if (lightIndex == -1) {
+        return float4(accumulated.rgb, 1.0);
+    }
 
-    float3 color = accumulated.rgb + diffuse.rgb * lit.Diffuse + specular.rgb * lit.Specular;
+    LightingResult lit = { {0, 0, 0}, {0, 0, 0} };
+    
+    if (Lights[lightIndex].Enabled) 
+    {
+        lit = ComputeLightingWS_Single(Lights[lightIndex], positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
+    }
+
+    float3 color = diffuse.rgb * lit.Diffuse + specular.rgb * lit.Specular;
 
     return float4(color, 1.0);
 }

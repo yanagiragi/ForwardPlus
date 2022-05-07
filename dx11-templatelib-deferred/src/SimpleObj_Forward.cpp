@@ -28,7 +28,6 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         vertexShaderConstantBuffers             // array of constant buffers
     );
 
-
     ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
     m_d3dDeviceContext->PSSetSamplers(
         0,                                      // start slot
@@ -99,7 +98,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
-            m_d3dDeviceContext->Draw(
+            Draw(
                 entity->Model->VertexCount(),
                 0
             );
@@ -160,7 +159,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
             m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
 
-            m_d3dDeviceContext->DrawInstanced(
+            DrawInstanced(
                 verticesCount,
                 size,
                 0,

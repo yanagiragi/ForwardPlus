@@ -80,7 +80,8 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
-            m_d3dDeviceContext->Draw(
+
+            Draw(
                 entity->Model->VertexCount(),
                 0
             );
@@ -132,7 +133,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
             ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
             m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
 
-            m_d3dDeviceContext->DrawInstanced(
+            DrawInstanced(
                 verticesCount,
                 size,
                 0,
@@ -199,7 +200,7 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
         textures->GetAddressOf()                // array of resources
     );
 
-    m_d3dDeviceContext->Draw(4, 0);
+    Draw(4, 0);
 
     // Unbind SRVs
     ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
@@ -244,6 +245,9 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
     m_d3dDeviceContext->IASetInputLayout(nullptr);
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
+    // don't use any blend state
+    m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+
     // setup textures
     ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
     m_d3dDeviceContext->PSSetSamplers(
@@ -266,11 +270,100 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
         textures->GetAddressOf()                // array of resources
     );
 
-    m_d3dDeviceContext->Draw(4, 0);
+    Draw(4, 0);
 
     // Unbind SRVs
     ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
+}
+
+void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
+{
+    // set target view to main RTV
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
+
+    // Setup the rasterizer stage
+    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+    m_d3dDeviceContext->RSSetViewports(1, &viewport);
+
+    // Setup the vertex shader stage
+    m_d3dDeviceContext->VSSetShader(m_d3dDeferredLightingVertexShader.Get(), nullptr, 0);
+
+    // Setup the pixel stage stage
+    m_d3dDeviceContext->PSSetShader(m_d3dDeferredLighting_SingleLight_PixelShader.Get(), nullptr, 0);
+    ID3D11Buffer* buffers[] = {
+        m_d3dConstantBuffers[CB_Light].Get(),
+        m_d3dConstantBuffers[CB_ScreenToViewParams].Get(),
+        m_d3dConstantBuffers[CB_LightCalculationOptions].Get()
+    };
+    m_d3dDeviceContext->PSSetConstantBuffers(
+        0,
+        _countof(buffers),
+        buffers
+    );
+
+    // Setup the input assembler stage
+    m_d3dDeviceContext->IASetInputLayout(nullptr);
+    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    // setup textures
+    ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
+    m_d3dDeviceContext->PSSetSamplers(
+        0,                                      // start slot
+        1,                                      // number of sampler states
+        samplerStates->GetAddressOf()           // array of sampler states
+    );
+
+    ComPtr<ID3D11ShaderResourceView> textures[] =
+    {
+        m_d3dRenderTargetView_lightAccumulation_SRV,
+        m_d3dRenderTargetView_diffuse_SRV,
+        m_d3dRenderTargetView_specular_SRV,
+        m_d3dRenderTargetView_normal_SRV,
+        m_d3dDepthStencilView_depth_SRV
+    };
+    m_d3dDeviceContext->PSSetShaderResources(
+        0,                                      // start slot
+        _countof(textures),                     // number of resources
+        textures->GetAddressOf()                // array of resources
+    );
+
+    for (int i = -1; i < m_LightCalculationCount; ++i)
+    {
+        m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
+
+        if (i == -1) {
+            // use regular depth state and disable blend for the first pass, which
+            // simple outputs current light accumulation (ambient)
+            m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+            m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+        }
+        else {
+            // disable depth test and use additive blend
+            m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_DisableDepthTest.Get(), 1);
+            m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, 0xffffffff);
+        }
+
+        Draw(4, 0);
+    }
+
+    // Unbind SRVs
+    ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
+
+    // reset to default states
+    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+    m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
 }
 
 void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
@@ -279,7 +372,14 @@ void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
     
     if (m_DeferredDebugMode == Deferred_DebugMode::None)
     {
-        RenderScene_Deferred_LightingPass_Loop();
+        if (m_LightCalculationMode == LightCalculationMode::LOOP)
+        {
+            RenderScene_Deferred_LightingPass_Loop();
+        }
+        else
+        {
+            RenderScene_Deferred_LightingPass_Stencil();
+        }
     }
     else 
     {

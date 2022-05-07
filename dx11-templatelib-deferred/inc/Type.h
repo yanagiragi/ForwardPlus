@@ -45,6 +45,12 @@ enum class LightingSpace
     LEN_LIGHTINGSPACE
 };
 
+enum class LightCalculationMode
+{
+    LOOP,
+    SINGLE,
+    LEN_LIGHTCALCULATIONMODE
+};
 #pragma endregion
 
 #pragma region Structures
@@ -89,8 +95,9 @@ struct DebugProperties
 struct LightingCalculationOptions
 {
     int LightingSpace = 0;
+    int LightCount = MAX_LIGHTS;
     int LightIndex;
-    float padding[2];
+    float padding;
 };
 
 #pragma endregion

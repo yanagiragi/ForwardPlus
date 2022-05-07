@@ -92,6 +92,10 @@ private:
 
     bool ResizeSwapChain(int width, int height);
 
+    // Wrap to native API
+    void Draw(UINT VertexCount, UINT StartVertexLocation);
+    void DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
+
     // Variables
     Camera m_Camera;
 
@@ -145,6 +149,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLightingVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_LoopLight_PixelShader = nullptr;
 
+    __int64 m_d3dDeferredLighting_SingleLight_PixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_SingleLight_PixelShader = nullptr;
+
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
     std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -188,6 +195,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
 
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_DisableDepthTest;
 
     struct Material defaultMaterial;
     struct Material diffuseMaterial = {
@@ -229,6 +237,10 @@ private:
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
+    int m_LightCalculationCount = MAX_LIGHTS;
+    LightCalculationMode m_LightCalculationMode = LightCalculationMode::SINGLE;
+
+    int m_DrawCallCount = 0;
 
     Vector2 m_ScreenDimensions;
 
