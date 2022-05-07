@@ -50,7 +50,9 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
 
     // set blend state to no blend
-    m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
+    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UINT sampleMask = 0xffffffff;
+    m_d3dDeviceContext->OMSetBlendState(NULL, blendFactor, sampleMask);
 
     // Draw Regular Entities
     {

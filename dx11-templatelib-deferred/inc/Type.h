@@ -45,6 +45,13 @@ enum class LightingSpace
     LEN_LIGHTINGSPACE
 };
 
+enum class LightingCalculation
+{
+    Loop,
+    Single,
+    LEN_LIGHTING_CALCULATION
+};
+
 #pragma endregion
 
 #pragma region Structures

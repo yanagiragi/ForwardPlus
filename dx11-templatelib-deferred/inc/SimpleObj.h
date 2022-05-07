@@ -121,6 +121,9 @@ private:
     __int64 m_d3dForward_LoopLight_InstancedPixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_LoopLight_InstancedPixelShader = nullptr;
 
+    __int64 m_d3dForward_SingleLight_PixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_SingleLight_PixelShader = nullptr;
+
     __int64 m_d3dDeferredGeometry_RegularVertexShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometry_RegularVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometry_RegularInputLayout = nullptr;
@@ -229,6 +232,7 @@ private:
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
+    LightingCalculation m_LightingCalculation = LightingCalculation::Loop;
 
     Vector2 m_ScreenDimensions;
 

@@ -151,6 +151,20 @@ void SimpleObj::LoadShaderResources()
         }
     }    
 
+    // Forward Single Light
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Forward/ForwardLighting_SingleLightPS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dForward_SingleLight_PixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dForward_SingleLight_PixelShader);
+            m_d3dForward_SingleLight_PixelShaderSize = size;
+        }
+    }
+
     // Deferred Geometry Regular
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
@@ -575,6 +589,13 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             }
         }
 
+        int lightingCalculation = (int)m_LightingCalculation;
+        if (ImGui::Combo("Lighting Calculation", &lightingCalculation, "Loop\0Single\0"))
+        {
+            m_LightingCalculation = (LightingCalculation)lightingCalculation;
+        }
+        
+
         int debugMode = (int)m_DeferredDebugMode;
         if (m_RenderMode == RenderMode::Deferred && 
             ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0"))
@@ -829,8 +850,8 @@ SimpleObj::SimpleObj(Window& window)
     , m_Yaw(0.0f)
 {
     m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
+    //m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
+    //m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
 
     XMVECTOR cameraPos = XMVectorSet(0, 7.5, 25, 1);
     XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
