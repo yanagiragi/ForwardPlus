@@ -339,6 +339,11 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
 
     for (int i = -1; i < m_LightCalculationCount; ++i)
     {
+        if (!m_Scene.Lights[i].Enabled)
+        {
+            continue;
+        }
+
         m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
         m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
 
