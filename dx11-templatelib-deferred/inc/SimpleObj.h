@@ -88,6 +88,7 @@ private:
     void RenderScene_Deferred_LightingPass();
 
     void RenderScene_Deferred_LightingPass_Loop();
+    void RenderScene_Deferred_LightingPass_Single();
     void RenderScene_Deferred_LightingPass_Stencil();
 
     bool ResizeSwapChain(int width, int height);
@@ -151,6 +152,9 @@ private:
 
     __int64 m_d3dDeferredLighting_SingleLight_PixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_SingleLight_PixelShader = nullptr;
+
+    __int64 m_d3dUnlitPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dUnlitPixelShader = nullptr;
 
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
@@ -228,6 +232,7 @@ private:
     };
 
     Scene m_Scene;
+    Model* m_lightVolume_sphere;
 
     const float fovInDegree = 45.0f;
     const float nearPlane = 0.1f;

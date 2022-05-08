@@ -285,7 +285,7 @@ void SimpleObj::LoadShaderResources()
     // Deferred Debug
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/DebugVS.hlsl";
+        std::wstring filename = L"assets/Shaders/DebugScreenVS.hlsl";
         _int64 size = GetFileSize(filename);
         if (size != m_d3dDebugVertexShaderSize)
         {
@@ -340,6 +340,20 @@ void SimpleObj::LoadShaderResources()
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
             CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLighting_SingleLight_PixelShader);
             m_d3dDeferredLighting_SingleLight_PixelShaderSize = size;
+        }
+    }
+
+    // Debug Unlit
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/UnlitPS.hlsl";
+        __int64 size = GetFileSize(filename);
+        if (size != m_d3dUnlitPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dUnlitPixelShader);
+            m_d3dUnlitPixelShaderSize = size;
         }
     }
 }
@@ -598,7 +612,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             }
 
             int lightCalculationMode = (int)m_LightCalculationMode;
-            if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0"))
+            if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
             {
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
@@ -1429,6 +1443,7 @@ bool SimpleObj::LoadContent()
         Model::AddInstancedVertexBuffer(key, buffer);
     }
 
+    // setup CB
     {
         D3D11_BUFFER_DESC frameConstantBufferDesc;
         ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
@@ -1501,33 +1516,68 @@ bool SimpleObj::LoadContent()
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_LightCalculationOptions");
     }
 
-    D3D11_BLEND_DESC blendStateDesc;
-    ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
-    blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
-    
-    blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-    blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-    blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    
-    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-    blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    
-    blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
-    AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
+    // setup BlendState & DepthStencilState
+    {
+        D3D11_BLEND_DESC blendStateDesc;
+        ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
+        blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
 
-    // Setup depth/stencil state.
-    D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
-    ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+        blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
 
-    depthStencilStateDesc.DepthEnable = FALSE;
-    depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-    depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    depthStencilStateDesc.StencilEnable = FALSE;
+        blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+        blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 
-    hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
-    AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+        blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
+        AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
+
+        // Setup depth/stencil state.
+        D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+        ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+        depthStencilStateDesc.DepthEnable = FALSE;
+        depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+        depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
+        depthStencilStateDesc.StencilEnable = FALSE;
+
+        hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
+        AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+    }
+
+    {
+        std::string modelPath = "assets/Models/sphere.obj";
+        m_lightVolume_sphere = new Model();
+        m_lightVolume_sphere->Load(modelPath.c_str());
+
+        // Create an initialize the vertex buffer.
+        D3D11_BUFFER_DESC vertexBufferDesc;
+        ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        vertexBufferDesc.ByteWidth = sizeof(VertexData) * m_lightVolume_sphere->VertexCount();    // size of the buffer in bytes
+        vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+        vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+
+        D3D11_SUBRESOURCE_DATA resourceData;
+        ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+        resourceData.pSysMem = m_lightVolume_sphere->Head();                                   // pointer to the data to initialize the buffer with
+        resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
+                                                                                        // No used for now.
+        resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
+                                                                                        // no used for now.
+        ID3D11Buffer* buffer = nullptr;
+        hr = m_d3dDevice->CreateBuffer(
+            &vertexBufferDesc,                                                          // buffer description
+            &resourceData,                                                              // pointer to the initialization data
+            &buffer                                                                     // pointer to the created buffer object
+        );
+        std::string message = "Unable to create vertex buffer of " + modelPath;
+        AssertIfFailed(hr, "Load Content", message.c_str());
+
+        Model::AddVertexBuffer(m_lightVolume_sphere->Key(), buffer);
+    }
 
     LoadShaderResources();
     LoadLight();

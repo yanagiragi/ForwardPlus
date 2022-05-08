@@ -91,7 +91,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     // Draw Instanced Entities
     {
         m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_InstancedInputLayout.Get());
-        
+
         m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_InstancedVertexShader.Get(), nullptr, 0);
         ID3D11Buffer* vertexShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Frame].Get() };
         m_d3dDeviceContext->VSSetConstantBuffers(
@@ -163,7 +163,7 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
 
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(m_d3dDebugVertexShader.Get(), nullptr, 0);
-    
+
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dDebugPixelShader.Get(), nullptr, 0);
 
@@ -207,9 +207,8 @@ void SimpleObj::RenderScene_Deferred_DebugPass()
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
-// simpled version for now
 void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
-{    
+{
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
         1,                                      // number of render target to bind
@@ -228,7 +227,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
 
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(m_d3dDeferredLightingVertexShader.Get(), nullptr, 0);
-    
+
     // Setup the pixel stage stage
     m_d3dDeviceContext->PSSetShader(m_d3dDeferredLighting_LoopLight_PixelShader.Get(), nullptr, 0);
     ID3D11Buffer* buffers[] = {
@@ -240,7 +239,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
         _countof(buffers),
         buffers
     );
-   
+
     // Setup the input assembler stage
     m_d3dDeviceContext->IASetInputLayout(nullptr);
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -278,6 +277,145 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
 }
 
 void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
+{
+    auto ToVector3 = [](Vector4& vec4) {
+        return Vector3(vec4.x, vec4.y, vec4.z);
+    };
+
+    // set target view to main RTV
+    m_d3dDeviceContext->OMSetRenderTargets(
+        1,                                      // number of render target to bind
+        m_d3dRenderTargetView.GetAddressOf(),   // pointer to an array of render-target view
+        m_d3dDepthStencilView.Get()             // pointer to depth-stencil view
+    );
+    m_d3dDeviceContext->OMSetDepthStencilState(
+        m_d3dDepthStencilState.Get(),           // depth stencil state
+        1                                       // stencil reference
+    );
+
+    // Setup the rasterizer stage
+    m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+    D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+    m_d3dDeviceContext->RSSetViewports(1, &viewport);
+
+    // Setup the vertex shader stage
+    m_d3dDeviceContext->VSSetShader(m_d3dRegularVertexShader.Get(), nullptr, 0);
+    m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
+
+    // Setup the pixel stage stage
+    m_d3dDeviceContext->PSSetShader(m_d3dUnlitPixelShader.Get(), nullptr, 0);
+    /*ID3D11Buffer* buffers[] = {
+        m_d3dConstantBuffers[CB_Light].Get(),
+        m_d3dConstantBuffers[CB_ScreenToViewParams].Get(),
+        m_d3dConstantBuffers[CB_LightCalculationOptions].Get()
+    };
+    m_d3dDeviceContext->PSSetConstantBuffers(
+        0,
+        _countof(buffers),
+        buffers
+    );*/
+
+    // Setup the input assembler stage
+    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // setup textures
+    /*ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
+    m_d3dDeviceContext->PSSetSamplers(
+        0,                                      // start slot
+        1,                                      // number of sampler states
+        samplerStates->GetAddressOf()           // array of sampler states
+    );
+
+    ComPtr<ID3D11ShaderResourceView> textures[] =
+    {
+        m_d3dRenderTargetView_lightAccumulation_SRV,
+        m_d3dRenderTargetView_diffuse_SRV,
+        m_d3dRenderTargetView_specular_SRV,
+        m_d3dRenderTargetView_normal_SRV,
+        m_d3dDepthStencilView_depth_SRV
+    };
+    m_d3dDeviceContext->PSSetShaderResources(
+        0,                                      // start slot
+        _countof(textures),                     // number of resources
+        textures->GetAddressOf()                // array of resources
+    );*/
+
+    Matrix viewProjectionMatrix = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
+    UINT vertexStride = sizeof(VertexData);
+    UINT offset = 0;
+
+    for (int i = -1; i < m_LightCalculationCount; ++i)
+    {
+        if (i != -1 && !m_Scene.Lights[i].Enabled)
+        {
+            continue;
+        }
+
+        auto light = &m_Scene.Lights[i];
+
+        if (light->LightType != (int)LightType::Point) {
+            continue;
+        }
+
+        auto strength = light->Strength;
+        auto constant = light->ConstantAttenuation;
+        auto linear = light->LinearAttenuation;
+        auto quadratic = light->QuadraticAttenuation;
+        auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
+
+        // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 15/256 as dark threshold
+        auto radius = (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 15.0) * lightMax))) / (2 * quadratic);
+
+        m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
+
+        auto model = Matrix::CreateScale(radius) * Matrix::CreateFromYawPitchRoll(ToVector3(light->DirectionWS)) * Matrix::CreateTranslation(ToVector3(light->PositionWS));
+        auto WorldViewProjectionMatrix = model * viewProjectionMatrix;
+
+        // leave InverseTransposeWorldMatrix, InverseTransposeWorldViewMatrix non-updated
+        m_ObjectConstantBuffer.WorldMatrix = model;
+        m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+
+        auto vertexBuffer = m_lightVolume_sphere->VertexBuffer();
+        m_d3dDeviceContext->IASetVertexBuffers(
+            0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+            1,                                      // number of vertex buffers in the array
+            &vertexBuffer,                          // pointer to an array of vertex buffers
+            &vertexStride,                          // pointer to stride values
+            &offset                                 // pointer to offset values
+        );
+
+        Draw(
+            m_lightVolume_sphere->VertexCount(),
+            0
+        );
+
+        /*if (i == -1) {
+            // use regular depth state and disable blend for the first pass, which
+            // simple outputs current light accumulation (ambient)
+            m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+            m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+        }
+        else {
+            // disable depth test and use additive blend
+            m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_DisableDepthTest.Get(), 1);
+            m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, 0xffffffff);
+        }
+
+        Draw(4, 0);*/
+    }
+
+    // Unbind SRVs
+    ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
+
+    // reset to default states
+    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+    m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+}
+
+void SimpleObj::RenderScene_Deferred_LightingPass_Single()
 {
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
@@ -339,7 +477,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
 
     for (int i = -1; i < m_LightCalculationCount; ++i)
     {
-        if (!m_Scene.Lights[i].Enabled)
+        if (i != -1 && !m_Scene.Lights[i].Enabled)
         {
             continue;
         }
@@ -374,19 +512,23 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
 void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
 {
     RenderScene_Deferred_GeometryPass();
-    
+
     if (m_DeferredDebugMode == Deferred_DebugMode::None)
     {
         if (m_LightCalculationMode == LightCalculationMode::LOOP)
         {
             RenderScene_Deferred_LightingPass_Loop();
         }
+        else if (m_LightCalculationMode == LightCalculationMode::SINGLE)
+        {
+            RenderScene_Deferred_LightingPass_Single();
+        }
         else
         {
             RenderScene_Deferred_LightingPass_Stencil();
         }
     }
-    else 
+    else
     {
         RenderScene_Deferred_DebugPass();
     }
