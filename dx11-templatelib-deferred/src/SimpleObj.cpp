@@ -356,6 +356,19 @@ void SimpleObj::LoadShaderResources()
             m_d3dUnlitPixelShaderSize = size;
         }
     }
+
+    // light volume VS
+    {
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Deferred/LightVolumeVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDeferredLighting_LightVolume_VertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredLighting_LightVolume_VertexShader);
+            m_d3dDeferredLighting_LightVolume_VertexShaderSize = size;
+        }
+    }
 }
 
 /// <summary>
@@ -1533,20 +1546,115 @@ bool SimpleObj::LoadContent()
         blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
         hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
         AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
+    }
+    
+    // Setup depth/stencil state.
+    {
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 
-        // Setup depth/stencil state.
-        D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
-        ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+            depthStencilStateDesc.DepthEnable = FALSE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.StencilEnable = FALSE;
 
-        depthStencilStateDesc.DepthEnable = FALSE;
-        depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
-        depthStencilStateDesc.StencilEnable = FALSE;
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+        }
 
-        hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
-        AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = TRUE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER;
+            depthStencilStateDesc.StencilEnable = TRUE;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_DECR_SAT;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_UnmarkPixels);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_UnmarkPixels");
+        }
+
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = TRUE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+            depthStencilStateDesc.StencilEnable = TRUE;
+            
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_EQUAL;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_ShadePixels);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_ShadePixels");
+        }
+
+        {
+            // Setup rasterizer state.
+            D3D11_RASTERIZER_DESC rasterizerDesc;
+            ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+            rasterizerDesc.AntialiasedLineEnable = FALSE;
+            rasterizerDesc.CullMode = D3D11_CULL_FRONT;
+            rasterizerDesc.DepthBias = 0;
+            rasterizerDesc.DepthBiasClamp = 0.0f;
+            rasterizerDesc.DepthClipEnable = FALSE;
+            rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+            rasterizerDesc.FrontCounterClockwise = FALSE;
+            rasterizerDesc.MultisampleEnable = FALSE;
+            rasterizerDesc.ScissorEnable = FALSE;
+            rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+
+            // Create the rasterizer state object.
+            hr = m_d3dDevice->CreateRasterizerState(&rasterizerDesc, &m_d3dCullFrontRasterizerState);
+            AssertIfFailed(hr, "Load Content", "Failed to create a RasterizerState: m_d3dCullFrontRasterizerState");
+        }
+
+        // debug
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = FALSE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+            depthStencilStateDesc.StencilEnable = TRUE;
+
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_EQUAL;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_Debug);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_Debug");
+        }
     }
 
+    // load light volume models
     {
         std::string modelPath = "assets/Models/sphere.obj";
         m_lightVolume_sphere = new Model();

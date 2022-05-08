@@ -70,18 +70,20 @@ float4 ScreenToView( float4 screen )
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
+    // convert to [0, 1]
+    float2 uv = IN.positionCS.xy / ScreenDimensions;
     int2 texCoord = IN.positionCS.xy;
     float depth = GBuffer_Depth.Load( int3( texCoord, 0 ) ).r;
     float4 positionVS = ScreenToView( float4( texCoord, depth, 1.0f ) );
     float4 positionWS = ViewToWorld(positionVS);
 
-    float4 accumulated = GBuffer_LightAccumulation.Sample(Sampler, IN.uv);
-    float4 diffuse = GBuffer_Diffuse.Sample(Sampler, IN.uv);
+    float4 accumulated = GBuffer_LightAccumulation.Sample(Sampler, uv);
+    float4 diffuse = GBuffer_Diffuse.Sample(Sampler, uv);
     
-    float4 specular = GBuffer_Specular.Sample(Sampler, IN.uv);
+    float4 specular = GBuffer_Specular.Sample(Sampler, uv);
     float specularPower = exp2(specular.a * 10.5f);
     
-    float4 normalRaw = GBuffer_Normal.Sample(Sampler, IN.uv);
+    float4 normalRaw = GBuffer_Normal.Sample(Sampler, uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
     if (lightIndex == -1) {

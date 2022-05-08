@@ -153,6 +153,9 @@ private:
     __int64 m_d3dDeferredLighting_SingleLight_PixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_SingleLight_PixelShader = nullptr;
 
+    __int64 m_d3dDeferredLighting_LightVolume_VertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLighting_LightVolume_VertexShader = nullptr;
+
     __int64 m_d3dUnlitPixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dUnlitPixelShader = nullptr;
 
@@ -200,6 +203,13 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_DisableDepthTest;
+
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_UnmarkPixels;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_ShadePixels;
+
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_d3dCullFrontRasterizerState;
+
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_Debug;
 
     struct Material defaultMaterial;
     struct Material diffuseMaterial = {
