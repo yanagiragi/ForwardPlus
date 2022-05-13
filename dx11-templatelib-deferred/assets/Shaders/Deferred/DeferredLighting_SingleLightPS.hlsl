@@ -72,6 +72,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 {
     // convert to [0, 1]
     float2 uv = IN.positionCS.xy / ScreenDimensions;
+    
     int2 texCoord = IN.positionCS.xy;
     float depth = GBuffer_Depth.Load( int3( texCoord, 0 ) ).r;
     float4 positionVS = ScreenToView( float4( texCoord, depth, 1.0f ) );
@@ -86,16 +87,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 normalRaw = GBuffer_Normal.Sample(Sampler, uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
-    if (lightIndex == -1) {
-        return float4(accumulated.rgb, 1.0);
-    }
-
     LightingResult lit = { {0, 0, 0}, {0, 0, 0} };
-    
-    if (Lights[lightIndex].Enabled) 
-    {
-        lit = ComputeLightingWS_Single(Lights[lightIndex], positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
-    }
+    lit = ComputeLightingWS_Single(Lights[lightIndex], positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
 
     float3 color = diffuse.rgb * lit.Diffuse + specular.rgb * lit.Specular;
 

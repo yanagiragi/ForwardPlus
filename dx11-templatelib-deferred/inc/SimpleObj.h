@@ -90,6 +90,7 @@ private:
     void RenderScene_Deferred_LightingPass_Loop();
     void RenderScene_Deferred_LightingPass_Single();
     void RenderScene_Deferred_LightingPass_Stencil();
+    void DrawLightVolume(Light* type);
 
     bool ResizeSwapChain(int width, int height);
 

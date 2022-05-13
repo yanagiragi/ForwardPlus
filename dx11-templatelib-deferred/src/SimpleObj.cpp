@@ -458,7 +458,6 @@ void SimpleObj::LoadLight()
     directionV3.Normalize();
     spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
 
-    //spotlight.DirectionWS.Normalize();
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Strength = 75.0f;
     spotlight.Enabled = true;
@@ -466,6 +465,7 @@ void SimpleObj::LoadLight()
     m_Scene.Lights[0] = directional;
     m_Scene.Lights[1] = point;
     m_Scene.Lights[2] = spotlight;
+    
 }
 
 /// <summary>
@@ -894,6 +894,11 @@ SimpleObj::SimpleObj(Window& window)
     // Setup camera initlal position
     m_InitialCameraPos = m_Camera.get_Translation();
     m_InitialCameraRot = m_Camera.get_Rotation();
+
+    m_RenderMode = RenderMode::Deferred;
+    m_Scene.GlobalAmbient.x = 0;
+    m_Scene.GlobalAmbient.y = 0;
+    m_Scene.GlobalAmbient.z = 0;
 }
 
 SimpleObj::~SimpleObj()
@@ -1006,9 +1011,9 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
 
     // update LightCalculationOptions CB
-    m_LightingCalculationOptionsConstrantBuffer.LightIndex = 0;
     m_LightingCalculationOptionsConstrantBuffer.LightingSpace = (int)m_LightingSpace;
     m_LightingCalculationOptionsConstrantBuffer.LightCount = m_LightCalculationCount;
+    m_LightingCalculationOptionsConstrantBuffer.LightIndex = 0;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
 
     // update ScreenToViewParams CB
