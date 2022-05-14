@@ -537,10 +537,26 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
             {
                 auto direction = Vector3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
                 direction.Normalize();
+                
+                auto color = Colors::LightPink;
+                if (type == LightType::Spotlight)
+                {
+                    color = Colors::PaleGreen;
+                }
+
                 // use negative direction to visual actual light dir calculation in shader
-                auto v1 = VertexPositionColor(position, Colors::Red);
-                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, Colors::RoyalBlue);
+                auto v1 = VertexPositionColor(position, color);
+                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, color);
+
+                // arrow part
+                auto perpendicular = Vector3::Zero;
+                direction.Cross(Vector3::Up, perpendicular);
+                auto v3 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 + perpendicular * 0.1, color);
+                auto v4 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 - perpendicular * 0.1, color);
+                
                 m_d3dPrimitiveBatch->DrawLine(v1, v2);
+                m_d3dPrimitiveBatch->DrawLine(v2, v3);
+                m_d3dPrimitiveBatch->DrawLine(v2, v4);
             }
         }
     }
