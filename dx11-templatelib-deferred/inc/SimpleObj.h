@@ -244,6 +244,8 @@ private:
 
     Scene m_Scene;
     Model* m_lightVolume_sphere;
+    const float m_lightVolume_coneSpotAngle = 26.565f * 2.0f;
+    Model* m_lightVolume_cone;
 
     const float fovInDegree = 45.0f;
     const float nearPlane = 0.1f;

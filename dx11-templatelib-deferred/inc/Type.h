@@ -35,6 +35,7 @@ enum class Deferred_DebugMode
     Specular,
     Normal,
     Depth,
+    LightVolume,
     LEN_DEFERRED_DEBUGMODE
 };
 

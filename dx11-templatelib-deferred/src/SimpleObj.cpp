@@ -515,20 +515,19 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
         for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
             auto light = &m_Scene.Lights[i];
+
+            if (!light->Enabled)
+            {
+                continue;
+            }
+
             auto position = Vector3(light->PositionWS.x, light->PositionWS.y, light->PositionWS.z);
             auto type = (LightType)light->LightType;
             auto strength = light->Strength;
 
             if (type == LightType::Point)
             {
-                auto constant = light->ConstantAttenuation;
-                auto linear = light->LinearAttenuation;
-                auto quadratic = light->QuadraticAttenuation;
-                auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
-                
-                // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 15/256 as dark threshold
-                auto radius = (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 15.0) * lightMax))) / (2 * quadratic);
-                
+                auto radius = Light::GetRadius(light);
                 auto sphere = BoundingSphere(position, radius);
                 DX::Draw(m_d3dPrimitiveBatch.get(), sphere, DirectX::Colors::White);
             }
@@ -635,7 +634,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         int debugMode = (int)m_DeferredDebugMode;
         if (m_RenderMode == RenderMode::Deferred)
         {
-            if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0"))
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0"))
             {
                 m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
             }
@@ -910,11 +909,6 @@ SimpleObj::SimpleObj(Window& window)
     // Setup camera initlal position
     m_InitialCameraPos = m_Camera.get_Translation();
     m_InitialCameraRot = m_Camera.get_Rotation();
-
-    m_RenderMode = RenderMode::Deferred;
-    m_Scene.GlobalAmbient.x = 0;
-    m_Scene.GlobalAmbient.y = 0;
-    m_Scene.GlobalAmbient.z = 0;
 }
 
 SimpleObj::~SimpleObj()
@@ -1676,37 +1670,40 @@ bool SimpleObj::LoadContent()
     }
 
     // load light volume models
+    auto LoadModel = [&](std::string filepath, Model*& target)
     {
-        std::string modelPath = "assets/Models/sphere.obj";
-        m_lightVolume_sphere = new Model();
-        m_lightVolume_sphere->Load(modelPath.c_str());
+        target = new Model();
+        target->Load(filepath.c_str());
 
         // Create an initialize the vertex buffer.
         D3D11_BUFFER_DESC vertexBufferDesc;
         ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        vertexBufferDesc.ByteWidth = sizeof(VertexData) * m_lightVolume_sphere->VertexCount();    // size of the buffer in bytes
+        vertexBufferDesc.ByteWidth = sizeof(VertexData) * target->VertexCount();    // size of the buffer in bytes
         vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
         vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
         vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
 
         D3D11_SUBRESOURCE_DATA resourceData;
         ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-        resourceData.pSysMem = m_lightVolume_sphere->Head();                                   // pointer to the data to initialize the buffer with
+        resourceData.pSysMem = target->Head();                                   // pointer to the data to initialize the buffer with
         resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
                                                                                         // No used for now.
         resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
                                                                                         // no used for now.
         ID3D11Buffer* buffer = nullptr;
-        hr = m_d3dDevice->CreateBuffer(
+        HRESULT hr = m_d3dDevice->CreateBuffer(
             &vertexBufferDesc,                                                          // buffer description
             &resourceData,                                                              // pointer to the initialization data
             &buffer                                                                     // pointer to the created buffer object
         );
-        std::string message = "Unable to create vertex buffer of " + modelPath;
+        std::string message = "Unable to create vertex buffer of " + filepath;
         AssertIfFailed(hr, "Load Content", message.c_str());
 
-        Model::AddVertexBuffer(m_lightVolume_sphere->Key(), buffer);
-    }
+        Model::AddVertexBuffer(target->Key(), buffer);
+    };
+
+    LoadModel("assets/Models/UnitSphere.obj", m_lightVolume_sphere);
+    LoadModel("assets/Models/UnitCone.obj", m_lightVolume_cone);
 
     LoadShaderResources();
     LoadLight();
