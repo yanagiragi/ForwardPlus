@@ -30,6 +30,12 @@
 #include "Entity.h"
 #include "Type.h"
 
+struct BufType
+{
+    int i;
+    float f;
+};
+
 class SimpleObj final : public Game
 {
     // aliases
@@ -287,6 +293,11 @@ private:
     #pragma endregion
 
     // test variables
+
+    struct BufType g_vBuf0[1] = { { 1, 0.4 } };
+    struct BufType g_vBuf1[1] = { { 2, 0.3 } };
+    struct BufType g_vBufResult[1] = { { 0, 0 } };
+
     ID3D11Buffer* g_pBuf0 = nullptr;
     ID3D11Buffer* g_pBuf1 = nullptr;
     ID3D11Buffer* g_pBufResult = nullptr;
