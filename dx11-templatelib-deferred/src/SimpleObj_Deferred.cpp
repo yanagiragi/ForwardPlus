@@ -666,11 +666,11 @@ void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
 
     if (m_DeferredDebugMode == Deferred_DebugMode::None || m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
     {
-        if (m_LightCalculationMode == LightCalculationMode::LOOP)
+        if (m_LightCalculationMode == LightCalculationMode::Loop)
         {
             RenderScene_Deferred_LightingPass_Loop();
         }
-        else if (m_LightCalculationMode == LightCalculationMode::SINGLE)
+        else if (m_LightCalculationMode == LightCalculationMode::Single)
         {
             RenderScene_Deferred_LightingPass_Single();
         }

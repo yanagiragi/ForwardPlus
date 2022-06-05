@@ -130,6 +130,9 @@ private:
     __int64 m_d3dForward_SingleLight_PixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_SingleLight_PixelShader = nullptr;
 
+    __int64 m_d3dForward_SingleLight_InstancedPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_SingleLight_InstancedPixelShader = nullptr;
+
     __int64 m_d3dDeferredGeometry_RegularVertexShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometry_RegularVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometry_RegularInputLayout = nullptr;
@@ -207,6 +210,7 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_DisableDepthTest;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_Overlay;
 
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_UnmarkPixels;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_ShadePixels;
@@ -259,7 +263,7 @@ private:
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
     int m_LightCalculationCount = MAX_LIGHTS;
-    LightCalculationMode m_LightCalculationMode = LightCalculationMode::SINGLE;
+    LightCalculationMode m_LightCalculationMode = LightCalculationMode::Single;
 
     int m_DrawCallCount = 0;
 
