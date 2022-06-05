@@ -1,0 +1,336 @@
+#pragma once
+
+#include <Windows.h>
+#include <strsafe.h>
+#include <direct.h>
+
+#include <wrl.h>
+
+#include <fstream>
+#include <iostream>
+#include <vector>
+
+#include <string>
+#include <cstdarg>
+
+// For redirect console outputs
+#include <fcntl.h>
+#include <io.h>
+
+#include <shlobj.h>
+#include <strsafe.h>
+
+static std::string GetLatestWinPixGpuCapturerPath()
+{
+    PWSTR pprogramFilesPath = NULL;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &pprogramFilesPath);
+
+    std::wstring programFilesPath(pprogramFilesPath);
+    std::string pixSearchPath = std::string(programFilesPath.begin(), programFilesPath.end()) + std::string("\\Microsoft PIX\\*");
+
+    WIN32_FIND_DATA findData;
+    bool foundPixInstallation = false;
+    char newestVersionFound[MAX_PATH];
+
+    HANDLE hFind = FindFirstFile(pixSearchPath.c_str(), &findData);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY) &&
+                (findData.cFileName[0] != '.'))
+            {
+                if (!foundPixInstallation || strcmp(newestVersionFound, findData.cFileName) <= 0)
+                {
+                    foundPixInstallation = true;
+                    StringCchCopy(newestVersionFound, _countof(newestVersionFound), findData.cFileName);
+                }
+            }
+        } while (FindNextFile(hFind, &findData) != 0);
+    }
+
+    FindClose(hFind);
+
+    if (!foundPixInstallation)
+    {
+        // TODO: Error, no PIX installation found
+    }
+
+    char output[MAX_PATH];
+    StringCchCopy(output, pixSearchPath.length(), pixSearchPath.data());
+    StringCchCat(output, MAX_PATH, &newestVersionFound[0]);
+    StringCchCat(output, MAX_PATH, "\\WinPixGpuCapturer.dll");
+
+    return &output[0];
+}
+
+/// <summary>
+/// Read file into lines of string
+/// </summary>
+/// <param name="filename"></param>
+/// <returns></returns>
+inline std::vector<char> readFile(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    bool exists = (bool)file;
+
+    if (!exists || !file.is_open())
+    {
+        throw std::runtime_error("failed to open file!");
+    }
+
+    size_t fileSize = (size_t)file.tellg();
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+
+    file.close();
+
+    return buffer;
+};
+
+/// <summary>
+/// Display error message box and throw exception if HRESULT fails
+/// </summary>
+/// <param name="hr"></param>
+/// <param name="title"></param>
+/// <param name="description"></param>
+/// <param name="exception"></param>
+inline void AssertIfFailed(HRESULT hr, LPTSTR title, LPTSTR description)
+{
+    if (FAILED(hr))
+    {
+        MessageBox(0, TEXT(description), TEXT(title), MB_OK);
+    }
+}
+
+// <summary>
+/// Display error message box and throw exception if HRESULT fails
+/// </summary>
+/// <param name="hr"></param>
+/// <param name="title"></param>
+/// <param name="description"></param>
+/// <param name="exception"></param>
+inline void AssertIfFailed(HRESULT hr, const char* title, const char* description)
+{
+    if (FAILED(hr))
+    {
+        MessageBox(0, TEXT(description), TEXT(title), MB_OK);
+    }
+}
+
+// <summary>
+/// Display error message box and throw exception if first param is false
+/// </summary>
+/// <param name="hr"></param>
+/// <param name="title"></param>
+/// <param name="description"></param>
+/// <param name="exception"></param>
+template<class T>
+inline void AssertIfNull(T target, const char* title, const char* description)
+{
+    if (target == NULL)
+    {
+        MessageBox(0, TEXT(description), TEXT(title), MB_OK);
+    }
+}
+
+/// <summary>
+/// Display error message in GUI
+/// </summary>
+/// <param name="description"></param>
+inline void DisplayError(const char* description)
+{
+    MessageBoxA(NULL, description, "Error: ", MB_ICONERROR);
+}
+
+/// <summary>
+/// Safely release a COM object
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="ptr"></param>
+template<class T>
+inline void SafeRelease(Microsoft::WRL::ComPtr<T> ptr)
+{
+    if (ptr != nullptr)
+    {
+        ptr->Release();
+        ptr = nullptr;
+    }
+}
+
+/// <summary>
+/// Safely release a COM object
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="ptr"></param>
+template<class T>
+inline void SafeRelease(T* ptr)
+{
+    if (ptr != NULL)
+    {
+        ptr->Release();
+        ptr = NULL;
+    }
+}
+
+
+/// <summary>
+/// Display last error from Win32api in message box
+/// </summary>
+/// <param name="messagePrefix"></param>
+inline void DisplayLastError(LPTSTR messagePrefix)
+{
+    // Retrieve the system error message for the last-error code
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        dw,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR)&lpMsgBuf,
+        0, NULL);
+
+    // Display the error message and exit the process
+    lpDisplayBuf = (LPVOID)LocalAlloc(
+        LMEM_ZEROINIT,
+        (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)messagePrefix) + 50) * sizeof(TCHAR)
+    );
+    StringCchPrintf(
+        (LPTSTR)lpDisplayBuf,
+        LocalSize(lpDisplayBuf) / sizeof(TCHAR),
+        TEXT("%s, error code = [%d], error message = %s"),
+        messagePrefix,
+        dw,
+        lpMsgBuf
+    );
+    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+}
+
+/// <summary>
+/// Get current working directory
+/// </summary>
+/// <param name="withTrailingSeperator"></param>
+/// <returns></returns>
+inline std::string GetCurrentWorkingDirectory(bool withTrailingSeperator)
+{
+    char pBuf[1024];
+    _getcwd(pBuf, 1024);
+    auto path = std::string(pBuf);
+    if (withTrailingSeperator)
+    {
+        path += "\\";
+    }
+
+    return path;
+}
+
+/// <summary>
+/// Transform lparam to virtual key code
+/// </summary>
+/// <param name="lparam"></param>
+/// <returns></returns>
+inline int GetVKcode(int lparam) {
+    // pick scan code and extended key bit
+    lparam = (lparam >> 16) & 0x1ff;
+
+    // Check ctrl and alt, if pressed do XOR to get the code
+    if (lparam & 0x100) {
+        lparam ^= 0xe100;
+    }
+    int vkCode = MapVirtualKey(lparam, MAPVK_VSC_TO_VK_EX);
+    return vkCode;
+}
+
+/// <summary>
+/// To allow redirect stdout to consoles for Win32 GUI App
+/// Reference: https://stackoverflow.com/a/46050762
+/// </summary>
+inline void RedirectIOToConsole() 
+{
+    //Create a console for this application
+    AllocConsole();
+
+    // Get STDOUT handle
+    HANDLE ConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    int SystemOutput = _open_osfhandle(intptr_t(ConsoleOutput), _O_TEXT);
+    FILE* COutputHandle = _fdopen(SystemOutput, "w");
+
+    // Get STDERR handle
+    HANDLE ConsoleError = GetStdHandle(STD_ERROR_HANDLE);
+    int SystemError = _open_osfhandle(intptr_t(ConsoleError), _O_TEXT);
+    FILE* CErrorHandle = _fdopen(SystemError, "w");
+
+    // Get STDIN handle
+    HANDLE ConsoleInput = GetStdHandle(STD_INPUT_HANDLE);
+    int SystemInput = _open_osfhandle(intptr_t(ConsoleInput), _O_TEXT);
+    FILE* CInputHandle = _fdopen(SystemInput, "r");
+
+    //make cout, wcout, cin, wcin, wcerr, cerr, wclog and clog point to console as well
+    std::ios::sync_with_stdio(true);
+
+    // Redirect the CRT standard input, output, and error handles to the console
+    freopen_s(&CInputHandle, "CONIN$", "r", stdin);
+    freopen_s(&COutputHandle, "CONOUT$", "w", stdout);
+    freopen_s(&CErrorHandle, "CONOUT$", "w", stderr);
+
+    //Clear the error state for each of the C++ standard stream objects. We need to do this, as
+    //attempts to access the standard streams before they refer to a valid target will cause the
+    //iostream objects to enter an error state. In versions of Visual Studio after 2005, this seems
+    //to always occur during startup regardless of whether anything has been read from or written to
+    //the console or not.
+    std::wcout.clear();
+    std::cout.clear();
+    std::wcerr.clear();
+    std::cerr.clear();
+    std::wcin.clear();
+    std::cin.clear();
+}
+
+template<typename T>
+inline UINT GetAlignedSize()
+{
+    return static_cast<UINT>(sizeof(T) + (16 - (sizeof(T) % 16)));
+}
+
+//missing string printf
+//this is safe and convenient but not exactly efficient
+inline std::string format(const char* fmt, ...) {
+    int size = 512;
+    char* buffer = 0;
+    buffer = new char[size];
+    va_list vl;
+    va_start(vl, fmt);
+    int nsize = vsnprintf(buffer, size, fmt, vl);
+    if (size <= nsize) { //fail delete buffer and try again
+        delete[] buffer;
+        buffer = 0;
+        buffer = new char[nsize + 1]; //+1 for /0
+        nsize = vsnprintf(buffer, size, fmt, vl);
+    }
+    std::string ret(buffer);
+    va_end(vl);
+    delete[] buffer;
+    return ret;
+}
+
+inline __int64 GetFileSize(std::wstring const& path)
+{
+    WIN32_FIND_DATAW data;
+    HANDLE h = FindFirstFileW(path.c_str(), &data);
+    if (h == INVALID_HANDLE_VALUE)
+        return -1;
+
+    FindClose(h);
+
+    return data.nFileSizeLow | (__int64)data.nFileSizeHigh << 32;
+}

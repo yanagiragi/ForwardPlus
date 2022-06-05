@@ -13,11 +13,11 @@ cbuffer LightProperties : register(b0)
 cbuffer LightingCalculationOptions : register(b1)
 {
     int lightingSpace;        // 4 bytes
+    int lightCount;           // 4 bytes
     int lightIndex;           // 4 bytes
-    float padding[2];         // 8 bytes
+    float padding;            // 4 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
-
 Texture2D Texture : register(t0);
 sampler Sampler : register(s0);
 
@@ -46,11 +46,11 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     LightingResult lit = { {0, 0, 0}, {0, 0, 0}};
     if (lightingSpace == WORLD_SPACE)
     {
-        lit = ComputeLightingWS(Lights, IN.PositionWS, normalize(IN.NormalWS), IN.Material.SpecularPower, EyePosition);
+        lit = ComputeLightingWS(Lights, lightCount, IN.PositionWS, normalize(IN.NormalWS), IN.Material.SpecularPower, EyePosition);
     }
     else if (lightingSpace == VIEW_SPACE)
     {
-        lit = ComputeLightingVS(Lights, IN.PositionVS, normalize(IN.NormalVS), IN.Material.SpecularPower);
+        lit = ComputeLightingVS(Lights, lightCount, IN.PositionVS, normalize(IN.NormalVS), IN.Material.SpecularPower);
     }
 
     float3 emissive = IN.Material.Emissive;

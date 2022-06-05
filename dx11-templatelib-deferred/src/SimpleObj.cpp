@@ -299,7 +299,7 @@ void SimpleObj::LoadShaderResources()
     // Deferred Debug
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/DebugVS.hlsl";
+        std::wstring filename = L"assets/Shaders/DebugScreenVS.hlsl";
         _int64 size = GetFileSize(filename);
         if (size != m_d3dDebugVertexShaderSize)
         {
@@ -341,6 +341,46 @@ void SimpleObj::LoadShaderResources()
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
             CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLighting_LoopLight_PixelShader);
             m_d3dDeferredLighting_LoopLight_PixelShaderSize = size;
+        }
+    }
+
+    // Deferred Lighting Single light
+    {
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Deferred/DeferredLighting_SingleLightPS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDeferredLighting_SingleLight_PixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dDeferredLighting_SingleLight_PixelShader);
+            m_d3dDeferredLighting_SingleLight_PixelShaderSize = size;
+        }
+    }
+
+    // Debug Unlit
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/UnlitPS.hlsl";
+        __int64 size = GetFileSize(filename);
+        if (size != m_d3dUnlitPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dUnlitPixelShader);
+            m_d3dUnlitPixelShaderSize = size;
+        }
+    }
+
+    // light volume VS
+    {
+        ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Deferred/LightVolumeVS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dDeferredLighting_LightVolume_VertexShaderSize)
+        {
+            vertexShaderBlob = LoadShader<ID3D11VertexShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, vertexShaderBlob, nullptr, m_d3dDeferredLighting_LightVolume_VertexShader);
+            m_d3dDeferredLighting_LightVolume_VertexShaderSize = size;
         }
     }
 }
@@ -432,14 +472,14 @@ void SimpleObj::LoadLight()
     directionV3.Normalize();
     spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
 
-    //spotlight.DirectionWS.Normalize();
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Strength = 75.0f;
     spotlight.Enabled = true;
 
-    m_Scene.Lights[0] = point;
-    m_Scene.Lights[1] = directional;
+    m_Scene.Lights[0] = directional;
+    m_Scene.Lights[1] = point;
     m_Scene.Lights[2] = spotlight;
+    
 }
 
 /// <summary>
@@ -489,20 +529,19 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
         for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
             auto light = &m_Scene.Lights[i];
+
+            if (!light->Enabled)
+            {
+                continue;
+            }
+
             auto position = Vector3(light->PositionWS.x, light->PositionWS.y, light->PositionWS.z);
             auto type = (LightType)light->LightType;
             auto strength = light->Strength;
 
             if (type == LightType::Point)
             {
-                auto constant = light->ConstantAttenuation;
-                auto linear = light->LinearAttenuation;
-                auto quadratic = light->QuadraticAttenuation;
-                auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
-                
-                // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 15/256 as dark threshold
-                auto radius = (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 15.0) * lightMax))) / (2 * quadratic);
-                
+                auto radius = Light::GetRadius(light);
                 auto sphere = BoundingSphere(position, radius);
                 DX::Draw(m_d3dPrimitiveBatch.get(), sphere, DirectX::Colors::White);
             }
@@ -511,10 +550,26 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
             {
                 auto direction = Vector3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
                 direction.Normalize();
+                
+                auto color = Colors::LightPink;
+                if (type == LightType::Spotlight)
+                {
+                    color = Colors::PaleGreen;
+                }
+
                 // use negative direction to visual actual light dir calculation in shader
-                auto v1 = VertexPositionColor(position, Colors::Red);
-                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, Colors::RoyalBlue);
+                auto v1 = VertexPositionColor(position, color);
+                auto v2 = VertexPositionColor(position - direction * directionalLightDebugLength, color);
+
+                // arrow part
+                auto perpendicular = Vector3::Zero;
+                direction.Cross(Vector3::Up, perpendicular);
+                auto v3 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 + perpendicular * 0.1, color);
+                auto v4 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 - perpendicular * 0.1, color);
+                
                 m_d3dPrimitiveBatch->DrawLine(v1, v2);
+                m_d3dPrimitiveBatch->DrawLine(v2, v3);
+                m_d3dPrimitiveBatch->DrawLine(v2, v4);
             }
         }
     }
@@ -571,6 +626,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     const float fastDragSpeed = 5.0f;
 
     ImGui::Text(format("Fps: %f (%f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
+    ImGui::Text(format("Draw Call: %d", m_DrawCallCount).c_str());
 
     ImGui::PushID("Render Techniques");
     {
@@ -597,10 +653,18 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         
 
         int debugMode = (int)m_DeferredDebugMode;
-        if (m_RenderMode == RenderMode::Deferred && 
-            ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0"))
+        if (m_RenderMode == RenderMode::Deferred)
         {
-            m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0"))
+            {
+                m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
+            }
+
+            int lightCalculationMode = (int)m_LightCalculationMode;
+            if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
+            {
+                m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
+            }
         }
 
         if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
@@ -609,6 +673,8 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
             m_DeferredDepthPower = scale;
         }
+
+        ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, 0.0f, MAX_LIGHTS);
     }
     ImGui::PopID();
 
@@ -952,6 +1018,8 @@ void SimpleObj::Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearSt
 
 void SimpleObj::OnRender(RenderEventArgs& e)
 {
+    m_DrawCallCount = 0;
+
     Clear(DirectX::Colors::CornflowerBlue, 1.0f, 0);
 
     // Setup Frame CB
@@ -974,8 +1042,9 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
 
     // update LightCalculationOptions CB
-    m_LightingCalculationOptionsConstrantBuffer.LightIndex = 0;
     m_LightingCalculationOptionsConstrantBuffer.LightingSpace = (int)m_LightingSpace;
+    m_LightingCalculationOptionsConstrantBuffer.LightCount = m_LightCalculationCount;
+    m_LightingCalculationOptionsConstrantBuffer.LightIndex = 0;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
 
     // update ScreenToViewParams CB
@@ -1423,6 +1492,7 @@ bool SimpleObj::LoadContent()
         Model::AddInstancedVertexBuffer(key, buffer);
     }
 
+    // setup CB
     {
         D3D11_BUFFER_DESC frameConstantBufferDesc;
         ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
@@ -1495,19 +1565,166 @@ bool SimpleObj::LoadContent()
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_LightCalculationOptions");
     }
 
-    D3D11_BLEND_DESC blendStateDesc;
-    ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
-    blendStateDesc.IndependentBlendEnable = false;
-    blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
-    blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_COLOR;
-    blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_DEST_COLOR;
-    blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-    blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
-    AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
+    // setup BlendState & DepthStencilState
+    {
+        D3D11_BLEND_DESC blendStateDesc;
+        ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
+        blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+
+        blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+
+        blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+        blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+        blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+        blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        hr = m_d3dDevice->CreateBlendState(&blendStateDesc, &m_d3dBlendState_Add);
+        AssertIfFailed(hr, "Load Content", "Unable to create blend state: m_d3dBlendState_Add");
+    }
+    
+    // Setup depth/stencil state.
+    {
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = FALSE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.StencilEnable = FALSE;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+        }
+
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = TRUE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER;
+            depthStencilStateDesc.StencilEnable = TRUE;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_DECR_SAT;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_UnmarkPixels);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_UnmarkPixels");
+        }
+
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = TRUE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+            depthStencilStateDesc.StencilEnable = TRUE;
+            
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_EQUAL;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_ShadePixels);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_ShadePixels");
+        }
+
+        {
+            // Setup rasterizer state.
+            D3D11_RASTERIZER_DESC rasterizerDesc;
+            ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+            rasterizerDesc.AntialiasedLineEnable = FALSE;
+            rasterizerDesc.CullMode = D3D11_CULL_FRONT;
+            rasterizerDesc.DepthBias = 0;
+            rasterizerDesc.DepthBiasClamp = 0.0f;
+            rasterizerDesc.DepthClipEnable = FALSE;
+            rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+            rasterizerDesc.FrontCounterClockwise = FALSE;
+            rasterizerDesc.MultisampleEnable = FALSE;
+            rasterizerDesc.ScissorEnable = FALSE;
+            rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+
+            // Create the rasterizer state object.
+            hr = m_d3dDevice->CreateRasterizerState(&rasterizerDesc, &m_d3dCullFrontRasterizerState);
+            AssertIfFailed(hr, "Load Content", "Failed to create a RasterizerState: m_d3dCullFrontRasterizerState");
+        }
+
+        // debug
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = FALSE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+            depthStencilStateDesc.StencilEnable = TRUE;
+
+            depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_EQUAL;
+            depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+            depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+            depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_Debug);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_Debug");
+        }
+    }
+
+    // load light volume models
+    auto LoadModel = [&](std::string filepath, Model*& target)
+    {
+        target = new Model();
+        target->Load(filepath.c_str());
+
+        // Create an initialize the vertex buffer.
+        D3D11_BUFFER_DESC vertexBufferDesc;
+        ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+        vertexBufferDesc.ByteWidth = sizeof(VertexData) * target->VertexCount();    // size of the buffer in bytes
+        vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+        vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+
+        D3D11_SUBRESOURCE_DATA resourceData;
+        ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+        resourceData.pSysMem = target->Head();                                   // pointer to the data to initialize the buffer with
+        resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
+                                                                                        // No used for now.
+        resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
+                                                                                        // no used for now.
+        ID3D11Buffer* buffer = nullptr;
+        HRESULT hr = m_d3dDevice->CreateBuffer(
+            &vertexBufferDesc,                                                          // buffer description
+            &resourceData,                                                              // pointer to the initialization data
+            &buffer                                                                     // pointer to the created buffer object
+        );
+        std::string message = "Unable to create vertex buffer of " + filepath;
+        AssertIfFailed(hr, "Load Content", message.c_str());
+
+        Model::AddVertexBuffer(target->Key(), buffer);
+    };
+
+    LoadModel("assets/Models/UnitSphere.obj", m_lightVolume_sphere);
+    LoadModel("assets/Models/UnitCone.obj", m_lightVolume_cone);
 
     LoadShaderResources();
     LoadLight();
@@ -1526,4 +1743,16 @@ bool SimpleObj::LoadContent()
 void SimpleObj::UnloadContent()
 {
     Model::UnloadStaticResources();
+}
+
+void SimpleObj::Draw(UINT VertexCount, UINT StartVertexLocation)
+{
+    m_DrawCallCount ++;
+    m_d3dDeviceContext->Draw(VertexCount, StartVertexLocation);
+}
+
+void SimpleObj::DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation)
+{
+    m_DrawCallCount++;
+    m_d3dDeviceContext->DrawInstanced(VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 }

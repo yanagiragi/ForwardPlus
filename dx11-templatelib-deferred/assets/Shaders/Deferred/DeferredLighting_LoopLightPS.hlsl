@@ -10,12 +10,21 @@ cbuffer LightProperties : register(b0)
     struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:                           // 672 bytes (42 * 16 byte boundary)
 
-cbuffer ScreenToViewParams : register( b1 )
+cbuffer ScreenToViewParams : register(b1)
 {
     float4x4 InverseView;
     float4x4 InverseProjection;
     float2 ScreenDimensions;
 }
+
+cbuffer LightingCalculationOptions : register(b2)
+{
+    int lightingSpace;        // 4 bytes
+    int lightCount;           // 4 bytes
+    int lightIndex;           // 4 bytes
+    float padding;            // 4 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
 
 // ==============================================================
 //
@@ -75,7 +84,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 normalRaw = GBuffer_Normal.Sample(Sampler, IN.uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
-    LightingResult lit = ComputeLightingWS(Lights, positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
+    LightingResult lit = ComputeLightingWS(Lights, lightCount, positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
 
     float3 color = accumulated.rgb + diffuse.rgb * lit.Diffuse + specular.rgb * lit.Specular;
 

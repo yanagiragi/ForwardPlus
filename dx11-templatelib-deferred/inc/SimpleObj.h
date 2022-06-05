@@ -88,9 +88,15 @@ private:
     void RenderScene_Deferred_LightingPass();
 
     void RenderScene_Deferred_LightingPass_Loop();
+    void RenderScene_Deferred_LightingPass_Single();
     void RenderScene_Deferred_LightingPass_Stencil();
+    void DrawLightVolume(Light* type);
 
     bool ResizeSwapChain(int width, int height);
+
+    // Wrap to native API
+    void Draw(UINT VertexCount, UINT StartVertexLocation);
+    void DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
 
     // Variables
     Camera m_Camera;
@@ -148,6 +154,15 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLightingVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_LoopLight_PixelShader = nullptr;
 
+    __int64 m_d3dDeferredLighting_SingleLight_PixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dDeferredLighting_SingleLight_PixelShader = nullptr;
+
+    __int64 m_d3dDeferredLighting_LightVolume_VertexShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredLighting_LightVolume_VertexShader = nullptr;
+
+    __int64 m_d3dUnlitPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dUnlitPixelShader = nullptr;
+
     // Primitive Batch
     std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
     std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -191,6 +206,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
 
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_DisableDepthTest;
+
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_UnmarkPixels;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_ShadePixels;
+
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_d3dCullFrontRasterizerState;
+
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_Debug;
 
     struct Material defaultMaterial;
     struct Material diffuseMaterial = {
@@ -223,6 +246,9 @@ private:
     };
 
     Scene m_Scene;
+    Model* m_lightVolume_sphere;
+    const float m_lightVolume_coneSpotAngle = 26.565f * 2.0f;
+    Model* m_lightVolume_cone;
 
     const float fovInDegree = 45.0f;
     const float nearPlane = 0.1f;
@@ -232,7 +258,10 @@ private:
     Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
-    LightingCalculation m_LightingCalculation = LightingCalculation::Loop;
+    int m_LightCalculationCount = MAX_LIGHTS;
+    LightCalculationMode m_LightCalculationMode = LightCalculationMode::SINGLE;
+
+    int m_DrawCallCount = 0;
 
     Vector2 m_ScreenDimensions;
 

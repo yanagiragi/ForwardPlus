@@ -24,7 +24,7 @@ struct Light
     //--------------------------------------------------------- (16 byte boundary)
     Vector4     Color = Vector4(1, 1, 1, 1);        // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
-    float       SpotAngle = 0.0f;                   // 4 bytes
+    float       SpotAngle = 0.0f;                   // 4 bytes. Angle in radians.
     float       ConstantAttenuation = 1.0f;         // 4 bytes
     float       LinearAttenuation = 0.7f;          // 4 bytes
     float       QuadraticAttenuation = 1.8f;        // 4 bytes
@@ -34,6 +34,19 @@ struct Light
     float       Strength = 0.0f;                    // 4 bytes
     int         Padding = 0;                            // 4 bytes
     //--------------------------------------------------------- (16 byte boundary)
+
+    static float GetRadius(Light* light)
+    {
+        auto constant = light->ConstantAttenuation;
+        auto linear = light->LinearAttenuation;
+        auto quadratic = light->QuadraticAttenuation;
+        auto strength = light->Strength;
+        auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
+
+        // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 10/256 as dark threshold
+        return (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 10.0) * lightMax))) / (2 * quadratic);
+    }
+
 };  // Total:                                       // 112 bytes (7 * 16)
 
 struct LightProperties

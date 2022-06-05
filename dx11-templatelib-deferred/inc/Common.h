@@ -22,13 +22,11 @@
 
 static std::string GetLatestWinPixGpuCapturerPath()
 {
-    PWSTR programFilesPath = NULL;
-    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+    PWSTR pprogramFilesPath = NULL;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &pprogramFilesPath);
 
-    char programFilesPath_char[MAX_PATH];
-    wcstombs(programFilesPath_char, programFilesPath, MAX_PATH);
-
-    std::string pixSearchPath = programFilesPath_char + std::string("\\Microsoft PIX\\*");
+    std::wstring programFilesPath(pprogramFilesPath);
+    std::string pixSearchPath = std::string(programFilesPath.begin(), programFilesPath.end()) + std::string("\\Microsoft PIX\\*");
 
     WIN32_FIND_DATA findData;
     bool foundPixInstallation = false;
@@ -48,7 +46,7 @@ static std::string GetLatestWinPixGpuCapturerPath()
                     StringCchCopy(newestVersionFound, _countof(newestVersionFound), findData.cFileName);
                 }
             }
-        }         while (FindNextFile(hFind, &findData) != 0);
+        } while (FindNextFile(hFind, &findData) != 0);
     }
 
     FindClose(hFind);

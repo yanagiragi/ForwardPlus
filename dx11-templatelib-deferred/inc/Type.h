@@ -35,6 +35,7 @@ enum class Deferred_DebugMode
     Specular,
     Normal,
     Depth,
+    LightVolume,
     LEN_DEFERRED_DEBUGMODE
 };
 
@@ -45,13 +46,13 @@ enum class LightingSpace
     LEN_LIGHTINGSPACE
 };
 
-enum class LightingCalculation
+enum class LightCalculationMode
 {
-    Loop,
-    Single,
-    LEN_LIGHTING_CALCULATION
+    LOOP,
+    SINGLE,
+    STENCIL,
+    LEN_LIGHTCALCULATIONMODE
 };
-
 #pragma endregion
 
 #pragma region Structures
@@ -96,8 +97,9 @@ struct DebugProperties
 struct LightingCalculationOptions
 {
     int LightingSpace = 0;
+    int LightCount = MAX_LIGHTS;
     int LightIndex;
-    float padding[2];
+    float padding;
 };
 
 #pragma endregion

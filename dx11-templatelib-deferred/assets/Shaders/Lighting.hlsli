@@ -114,7 +114,7 @@ LightingResult DoSpotLightVS(Light light, float3 V, float3 P, float3 N, float sp
     return _DoSpotLight(light, V, P, N, specularPower, L, spotIntensity);
 }
 
-LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, float3 normalVS, float specularPower)
+LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], int lightCount, float3 positionVS, float3 normalVS, float specularPower)
 {
     // view space calculation is still buggy!
 
@@ -123,7 +123,7 @@ LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], float3 positionVS, fl
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
     [unroll]
-    for (int i = 0; i < MAX_LIGHTS; ++i)
+    for (int i = 0; i < lightCount; ++i)
     {
         if (!Lights[i].Enabled)
         {
@@ -186,14 +186,14 @@ LightingResult ComputeLightingVS_Single(Light light, float3 positionVS, float3 n
     return totalResult;
 }
 
-LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
+LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], int lightCount, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
 {
     float3 view = normalize(eyePosition - positionWS);
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
     [unroll]
-    for (int i = 0; i < MAX_LIGHTS; ++i)
+    for (int i = 0; i < lightCount; ++i)
     {
         if (!Lights[i].Enabled)
         {
