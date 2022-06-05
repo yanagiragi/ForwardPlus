@@ -1,10 +1,10 @@
-float4 DoDiffuse(Light light, float3 L, float3 N)
+float4 DoDiffuse(LightProperties light, float3 L, float3 N)
 {
     float NdotL = max(0, dot(N, L));
     return light.Color * NdotL;
 }
 
-float4 DoSpecular(Light light, float3 V, float3 L, float3 N, float specularPower)
+float4 DoSpecular(LightProperties light, float3 V, float3 L, float3 N, float specularPower)
 {
     // Phong lighting.
     float3 R = normalize(reflect(-L, N));
@@ -17,12 +17,12 @@ float4 DoSpecular(Light light, float3 V, float3 L, float3 N, float specularPower
     return light.Color * pow(RdotV, specularPower);
 }
 
-float DoAttenuation(Light light, float d)
+float DoAttenuation(LightProperties light, float d)
 {
     return 1.0f / (light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d);
 }
 
-float DoSpotConeWS(Light light, float3 L)
+float DoSpotConeWS(LightProperties light, float3 L)
 {
     float minCos = cos(light.SpotAngle);
     float maxCos = (minCos + 1.0f) / 2.0f;
@@ -30,7 +30,7 @@ float DoSpotConeWS(Light light, float3 L)
     return smoothstep(minCos, maxCos, cosAngle);
 }
 
-float DoSpotConeVS(Light light, float3 L)
+float DoSpotConeVS(LightProperties light, float3 L)
 {
     float minCos = cos(light.SpotAngle);
     float maxCos = (minCos + 1.0f) / 2.0f;
@@ -38,7 +38,7 @@ float DoSpotConeVS(Light light, float3 L)
     return smoothstep(minCos, maxCos, cosAngle);
 }
 
-LightingResult _DoDirectionalLight(Light light, float3 V, float3 N, float specularPower, float3 L)
+LightingResult _DoDirectionalLight(LightProperties light, float3 V, float3 N, float specularPower, float3 L)
 {
     LightingResult result;
     result.Diffuse = DoDiffuse(light, L, N);
@@ -46,19 +46,19 @@ LightingResult _DoDirectionalLight(Light light, float3 V, float3 N, float specul
     return result;
 }
 
-LightingResult DoDirectionalLightWS(Light light, float3 V, float3 N, float specularPower)
+LightingResult DoDirectionalLightWS(LightProperties light, float3 V, float3 N, float specularPower)
 {
     float3 L = normalize(light.DirectionWS.xyz);
     return _DoDirectionalLight(light, V, N, specularPower, L);
 }
 
-LightingResult DoDirectionalLightVS(Light light, float3 V, float3 N, float specularPower)
+LightingResult DoDirectionalLightVS(LightProperties light, float3 V, float3 N, float specularPower)
 {
     float3 L = normalize(light.DirectionVS.xyz); // buggy! Note: negative direction gets lit but still wrong
     return _DoDirectionalLight(light, V, N, specularPower, L);
 }
 
-LightingResult _DoPointLight(Light light, float3 V, float3 P, float3 N, float specularPower, float3 L)
+LightingResult _DoPointLight(LightProperties light, float3 V, float3 P, float3 N, float specularPower, float3 L)
 {
     LightingResult result;
     
@@ -73,19 +73,19 @@ LightingResult _DoPointLight(Light light, float3 V, float3 P, float3 N, float sp
     return result;
 }
 
-LightingResult DoPointLightWS(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoPointLightWS(LightProperties light, float3 V, float3 P, float3 N, float specularPower)
 {
     float3 L = (light.PositionWS - P).xyz;
     return _DoPointLight(light, V, P, N, specularPower, L);
 }
 
-LightingResult DoPointLightVS(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoPointLightVS(LightProperties light, float3 V, float3 P, float3 N, float specularPower)
 {
     float3 L = (light.PositionVS - P).xyz;
     return _DoPointLight(light, V, P, N, specularPower, L);
 }
 
-LightingResult _DoSpotLight(Light light, float3 V, float3 P, float3 N, float specularPower, float3 L, float spotIntensity)
+LightingResult _DoSpotLight(LightProperties light, float3 V, float3 P, float3 N, float specularPower, float3 L, float spotIntensity)
 {
     LightingResult result;
 
@@ -100,21 +100,21 @@ LightingResult _DoSpotLight(Light light, float3 V, float3 P, float3 N, float spe
     return result;
 }
 
-LightingResult DoSpotLightWS(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoSpotLightWS(LightProperties light, float3 V, float3 P, float3 N, float specularPower)
 {
     float3 L = (light.PositionWS - P).xyz;
     float spotIntensity = DoSpotConeWS(light, -normalize(L));
     return _DoSpotLight(light, V, P, N, specularPower, L, spotIntensity);
 }
 
-LightingResult DoSpotLightVS(Light light, float3 V, float3 P, float3 N, float specularPower)
+LightingResult DoSpotLightVS(LightProperties light, float3 V, float3 P, float3 N, float specularPower)
 {
     float3 L = (light.PositionVS - P).xyz;
     float spotIntensity = DoSpotConeVS(light, -normalize(L));
     return _DoSpotLight(light, V, P, N, specularPower, L, spotIntensity);
 }
 
-LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], int lightCount, float3 positionVS, float3 normalVS, float specularPower)
+LightingResult ComputeLightingVS(LightProperties Lights[MAX_LIGHTS], int lightCount, float3 positionVS, float3 normalVS, float specularPower)
 {
     // view space calculation is still buggy!
 
@@ -152,7 +152,7 @@ LightingResult ComputeLightingVS(Light Lights[MAX_LIGHTS], int lightCount, float
     return totalResult;
 }
 
-LightingResult ComputeLightingVS_Single(Light light, float3 positionVS, float3 normalVS, float specularPower)
+LightingResult ComputeLightingVS_Single(LightProperties light, float3 positionVS, float3 normalVS, float specularPower)
 {
     // view space calculation is still buggy!
 
@@ -186,7 +186,7 @@ LightingResult ComputeLightingVS_Single(Light light, float3 positionVS, float3 n
     return totalResult;
 }
 
-LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], int lightCount, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
+LightingResult ComputeLightingWS(LightProperties Lights[MAX_LIGHTS], int lightCount, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
 {
     float3 view = normalize(eyePosition - positionWS);
     
@@ -222,7 +222,7 @@ LightingResult ComputeLightingWS(Light Lights[MAX_LIGHTS], int lightCount, float
     return totalResult;
 }
 
-LightingResult ComputeLightingWS_Single(Light light, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
+LightingResult ComputeLightingWS_Single(LightProperties light, float3 positionWS, float3 normalWS, float specularPower, float3 eyePosition)
 {
     float3 view = normalize(eyePosition - positionWS);
     
