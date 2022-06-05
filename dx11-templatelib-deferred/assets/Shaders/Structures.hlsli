@@ -10,7 +10,7 @@
 // Structures
 // 
 // ==============================================================
-struct Light
+struct LightProperties
 {
     float4      PositionWS;             // 16 bytes
     float4      PositionVS;             // 16 bytes
@@ -32,7 +32,7 @@ struct Light
     //----------------------------------- (16 byte boundary)
 };  // Total:                           // 80 bytes (5 * 16)
 
-struct _Material
+struct MaterialProperties
 {
     float4  Emissive;       // 16 bytes
     //----------------------------------- (16 byte boundary)

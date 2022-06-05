@@ -44,7 +44,8 @@ struct Light
         auto lightMax = std::fmaxf(std::fmaxf(light->Color.x, light->Color.y), light->Color.z) * strength;
 
         // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 10/256 as dark threshold
-        return (-linear + std::sqrtf(linear * linear - 4 * quadratic * (constant - (256.0 / 10.0) * lightMax))) / (2 * quadratic);
+        float darkThreshold = (256.0f / 2.5f);
+        return (-linear + std::sqrtf(linear * linear - 4.0f * quadratic * (constant - darkThreshold * lightMax))) / (2.0f * quadratic);
     }
 
 };  // Total:                                       // 112 bytes (7 * 16)

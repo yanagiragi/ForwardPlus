@@ -22,7 +22,7 @@ struct AppData
     matrix WorldMatrix : WORLDMATRIX;
     matrix InverseTransposeWorldMatrix : NORMALWORLDMATRIX;
     matrix InverseTransposeWorldViewMatrix : NORMALVIEWMATRIX;
-    struct _Material Material : MATERIAL;
+    struct MaterialProperties Material : MATERIAL;
 };
 
 struct VertexShaderOutput
@@ -33,7 +33,7 @@ struct VertexShaderOutput
     float3 PositionVS : TEXCOORD2;
     float3 NormalWS : TEXCOORD3;
     float3 NormalVS : TEXCOORD4;
-    struct _Material Material : MATERIAL;
+    struct MaterialProperties Material : MATERIAL;
 };
 
 VertexShaderOutput main(AppData IN)

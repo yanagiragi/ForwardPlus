@@ -48,9 +48,9 @@ enum class LightingSpace
 
 enum class LightCalculationMode
 {
-    LOOP,
-    SINGLE,
-    STENCIL,
+    Loop,
+    Single,
+    Stencil,
     LEN_LIGHTCALCULATIONMODE
 };
 #pragma endregion
