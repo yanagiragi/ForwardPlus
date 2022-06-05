@@ -7,12 +7,11 @@
 #include "SimpleObj.h"
 #include "Common.h"
 
-const char* g_WindowName = "Deferred Shading Test";
+const char* g_WindowName = "Forward+ Test";
 int g_WindowWidth = 1280;
 int g_WindowHeight = 720;
 bool g_VSync = true;
 bool g_Windowed = true;
-
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, LPWSTR cmdLine, int cmdShow)
 {
@@ -35,7 +34,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, LPWSTR cmdLine,
 
     Window& window = app.CreateRenderWindow(g_WindowName, g_WindowWidth, g_WindowHeight, g_VSync, g_Windowed);
 
-    SimpleObj* pDemo = new SimpleObj(window);
+    Yr::SimpleObj* pDemo = new Yr::SimpleObj(window);
 
     if (!pDemo->Initialize())
     {

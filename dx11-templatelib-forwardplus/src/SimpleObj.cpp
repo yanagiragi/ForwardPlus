@@ -6,6 +6,7 @@
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
+using namespace Yr;
 
 /// <summary>
 /// Wrapper to load shader resources
@@ -398,16 +399,29 @@ void SimpleObj::LoadShaderResources()
         }
     }
 
-    // Forward plus compute shader
+    // Forward plus compute frustum shader
+    {
+        ComPtr<ID3DBlob> computeShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/ForwardPlus/ComputeFrustum.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dFowrardPlus_ComputeFrustumShaderSize)
+        {
+            computeShaderBlob = LoadShader<ID3D11ComputeShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, computeShaderBlob, nullptr, m_d3dFowrardPlus_ComputeFrustumShader);
+            m_d3dFowrardPlus_ComputeFrustumShaderSize = size;
+        }
+    }
+
+    // Forward plus test shader
     {
         ComPtr<ID3DBlob> computeShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/testCS.hlsl";
         _int64 size = GetFileSize(filename);
-        if (size != m_d3dFowrardPlus_ComputeShaderSize)
+        if (size != m_d3dFowrardPlus_TestShaderSize)
         {
             computeShaderBlob = LoadShader<ID3D11ComputeShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, computeShaderBlob, nullptr, m_d3dFowrardPlus_ComputeShader);
-            m_d3dFowrardPlus_ComputeShaderSize = size;
+            CreateShader(m_d3dDevice, computeShaderBlob, nullptr, m_d3dFowrardPlus_TestShader);
+            m_d3dFowrardPlus_TestShaderSize = size;
         }
     }
 }
@@ -1268,14 +1282,17 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
         e.Height = 1;
     }
 
-    float aspectRatio = e.Width / (float)e.Height;
-
-    m_Camera.set_Projection(fovInDegree, aspectRatio, nearPlane, farPlane);
+    // update effect for draw debug primitives
     Matrix projectionMatrix = m_Camera.get_ProjectionMatrix();
     m_d3dEffect->SetProjection(projectionMatrix);
 
+    // update screen dimensions
     m_ScreenDimensions = Vector2(e.Width, e.Height);
     
+    // update camera
+    float aspectRatio = e.Width / (float)e.Height;
+    m_Camera.set_Projection(fovInDegree, aspectRatio, nearPlane, farPlane);
+
     // Setup the viewports for the camera.
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0.0f;
@@ -1284,10 +1301,10 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     viewport.Height = static_cast<FLOAT>(m_Window.get_ClientHeight());
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
-
     m_Camera.set_Viewport(viewport);
-
-    m_d3dDeviceContext->RSSetViewports(1, &viewport);
+    
+    // Prepare frustum for forward plus
+    ComputeFrustum(e.Width, e.Height, BLOCK_SIZE);
 }
 
 bool SimpleObj::ResizeSwapChain(int width, int height)
@@ -1442,6 +1459,38 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
     return true;
 }
 
+HRESULT SimpleObj::CreateConstantBuffer(int elementSize, ID3D11Buffer** outBuffer)
+{
+    D3D11_BUFFER_DESC frameConstantBufferDesc;
+    ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+    frameConstantBufferDesc.ByteWidth = elementSize;
+    frameConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    frameConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    frameConstantBufferDesc.CPUAccessFlags = 0;
+
+    return m_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, outBuffer);
+}
+
+ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* device, ID3D11DeviceContext* deviceContext, ID3D11Buffer* targetBuffer)
+{
+    ID3D11Buffer* cpuReadBuffer = nullptr;
+
+    D3D11_BUFFER_DESC desc = {};
+    targetBuffer->GetDesc(&desc);
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+
+    HRESULT hr = device->CreateBuffer(&desc, nullptr, &cpuReadBuffer);
+    AssertIfFailed(hr, "Read Buffer", "Unable to create cpuReadBuffer");
+
+    // Copy data to CPU-read buffer
+    deviceContext->CopyResource(cpuReadBuffer, targetBuffer);
+
+    return cpuReadBuffer;
+}
+
 bool SimpleObj::LoadContent()
 {
     AssertIfFailed(m_d3dDevice == nullptr, "Load Content", "Device is null");
@@ -1532,75 +1581,29 @@ bool SimpleObj::LoadContent()
 
     // setup CB
     {
-        D3D11_BUFFER_DESC frameConstantBufferDesc;
-        ZeroMemory(&frameConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        frameConstantBufferDesc.ByteWidth = sizeof(struct FrameConstantBuffer);
-        frameConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        frameConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        frameConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Frame]);
+        hr = CreateConstantBuffer(sizeof(struct FrameConstantBuffer), &m_d3dConstantBuffers[CB_Frame]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Frame");
 
-        D3D11_BUFFER_DESC objectConstantBufferDesc;
-        ZeroMemory(&objectConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        objectConstantBufferDesc.ByteWidth = sizeof(struct ObjectConstantBuffer);
-        objectConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        objectConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        objectConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&objectConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Object]);
+        hr = CreateConstantBuffer(sizeof(struct ObjectConstantBuffer), &m_d3dConstantBuffers[CB_Object]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Object");
 
-        D3D11_BUFFER_DESC materialConstantBufferDesc;
-        ZeroMemory(&materialConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        materialConstantBufferDesc.ByteWidth = sizeof(struct MaterialProperties);
-        materialConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        materialConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        materialConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&materialConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Material]);
+        hr = CreateConstantBuffer(sizeof(struct MaterialProperties), &m_d3dConstantBuffers[CB_Material]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Material");
 
-        D3D11_BUFFER_DESC lightConstantBufferDesc;
-        ZeroMemory(&lightConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        lightConstantBufferDesc.ByteWidth = sizeof(struct LightProperties);
-        lightConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        lightConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        lightConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&lightConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Light]);
+        hr = CreateConstantBuffer(sizeof(struct LightProperties), &m_d3dConstantBuffers[CB_Light]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
 
-        D3D11_BUFFER_DESC debugConstantBufferDesc;
-        ZeroMemory(&debugConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        debugConstantBufferDesc.ByteWidth = sizeof(struct DebugProperties);
-        debugConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        debugConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        debugConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&debugConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_Debug]);
+        hr = CreateConstantBuffer(sizeof(struct DebugProperties), &m_d3dConstantBuffers[CB_Debug]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_Light");
 
-        D3D11_BUFFER_DESC screenToViewParamsConstantBufferDesc;
-        ZeroMemory(&screenToViewParamsConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        screenToViewParamsConstantBufferDesc.ByteWidth = sizeof(struct ScreenToViewParams);
-        screenToViewParamsConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        screenToViewParamsConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        screenToViewParamsConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&screenToViewParamsConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_ScreenToViewParams]);
+        hr = CreateConstantBuffer(sizeof(struct ScreenToViewParams), &m_d3dConstantBuffers[CB_ScreenToViewParams]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_ScreenToViewParams");
 
-        D3D11_BUFFER_DESC lightCalculationOptionsConstantBufferDesc;
-        ZeroMemory(&lightCalculationOptionsConstantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        lightCalculationOptionsConstantBufferDesc.ByteWidth = sizeof(struct LightingCalculationOptions);
-        lightCalculationOptionsConstantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        lightCalculationOptionsConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        lightCalculationOptionsConstantBufferDesc.CPUAccessFlags = 0;
-
-        hr = m_d3dDevice->CreateBuffer(&lightCalculationOptionsConstantBufferDesc, nullptr, &m_d3dConstantBuffers[CB_LightCalculationOptions]);
+        hr = CreateConstantBuffer(sizeof(struct LightingCalculationOptions), &m_d3dConstantBuffers[CB_LightCalculationOptions]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_LightCalculationOptions");
+
+        hr = CreateConstantBuffer(sizeof(struct DispatchParams), &m_d3dConstantBuffers[CB_DispatchParams]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_DispatchParams");
     }
 
     // setup BlendState & DepthStencilState
@@ -1804,15 +1807,15 @@ bool SimpleObj::LoadContent()
                 {
                     // This is a Structured Buffer
 
-                    desc.Format = DXGI_FORMAT_UNKNOWN;
-                    desc.BufferEx.NumElements = descBuf.ByteWidth / descBuf.StructureByteStride;
+desc.Format = DXGI_FORMAT_UNKNOWN;
+desc.BufferEx.NumElements = descBuf.ByteWidth / descBuf.StructureByteStride;
                 }
                 else
                 {
-                    return E_INVALIDARG;
+                return E_INVALIDARG;
                 }
 
-            return pDevice->CreateShaderResourceView(pBuffer, &desc, ppSRVOut);
+                return pDevice->CreateShaderResourceView(pBuffer, &desc, ppSRVOut);
         };
 
         auto CreateBufferUAV = [](ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut)
@@ -1858,7 +1861,7 @@ bool SimpleObj::LoadContent()
 
         // RunComputeShader( g_pContext, g_pCS, 2, aRViews, nullptr, nullptr, 0, g_pBufResultUAV, NUM_ELEMENTS, 1, 1 );
         ID3D11ShaderResourceView* pShaderResourceViews[2] = { g_pBuf0SRV, g_pBuf1SRV };
-        m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_ComputeShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_TestShader.Get(), nullptr, 0);
         m_d3dDeviceContext->CSSetShaderResources(0, _countof(pShaderResourceViews), pShaderResourceViews);
         m_d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &g_pBufResultUAV, nullptr);
         m_d3dDeviceContext->Dispatch(1, 1, 1);
@@ -1874,35 +1877,19 @@ bool SimpleObj::LoadContent()
         ID3D11Buffer* ppCBnullptr[1] = { nullptr };
         m_d3dDeviceContext->CSSetConstantBuffers(0, 1, ppCBnullptr);
 
-
         // Read back the result from GPU, verify its correctness against result computed by CPU
         {
-            auto CreateAndCopyToDebugBuf = [](ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer)
-            {
-                ID3D11Buffer* debugbuf = nullptr;
+            std::vector<BufType> p;
+            auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), g_pBufResult);
 
-                D3D11_BUFFER_DESC desc = {};
-                pBuffer->GetDesc(&desc);
-                desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-                desc.Usage = D3D11_USAGE_STAGING;
-                desc.BindFlags = 0;
-                desc.MiscFlags = 0;
-                if (SUCCEEDED(pDevice->CreateBuffer(&desc, nullptr, &debugbuf)))
-                {
-                    pd3dImmediateContext->CopyResource(debugbuf, pBuffer);
-                }
-
-                return debugbuf;
-            };
-
-            ID3D11Buffer* debugbuf = CreateAndCopyToDebugBuf(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), g_pBufResult);
+            // Save buffer to T
             D3D11_MAPPED_SUBRESOURCE MappedResource;
-            BufType* p;
-            m_d3dDeviceContext->Map(debugbuf, 0, D3D11_MAP_READ, 0, &MappedResource);
+            m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
+            p.assign(1, *(BufType*)MappedResource.pData);
 
-            // Set a break point here and put down the expression "p, 1024" in your watch window to see what has been written out by our CS
-            // This is also a common trick to debug CS programs.
-            p = (BufType*)MappedResource.pData;
+            // Clean up
+            m_d3dDeviceContext->Unmap(tempBuffer, 0);
+            SafeRelease(tempBuffer);
 
             // Verify that if Compute Shader has done right
             printf("Verifying against CPU result...");
@@ -1917,10 +1904,21 @@ bool SimpleObj::LoadContent()
                 }
             if (bSuccess)
                 printf("succeeded\n");
-
-            m_d3dDeviceContext->Unmap(debugbuf, 0);
-            SafeRelease(debugbuf);
         }
+    }
+
+    {
+         auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dFrustumBuffers.Get());
+
+         // Save buffer to T
+         D3D11_MAPPED_SUBRESOURCE MappedResource;
+         m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
+         //m_Frustums.assign(m_Frustums.size(), *(struct Frustum*)MappedResource.pData);
+         std::copy_n((struct Frustum*)MappedResource.pData, m_Frustums.size(), m_Frustums.data());
+
+         // Clean up
+         m_d3dDeviceContext->Unmap(tempBuffer, 0);
+         SafeRelease(tempBuffer);
     }
 
     return true;

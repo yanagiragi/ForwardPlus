@@ -1,5 +1,7 @@
 #include "SimpleObj.h"
+
 using namespace Microsoft::WRL;
+using namespace Yr;
 
 void SimpleObj::RenderScene_Deferred_GeometryPass()
 {
