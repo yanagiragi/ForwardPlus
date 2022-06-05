@@ -7,7 +7,7 @@ cbuffer LightProperties : register(b0)
     //----------------------------------- (16 byte boundary)
     float4 GlobalAmbient;               // 16 bytes
     //----------------------------------- (16 byte boundary)
-    struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
+    struct LightProperties Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:                           // 672 bytes (42 * 16 byte boundary)
 
 cbuffer LightingCalculationOptions : register(b1)
@@ -38,7 +38,7 @@ struct PixelShaderInput
     float3 PositionVS : TEXCOORD2;
     float3 NormalWS : TEXCOORD3;
     float3 NormalVS : TEXCOORD4;
-    struct _Material Material : MATERIAL;
+    struct MaterialProperties Material : MATERIAL;
 };
 
 float4 main(PixelShaderInput IN) : SV_TARGET

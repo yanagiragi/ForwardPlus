@@ -2,7 +2,7 @@
 
 cbuffer MaterialProperties : register(b0)
 {
-    struct _Material Material;
+    struct MaterialProperties Material;
 };
 
 cbuffer LightProperties : register(b1)
@@ -11,7 +11,7 @@ cbuffer LightProperties : register(b1)
     //----------------------------------- (16 byte boundary)
     float4 GlobalAmbient;               // 16 bytes
     //----------------------------------- (16 byte boundary)
-    struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
+    struct LightProperties Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:                           // 672 bytes (42 * 16 byte boundary)
 
 
