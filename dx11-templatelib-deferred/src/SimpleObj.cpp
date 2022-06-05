@@ -151,6 +151,34 @@ void SimpleObj::LoadShaderResources()
         }
     }    
 
+    // Forward Single Light
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Forward/ForwardLighting_SingleLightPS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dForward_SingleLight_PixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dForward_SingleLight_PixelShader);
+            m_d3dForward_SingleLight_PixelShaderSize = size;
+        }
+    }
+
+    // Forward Single Light Instanced
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/Forward/ForwardLighting_SingleLightPS_Instanced.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dForward_SingleLight_InstancedPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dForward_SingleLight_InstancedPixelShader);
+            m_d3dForward_SingleLight_InstancedPixelShaderSize = size;
+        }
+    }
+
     // Deferred Geometry Regular
     {
         ComPtr<ID3DBlob> vertexShaderBlob = nullptr;
@@ -641,6 +669,15 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
             int lightCalculationMode = (int)m_LightCalculationMode;
             if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
+            {
+                m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
+            }
+        }
+        
+        else if (m_RenderMode == RenderMode::Forward)
+        {
+            int lightCalculationMode = (int)m_LightCalculationMode;
+            if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0")) // no stencil mode
             {
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
@@ -1575,6 +1612,18 @@ bool SimpleObj::LoadContent()
 
             hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_DisableDepthTest);
             AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_DisableDepthTest");
+        }
+
+        {
+            D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+            ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+            depthStencilStateDesc.DepthEnable = TRUE;
+            depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+            hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState_Overlay);
+            AssertIfFailed(hr, "Load Content", "Failed to create a DepthStencilState: m_d3dDepthStencilState_LEqual");
         }
 
         {
