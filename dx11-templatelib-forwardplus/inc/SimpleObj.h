@@ -120,6 +120,12 @@ private:
     __int64 m_d3dForward_LoopLight_InstancedPixelShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_LoopLight_InstancedPixelShader = nullptr;
 
+    __int64 m_d3dForward_SingleLight_PixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_SingleLight_PixelShader = nullptr;
+
+    __int64 m_d3dForward_SingleLight_InstancedPixelShaderSize = 0;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dForward_SingleLight_InstancedPixelShader = nullptr;
+
     __int64 m_d3dDeferredGeometry_RegularVertexShaderSize = 0;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_d3dDeferredGeometry_RegularVertexShader = nullptr;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> m_d3dDeferredGeometry_RegularInputLayout = nullptr;
@@ -200,12 +206,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dRenderTargetView_normal_tex;
 
     // Blend / Depth / Stencil States
+    Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_DisableDepthTest;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_Overlay;
+
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_UnmarkPixels;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_ShadePixels;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_d3dDepthStencilState_Debug;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_d3dCullFrontRasterizerState;
-    Microsoft::WRL::ComPtr<ID3D11BlendState> m_d3dBlendState_Add;
 
     // Materials
     struct Material defaultMaterial;
@@ -258,7 +266,7 @@ private:
     float m_DeferredDepthPower = 500.0f;
     LightingSpace m_LightingSpace = LightingSpace::World;
     int m_LightCalculationCount = MAX_LIGHTS;
-    LightCalculationMode m_LightCalculationMode = LightCalculationMode::SINGLE;
+    LightCalculationMode m_LightCalculationMode = LightCalculationMode::Single;
 
     // Others
     Scene m_Scene;
@@ -276,7 +284,7 @@ private:
     std::function<void(vec3)> m_DirectionWindowVec3Setter = nullptr;
     std::function<const char* (void)> m_DirectionWindowNameGetter = nullptr;
 
-#pragma endregion
+    #pragma endregion
 
     // test variables
     ID3D11Buffer* g_pBuf0 = nullptr;

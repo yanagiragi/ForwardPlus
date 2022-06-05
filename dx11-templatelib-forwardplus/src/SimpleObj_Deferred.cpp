@@ -564,16 +564,20 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
             m_d3dDeviceContext->PSSetSamplers(0, 1, m_d3dSamplerState.GetAddressOf());
 
             DrawLightVolume(light);
+
+            // Unbind SRVs
+            ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
+            m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
         }
     }
 
-    // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[5] = { NULL, NULL, NULL, NULL, NULL };
-    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
-
     // reset to default states
-    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
-    m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+    m_d3dDeviceContext->OMSetDepthStencilState(nullptr, 1);
+    m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+
+    // Unbind RTVs
+    ID3D11RenderTargetView* nullRTV = nullptr;
+    m_d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
 }
 
 void SimpleObj::RenderScene_Deferred_LightingPass_Single()
@@ -664,11 +668,11 @@ void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
 
     if (m_DeferredDebugMode == Deferred_DebugMode::None || m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
     {
-        if (m_LightCalculationMode == LightCalculationMode::LOOP)
+        if (m_LightCalculationMode == LightCalculationMode::Loop)
         {
             RenderScene_Deferred_LightingPass_Loop();
         }
-        else if (m_LightCalculationMode == LightCalculationMode::SINGLE)
+        else if (m_LightCalculationMode == LightCalculationMode::Single)
         {
             RenderScene_Deferred_LightingPass_Single();
         }

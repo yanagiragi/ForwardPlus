@@ -23,6 +23,7 @@ cbuffer LightingCalculationOptions : register(b2)
     float padding;            // 4 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
 Texture2D Texture : register(t0);
 sampler Sampler : register(s0);
 
@@ -48,26 +49,34 @@ struct PixelShaderInput
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     LightingResult lit = { {0, 0, 0}, {0, 0, 0}};
-    if (lightingSpace == WORLD_SPACE)
-    {
-        lit = ComputeLightingWS(Lights, lightCount, IN.PositionWS, normalize(IN.NormalWS), Material.SpecularPower, EyePosition);
-    }
-    else if (lightingSpace == VIEW_SPACE)
-    {
-        lit = ComputeLightingVS(Lights, lightCount, IN.PositionVS, normalize(IN.NormalVS), Material.SpecularPower);
-    }
 
     float3 emissive = Material.Emissive;
     float3 ambient = Material.Ambient * GlobalAmbient;
-    float3 diffuse = Material.Diffuse * lit.Diffuse;
-    float3 specular = Material.Specular * lit.Specular;
 
     float4 texColor = { 1, 1, 1, 1 };
-
     if (Material.UseTexture)
     {
         texColor = Texture.Sample(Sampler, IN.uv);
     }
 
-    return float4((emissive + ambient + diffuse) * texColor.rgb + specular, 1.0);
+    if(lightIndex == -1)
+    {
+        return float4((emissive + ambient) * texColor.rgb, 1.0);
+    }
+    else
+    {
+        if (lightingSpace == WORLD_SPACE)
+        {
+            lit = ComputeLightingWS_Single(Lights[lightIndex], IN.PositionWS, normalize(IN.NormalWS), Material.SpecularPower, EyePosition);
+        }
+        else if (lightingSpace == VIEW_SPACE)
+        {
+            lit = ComputeLightingVS_Single(Lights[lightIndex], IN.PositionVS, normalize(IN.NormalVS), Material.SpecularPower);
+        }
+    }
+
+    float3 diffuse = Material.Diffuse * lit.Diffuse;
+    float3 specular = Material.Specular * lit.Specular;
+
+    return float4(diffuse * texColor.rgb + specular, 1.0);
 }
