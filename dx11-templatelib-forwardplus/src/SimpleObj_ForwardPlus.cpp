@@ -104,4 +104,19 @@ void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
     
     ID3D11Buffer* nullConstantBuffers[1] = { nullptr };
     m_d3dDeviceContext->CSSetConstantBuffers(0, 1, nullConstantBuffers);
+
+#ifdef _DEBUG
+    {
+        // copy result back to m_d3dFrustumBuffers
+        auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dFrustumBuffers.Get());
+
+        D3D11_MAPPED_SUBRESOURCE MappedResource;
+        m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
+        std::copy_n((struct Frustum*)MappedResource.pData, m_Frustums.size(), m_Frustums.data());
+
+        // Clean up
+        m_d3dDeviceContext->Unmap(tempBuffer, 0);
+        SafeRelease(tempBuffer);
+    }
+#endif
 }

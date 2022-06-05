@@ -1491,6 +1491,40 @@ ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* device, ID3D11DeviceContext* d
     return cpuReadBuffer;
 }
 
+HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut)
+{
+    D3D11_BUFFER_DESC descBuf = {};
+    pBuffer->GetDesc(&descBuf);
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
+    desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+    desc.BufferEx.FirstElement = 0;
+
+    // This is a Raw Buffer
+    if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS)
+    {
+        desc.Format = DXGI_FORMAT_R32_TYPELESS;
+        desc.BufferEx.Flags = D3D11_BUFFEREX_SRV_FLAG_RAW;
+        desc.BufferEx.NumElements = descBuf.ByteWidth / 4;
+    }
+    
+    else
+    {
+        // This is a Structured Buffer
+        if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED)
+        {
+            desc.Format = DXGI_FORMAT_UNKNOWN;
+            desc.BufferEx.NumElements = descBuf.ByteWidth / descBuf.StructureByteStride;
+        }
+        else
+        {
+            return E_INVALIDARG;
+        }
+    }
+
+    return pDevice->CreateShaderResourceView(pBuffer, &desc, ppSRVOut);
+}
+
 bool SimpleObj::LoadContent()
 {
     AssertIfFailed(m_d3dDevice == nullptr, "Load Content", "Device is null");
@@ -1762,164 +1796,6 @@ bool SimpleObj::LoadContent()
     OnResize(resizeEventArgs);
 
     SetupImgui();
-
-    // test compute shader
-    {
-        auto CreateStructuredBuffer = [](ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut)
-        {
-            *ppBufOut = nullptr;
-
-            D3D11_BUFFER_DESC desc = {};
-            desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-            desc.ByteWidth = uElementSize * uCount;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-            desc.StructureByteStride = uElementSize;
-
-            if (pInitData)
-            {
-                D3D11_SUBRESOURCE_DATA InitData;
-                InitData.pSysMem = pInitData;
-                return pDevice->CreateBuffer(&desc, &InitData, ppBufOut);
-            }
-            else
-                return pDevice->CreateBuffer(&desc, nullptr, ppBufOut);
-        };
-
-        auto CreateBufferSRV = [](ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut)
-        {
-            D3D11_BUFFER_DESC descBuf = {};
-            pBuffer->GetDesc(&descBuf);
-
-            D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
-            desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-            desc.BufferEx.FirstElement = 0;
-
-            if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS)
-            {
-                // This is a Raw Buffer
-
-                desc.Format = DXGI_FORMAT_R32_TYPELESS;
-                desc.BufferEx.Flags = D3D11_BUFFEREX_SRV_FLAG_RAW;
-                desc.BufferEx.NumElements = descBuf.ByteWidth / 4;
-            }
-            else
-                if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED)
-                {
-                    // This is a Structured Buffer
-
-desc.Format = DXGI_FORMAT_UNKNOWN;
-desc.BufferEx.NumElements = descBuf.ByteWidth / descBuf.StructureByteStride;
-                }
-                else
-                {
-                return E_INVALIDARG;
-                }
-
-                return pDevice->CreateShaderResourceView(pBuffer, &desc, ppSRVOut);
-        };
-
-        auto CreateBufferUAV = [](ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut)
-        {
-            D3D11_BUFFER_DESC descBuf = {};
-            pBuffer->GetDesc(&descBuf);
-
-            D3D11_UNORDERED_ACCESS_VIEW_DESC desc = {};
-            desc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-            desc.Buffer.FirstElement = 0;
-
-            if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS)
-            {
-                // This is a Raw Buffer
-
-                desc.Format = DXGI_FORMAT_R32_TYPELESS; // Format must be DXGI_FORMAT_R32_TYPELESS, when creating Raw Unordered Access View
-                desc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
-                desc.Buffer.NumElements = descBuf.ByteWidth / 4;
-            }
-            else
-                if (descBuf.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED)
-                {
-                    // This is a Structured Buffer
-
-                    desc.Format = DXGI_FORMAT_UNKNOWN;      // Format must be must be DXGI_FORMAT_UNKNOWN, when creating a View of a Structured Buffer
-                    desc.Buffer.NumElements = descBuf.ByteWidth / descBuf.StructureByteStride;
-                }
-                else
-                {
-                    return E_INVALIDARG;
-                }
-
-            return pDevice->CreateUnorderedAccessView(pBuffer, &desc, ppUAVOut);
-        };
-
-        CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(BufType), 1, &g_vBuf0[0], &g_pBuf0);
-        CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(BufType), 1, &g_vBuf1[0], &g_pBuf1);
-        CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(BufType), 1, NULL, &g_pBufResult);
-
-        CreateBufferSRV(m_d3dDevice.Get(), g_pBuf0, &g_pBuf0SRV);
-        CreateBufferSRV(m_d3dDevice.Get(), g_pBuf1, &g_pBuf1SRV);
-        CreateBufferUAV(m_d3dDevice.Get(), g_pBufResult, &g_pBufResultUAV);
-
-        // RunComputeShader( g_pContext, g_pCS, 2, aRViews, nullptr, nullptr, 0, g_pBufResultUAV, NUM_ELEMENTS, 1, 1 );
-        ID3D11ShaderResourceView* pShaderResourceViews[2] = { g_pBuf0SRV, g_pBuf1SRV };
-        m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_TestShader.Get(), nullptr, 0);
-        m_d3dDeviceContext->CSSetShaderResources(0, _countof(pShaderResourceViews), pShaderResourceViews);
-        m_d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &g_pBufResultUAV, nullptr);
-        m_d3dDeviceContext->Dispatch(1, 1, 1);
-
-        m_d3dDeviceContext->CSSetShader(nullptr, nullptr, 0);
-
-        ID3D11UnorderedAccessView* ppUAViewnullptr[1] = { nullptr };
-        m_d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, ppUAViewnullptr, nullptr);
-
-        ID3D11ShaderResourceView* ppSRVnullptr[2] = { nullptr, nullptr };
-        m_d3dDeviceContext->CSSetShaderResources(0, 2, ppSRVnullptr);
-
-        ID3D11Buffer* ppCBnullptr[1] = { nullptr };
-        m_d3dDeviceContext->CSSetConstantBuffers(0, 1, ppCBnullptr);
-
-        // Read back the result from GPU, verify its correctness against result computed by CPU
-        {
-            std::vector<BufType> p;
-            auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), g_pBufResult);
-
-            // Save buffer to T
-            D3D11_MAPPED_SUBRESOURCE MappedResource;
-            m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
-            p.assign(1, *(BufType*)MappedResource.pData);
-
-            // Clean up
-            m_d3dDeviceContext->Unmap(tempBuffer, 0);
-            SafeRelease(tempBuffer);
-
-            // Verify that if Compute Shader has done right
-            printf("Verifying against CPU result...");
-            bool bSuccess = true;
-            for (int i = 0; i < 1; ++i)
-                if ((p[i].i != g_vBuf0[i].i + g_vBuf1[i].i) || (p[i].f != g_vBuf0[i].f + g_vBuf1[i].f))
-                {
-                    printf("failure\n");
-                    bSuccess = false;
-
-                    break;
-                }
-            if (bSuccess)
-                printf("succeeded\n");
-        }
-    }
-
-    {
-         auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dFrustumBuffers.Get());
-
-         // Save buffer to T
-         D3D11_MAPPED_SUBRESOURCE MappedResource;
-         m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
-         //m_Frustums.assign(m_Frustums.size(), *(struct Frustum*)MappedResource.pData);
-         std::copy_n((struct Frustum*)MappedResource.pData, m_Frustums.size(), m_Frustums.data());
-
-         // Clean up
-         m_d3dDeviceContext->Unmap(tempBuffer, 0);
-         SafeRelease(tempBuffer);
-    }
 
     return true;
 }

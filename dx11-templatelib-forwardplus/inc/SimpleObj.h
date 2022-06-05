@@ -32,16 +32,8 @@
 
 #define BLOCK_SIZE 16
 
-struct BufType
-{
-    int i;
-    float f;
-};
-
 namespace Yr
 {
-
-
     class SimpleObj final : public Game
     {
         // aliases
@@ -77,7 +69,7 @@ namespace Yr
         virtual void Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil);
 
     private:
-#pragma region Functions
+        #pragma region Functions
         void LoadShaderResources();
         void LoadDebugDraw();
         void LoadTexture();
@@ -104,6 +96,7 @@ namespace Yr
         HRESULT CreateConstantBuffer(int elementSize, ID3D11Buffer** outBuffer);
 
         ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer);
+        HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
 
         void ComputeFrustum(int width, int height, int blockSize);
         HRESULT CreateBufferUAV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut);
@@ -113,9 +106,9 @@ namespace Yr
         void Draw(UINT VertexCount, UINT StartVertexLocation);
         void DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
 
-#pragma endregion
+        #pragma endregion
 
-#pragma region Variables
+        #pragma region Variables
 
         // Input Flags
         // For panning the camera.
@@ -313,20 +306,6 @@ namespace Yr
         std::function<void(vec3)> m_DirectionWindowVec3Setter = nullptr;
         std::function<const char* (void)> m_DirectionWindowNameGetter = nullptr;
 
-#pragma endregion
-
-        // test variables
-
-        struct BufType g_vBuf0[1] = { { 1, 0.4 } };
-        struct BufType g_vBuf1[1] = { { 2, 0.3 } };
-        struct BufType g_vBufResult[1] = { { 0, 0 } };
-
-        ID3D11Buffer* g_pBuf0 = nullptr;
-        ID3D11Buffer* g_pBuf1 = nullptr;
-        ID3D11Buffer* g_pBufResult = nullptr;
-
-        ID3D11ShaderResourceView* g_pBuf0SRV = nullptr;
-        ID3D11ShaderResourceView* g_pBuf1SRV = nullptr;
-        ID3D11UnorderedAccessView* g_pBufResultUAV = nullptr;
+        #pragma endregion
     };
 }
