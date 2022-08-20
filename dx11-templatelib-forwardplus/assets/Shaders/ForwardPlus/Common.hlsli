@@ -9,15 +9,16 @@ struct Frustum
     Plane planes[4];    // left, right, top, bottom
 };
 
-Plane ComputePlane(float3 p0, float3 p1, float3 p2)
+struct Sphere
 {
-    Plane plane;
+    float3 c;   // Center point.
+    float  r;   // Radius.
+};
 
-    float3 v1 = p1 - p0;
-    float3 v2 = p2 - p0;
-
-    plane.N = normalize(cross(v1, v2));
-    plane.d = dot(plane.N, p0);
-
-    return plane;
-}
+struct Cone
+{
+    float3 T;   // Cone tip.
+    float  h;   // Height of the cone.
+    float3 d;   // Direction of the cone.
+    float  r;   // bottom radius of the cone.
+};

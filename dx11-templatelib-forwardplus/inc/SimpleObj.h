@@ -175,8 +175,8 @@ namespace Yr
         __int64 m_d3dFowrardPlus_ComputeFrustumShaderSize = 0;
         Microsoft::WRL::ComPtr<ID3D11ComputeShader> m_d3dFowrardPlus_ComputeFrustumShader = nullptr;
 
-        __int64 m_d3dFowrardPlus_TestShaderSize = 0;
-        Microsoft::WRL::ComPtr<ID3D11ComputeShader> m_d3dFowrardPlus_TestShader = nullptr;
+        __int64 m_d3dFowrardPlus_CullLightShaderSize = 0;
+        Microsoft::WRL::ComPtr<ID3D11ComputeShader> m_d3dFowrardPlus_CullLightShader = nullptr;
 
         // Primitive Batch
         std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;

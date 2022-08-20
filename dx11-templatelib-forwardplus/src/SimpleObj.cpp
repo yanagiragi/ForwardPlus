@@ -412,16 +412,16 @@ void SimpleObj::LoadShaderResources()
         }
     }
 
-    // Forward plus test shader
+    // Forward plus light culling shader
     {
         ComPtr<ID3DBlob> computeShaderBlob = nullptr;
-        std::wstring filename = L"assets/Shaders/testCS.hlsl";
+        std::wstring filename = L"assets/Shaders/ForwardPlus/CullLight.hlsl";
         _int64 size = GetFileSize(filename);
-        if (size != m_d3dFowrardPlus_TestShaderSize)
+        if (size != m_d3dFowrardPlus_CullLightShaderSize)
         {
             computeShaderBlob = LoadShader<ID3D11ComputeShader>(m_d3dDevice, filename, "main", "latest");
-            CreateShader(m_d3dDevice, computeShaderBlob, nullptr, m_d3dFowrardPlus_TestShader);
-            m_d3dFowrardPlus_TestShaderSize = size;
+            CreateShader(m_d3dDevice, computeShaderBlob, nullptr, m_d3dFowrardPlus_CullLightShader);
+            m_d3dFowrardPlus_CullLightShaderSize = size;
         }
     }
 }

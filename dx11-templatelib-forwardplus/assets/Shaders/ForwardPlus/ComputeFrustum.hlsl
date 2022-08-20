@@ -45,6 +45,20 @@ float4 ScreenToView( float4 screen )
     return ClipToView( clip );
 }
 
+// right-handed (counter-clockwise winding order), so the normal points to inside of the frustum
+Plane ComputePlane(float3 p0, float3 p1, float3 p2)
+{
+    Plane plane;
+
+    float3 v1 = p1 - p0;
+    float3 v2 = p2 - p0;
+
+    plane.N = normalize(cross(v1, v2));
+    plane.d = dot(plane.N, p0);
+
+    return plane;
+}
+
 //  =========================
 //      Main Functions
 //  =========================
