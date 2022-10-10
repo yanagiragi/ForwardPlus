@@ -83,6 +83,7 @@ namespace Yr
 
         void RenderScene_Forward(RenderEventArgs& e);
         void RenderScene_Deferred(RenderEventArgs& e);
+        void RenderScene_FowardPlus(RenderEventArgs& e);
 
         void RenderScene_Deferred_GeometryPass();
         void RenderScene_Deferred_DebugPass();
@@ -91,6 +92,10 @@ namespace Yr
         void RenderScene_Deferred_LightingPass_Stencil();
         void DrawLightVolume(Light* type);
 
+        void ComputeFrustum(int width, int height, int blockSize);
+        void RenderScene_FowardPlus_CullLightPass(int width, int height, int blockSize);
+
+
         bool ResizeSwapChain(int width, int height);
 
         HRESULT CreateConstantBuffer(int elementSize, ID3D11Buffer** outBuffer);
@@ -98,8 +103,8 @@ namespace Yr
         ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer);
         HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
 
-        void ComputeFrustum(int width, int height, int blockSize);
-        HRESULT CreateBufferUAV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut);
+        HRESULT CreateStructuredBufferSRV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
+        HRESULT CreateStructuredBufferUAV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut);
         HRESULT CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut);
 
         // Wrap to native API
@@ -233,9 +238,21 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_d3dCullFrontRasterizerState;
 
         // Compute shader
-        std::vector<struct Frustum> m_Frustums;
+        std::vector<struct Frustum> m_frustums;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dFrustumBuffers;
-        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dFrustumBuffersUAV;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dFrustumBuffers_UAV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dFrustumBuffers_SRV;
+
+        std::vector<int> m_opaqueLightIndexCounter;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexCounterBuffers;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexCounterBuffers_UAV;
+
+        std::vector<int> m_opaqueLightIndexList;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexListBuffers;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexListBuffers_UAV;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dOpaqueLightGridBuffers;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightGrid_UAV;
 
         // Materials
         struct Material defaultMaterial;

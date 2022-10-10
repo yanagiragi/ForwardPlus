@@ -36,16 +36,16 @@ cbuffer LightProperties : register(b2)
 };  // Total:  
 
 // The depth from the screen space texture.
-Texture2D DepthTextureVS : register( t3 );
+Texture2D DepthTextureVS : register( t0 );
 
 // Precomputed frustums for the grid.
-StructuredBuffer<Frustum> in_Frustums : register( t9 );
+StructuredBuffer<Frustum> in_Frustums : register( t1 );
 
 // "o_" prefix indicates light lists for opaque geometry while 
 // "t_" prefix indicates light lists for transparent geometry.
-RWStructuredBuffer<uint> o_LightIndexCounter : register( u1 );
-RWStructuredBuffer<uint> o_LightIndexList : register( u3 );
-RWTexture2D<uint2> o_LightGrid : register( u5 );
+RWStructuredBuffer<uint> o_LightIndexCounter : register( u0 );
+RWStructuredBuffer<uint> o_LightIndexList : register( u1 );
+RWTexture2D<uint2> o_LightGrid : register( u2 );
 
 // RWStructuredBuffer<uint> t_LightIndexCounter : register( u2 );
 // RWStructuredBuffer<uint> t_LightIndexList : register( u4 );

@@ -536,6 +536,9 @@ void SimpleObj::RenderScene(RenderEventArgs& e)
     case RenderMode::Deferred:
         RenderScene_Deferred(e);
         break;
+    case RenderMode::ForwardPlus:
+        RenderScene_FowardPlus(e);
+        break;
     }
 }
 
@@ -672,7 +675,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     ImGui::PushID("Render Techniques");
     {
         int renderMode = (int)m_RenderMode;
-        if (ImGui::Combo("Render Techniques", &renderMode, "Forward\0Deferred\0"))
+        if (ImGui::Combo("Render Techniques", &renderMode, "Forward\0Deferred\0Forward Plus\0"))
         {
             m_RenderMode = (RenderMode)renderMode;
         }
@@ -1302,9 +1305,6 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     m_Camera.set_Viewport(viewport);
-    
-    // Prepare frustum for forward plus
-    ComputeFrustum(e.Width, e.Height, BLOCK_SIZE);
 }
 
 bool SimpleObj::ResizeSwapChain(int width, int height)
@@ -1454,6 +1454,77 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         hr = m_d3dDevice->CreateDepthStencilView(m_d3dDepthStencilView_depth_tex.Get(), &depthStencilViewDesc, &m_d3dDepthStencilView_depth);
         AssertIfFailed(hr, "Failed to create DepthStencilView.", "m_d3dDepthStencilView_depth");
+    }
+
+    {
+        int threadGroupCountX = std::ceilf((float)width / (float)BLOCK_SIZE);
+        int threadGroupCountY = std::ceilf((float)height / (float)BLOCK_SIZE);
+        int threadGroupCountZ = 1;
+        int totalGroupCounts = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
+
+        // m_d3dFrustumBuffers
+        {
+            m_frustums.resize(totalGroupCounts);
+            m_opaqueLightIndexCounter.resize(totalGroupCounts);
+            m_opaqueLightIndexList.resize(totalGroupCounts);
+
+            // TODO: Resize the buffer instead of re-create it
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(struct Frustum), totalGroupCounts, NULL, m_d3dFrustumBuffers.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer", "Unable to create m_d3dFrustumBuffers");
+
+            // TODO: Resize the buffer instead of re-create it
+            hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dFrustumBuffers.Get(), m_d3dFrustumBuffers_UAV.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_d3dFrustumBuffersUAV");
+
+            hr = CreateStructuredBufferSRV(m_d3dDevice.Get(), m_d3dFrustumBuffers.Get(), m_d3dFrustumBuffers_SRV.GetAddressOf());
+            AssertIfFailed(hr, "Failed to create SRV", "Unable to create m_d3dFrustumBuffers_SRV");
+        }
+
+        // m_d3dOpaqueLightIndexCounterBuffers
+        {
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(int), totalGroupCounts, NULL, m_d3dOpaqueLightIndexCounterBuffers.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexCounterBuffers");
+
+            hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexCounterBuffers.Get(), m_d3dOpaqueLightIndexCounterBuffers_UAV.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_opaqueLightIndexCounterBuffersUAV");
+        }
+
+        // m_d3dOpaqueLightIndexListBuffers
+        {
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(int), totalGroupCounts, NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexListBuffers");
+
+            hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexListBuffers.Get(), m_d3dOpaqueLightIndexListBuffers_UAV.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_opaqueLightIndexListBuffersUAV");
+        }
+
+        // m_d3dOpaqueLightGrid
+        {
+            D3D11_TEXTURE2D_DESC textureDesc;
+            ZeroMemory(&textureDesc, sizeof(textureDesc));
+            textureDesc.Width = threadGroupCountX;
+            textureDesc.Height = threadGroupCountY;
+            textureDesc.MipLevels = 1;
+            textureDesc.ArraySize = 1;
+            textureDesc.Format = DXGI_FORMAT_R32G32_UINT; // uint2
+            textureDesc.SampleDesc.Count = 1;
+            textureDesc.Usage = D3D11_USAGE_DEFAULT;
+            textureDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+            textureDesc.CPUAccessFlags = 0;
+            textureDesc.MiscFlags = 0;
+            
+            hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dOpaqueLightGridBuffers);
+            AssertIfFailed(hr, "Failed to create texture", "m_d3dOpaqueLightGridBuffers");
+
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+
+            hr = m_d3dDevice->CreateUnorderedAccessView(m_d3dOpaqueLightGridBuffers.Get(), &uavDesc, m_d3dOpaqueLightGrid_UAV.GetAddressOf());
+            AssertIfFailed(hr, "Failed to create UAV", "m_d3dOpaqueLightGrid_UAV");
+        }
+
+        // Prepare frustum for forward plus
+        ComputeFrustum(width, height, BLOCK_SIZE);
     }
     
     return true;

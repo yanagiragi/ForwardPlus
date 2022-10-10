@@ -28,6 +28,7 @@ namespace Yr
     {
         Forward,
         Deferred,
+        ForwardPlus,
         LEN_RENDER_MODE
     };
 
@@ -124,6 +125,12 @@ namespace Yr
     struct Frustum
     {
         struct Plane plane[4];
+    };
+
+    struct uint2
+    {
+        unsigned int x;
+        unsigned int y;
     };
 
     #pragma endregion
