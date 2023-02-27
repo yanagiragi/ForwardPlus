@@ -254,6 +254,10 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dOpaqueLightGridBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightGrid_UAV;
 
+        std::vector <float> m_debugRWList;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dDebugRWListBuffers;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dDebugRWListBuffers_UAV;
+
         // Materials
         struct Material defaultMaterial;
 

@@ -192,6 +192,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
         m_d3dOpaqueLightIndexCounterBuffers_UAV.Get(),
         m_d3dOpaqueLightIndexListBuffers_UAV.Get(),
         m_d3dOpaqueLightGrid_UAV.Get(),
+        m_d3dDebugRWListBuffers_UAV.Get(),
     };
 
     // bind input
@@ -220,6 +221,19 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
     {
         {
             // copy result back to m_opaqueLightIndexCounter
+            auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dDebugRWListBuffers.Get());
+
+            D3D11_MAPPED_SUBRESOURCE MappedResource;
+            m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
+            std::copy_n((float*)MappedResource.pData, m_debugRWList.size(), m_debugRWList.data());
+
+            // Clean up
+            m_d3dDeviceContext->Unmap(tempBuffer, 0);
+            SafeRelease(tempBuffer);
+        }
+
+        {
+            // copy result back to m_opaqueLightIndexCounter
             auto tempBuffer = ReadBuffer(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dOpaqueLightIndexCounterBuffers.Get());
 
             D3D11_MAPPED_SUBRESOURCE MappedResource;
@@ -238,6 +252,17 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
             D3D11_MAPPED_SUBRESOURCE MappedResource;
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
             std::copy_n((int*)MappedResource.pData, m_opaqueLightIndexList.size(), m_opaqueLightIndexList.data());
+
+            int zeroCount = 0;
+            for (auto i : m_opaqueLightIndexList) {
+                if (i == 0) {
+                    zeroCount += 1;
+                }
+                else {
+                    std::cout << i << ",";
+                }
+            }
+            std::cout << "Zero Count = " << zeroCount << " / " << m_opaqueLightIndexList.size() << std::endl;
 
             // Clean up
             m_d3dDeviceContext->Unmap(tempBuffer, 0);

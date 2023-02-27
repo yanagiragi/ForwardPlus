@@ -1523,6 +1523,17 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             AssertIfFailed(hr, "Failed to create UAV", "m_d3dOpaqueLightGrid_UAV");
         }
 
+        // m_debugRWList
+        {
+            m_debugRWList.resize(totalGroupCounts);
+
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(float), totalGroupCounts, NULL, m_d3dDebugRWListBuffers.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer", "Unable to create m_d3dDebugRWListBuffers");
+
+            hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dDebugRWListBuffers.Get(), m_d3dDebugRWListBuffers_UAV.GetAddressOf());
+            AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_d3dDebugRWListBuffers_UAV");
+        }
+
         // Prepare frustum for forward plus
         ComputeFrustum(width, height, BLOCK_SIZE);
     }

@@ -46,6 +46,7 @@ StructuredBuffer<Frustum> in_Frustums : register( t1 );
 RWStructuredBuffer<uint> o_LightIndexCounter : register( u0 );
 RWStructuredBuffer<uint> o_LightIndexList : register( u1 );
 RWTexture2D<uint2> o_LightGrid : register( u2 );
+RWStructuredBuffer<float4> debugList : register( u3 );
 
 // RWStructuredBuffer<uint> t_LightIndexCounter : register( u2 );
 // RWStructuredBuffer<uint> t_LightIndexList : register( u4 );
