@@ -95,7 +95,7 @@ void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
     
     m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
-    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = Vector2(width, height);
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
 
     m_DispatchParamsConstantBuffer.numThreads[0] = width;
