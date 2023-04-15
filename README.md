@@ -1,6 +1,6 @@
 # ForwardPlus
 
-Learning and implement Forward+ using DX11
+Learning and implement Forward+ using DX11 (wip)
 
 ## Update note:
 
