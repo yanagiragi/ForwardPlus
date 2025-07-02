@@ -92,7 +92,7 @@ void main(ComputeShaderInput IN)
     }
 
     Frustum frustum;
-    frustum.planes[0] = ComputePlane(eyePos, viewSpace[0], viewSpace[2]); // left plane
+    frustum.planes[0] = ComputePlane(eyePos, viewSpace[2], viewSpace[0]); // left plane
     frustum.planes[1] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]); // right plane
     frustum.planes[2] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]); // top plane
     frustum.planes[3] = ComputePlane(eyePos, viewSpace[3], viewSpace[2]); // bottom plane
