@@ -309,7 +309,7 @@ namespace Yr
         float m_DeferredDepthPower = 500.0f;
         LightingSpace m_LightingSpace = LightingSpace::World;
         int m_LightCalculationCount = MAX_LIGHTS;
-        LightCalculationMode m_LightCalculationMode = LightCalculationMode::Single;
+        LightCalculationMode m_LightCalculationMode = LightCalculationMode::Loop;
 
         // Others
         Scene m_Scene;

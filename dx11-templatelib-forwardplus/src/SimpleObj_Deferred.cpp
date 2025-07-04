@@ -638,13 +638,13 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Single()
     m_d3dDeviceContext->CopyResource(backBuffer.Get(), m_d3dRenderTargetView_lightAccumulation_tex.Get());
     backBuffer.Reset();
 
-    // disable depth test and use additive blend
+    // disable depth test and use override blend in single light mode
     m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_DisableDepthTest.Get(), 1);
-    m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, 0xffffffff);
+    m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
 
-    for (int i = 0; i < m_LightCalculationCount; ++i)
+    for (int i = -1; i < MAX_LIGHTS; ++i)
     {
-        if (!m_Scene.Lights[i].Enabled)
+        if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
         {
             continue;
         }

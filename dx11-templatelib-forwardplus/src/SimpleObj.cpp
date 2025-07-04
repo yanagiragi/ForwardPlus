@@ -720,7 +720,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             m_DeferredDepthPower = scale;
         }
 
-        ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, 0.0f, MAX_LIGHTS);
+        ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
     }
     ImGui::PopID();
 

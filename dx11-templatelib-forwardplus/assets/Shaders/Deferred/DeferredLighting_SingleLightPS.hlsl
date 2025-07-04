@@ -87,6 +87,12 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 normalRaw = GBuffer_Normal.Sample(Sampler, uv);
     float3 normalWS = normalize(normalRaw.rgb * 2.0 - 1.0); // never normalize a vector4!
 
+    // Draw ambient if lightIndex = -1
+    if (lightIndex < 0)
+    {
+        return accumulated;
+    }
+
     LightingResult lit = { {0, 0, 0}, {0, 0, 0} };
     lit = ComputeLightingWS_Single(Lights[lightIndex], positionWS.xyz, normalWS, specularPower, EyePosition.xyz);
 

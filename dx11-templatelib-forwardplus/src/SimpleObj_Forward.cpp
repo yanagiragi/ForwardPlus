@@ -222,9 +222,9 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                     &offset                                 // pointer to offset values
                 );
 
-                for (int i = -1; i < m_LightCalculationCount; ++i)
+                for (int i = -1; i < MAX_LIGHTS; ++i)
                 {
-                    if (i > 0 && !m_Scene.Lights[i].Enabled)
+                    if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
                     {
                         continue;
                     }
@@ -299,9 +299,9 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
 
                 bool hasDrawAnyModel = false;
-                for (int i = -1; i < m_LightCalculationCount; ++i)
+                for (int i = -1; i < MAX_LIGHTS; ++i)
                 {
-                    if (i > 0 && !m_Scene.Lights[i].Enabled)
+                    if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
                     {
                         continue;
                     }
