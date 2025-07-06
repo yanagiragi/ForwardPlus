@@ -1017,26 +1017,28 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
 
     for (auto &light : m_Scene.Lights)
     {
-        auto PositionVS = Vector3(Vector4::Transform(light.PositionWS, viewMatrix));
-        light.PositionVS = Vector4(PositionVS.x, PositionVS.y, PositionVS.z, 1.0f);
+        auto PositionVS = Vector4::Transform(light.PositionWS, viewMatrix);
+        light.PositionVS = PositionVS; // Vector4(PositionVS.x, PositionVS.y, PositionVS.z, 1.0f);
         
-        auto directionVS = Vector3(Vector4::Transform(light.DirectionWS, viewMatrix));
-        directionVS.Normalize();
-        light.DirectionVS = Vector4(directionVS.x, directionVS.y, directionVS.z, 1.0f);
+        // set w = 0 since we does want to involve translation in view space conversion
+        auto DirectionWS = Vector4(light.DirectionWS.x, light.DirectionWS.y, light.DirectionWS.z, 0.0);
+        auto directionVS = Vector3(Vector4::Transform(DirectionWS, viewMatrix));
+        light.DirectionVS = Vector4(directionVS.x, directionVS.y, directionVS.z, 0.0f);
 
-        /*
-        if (light.LightType != (int)LightType::Directional) continue;
-        if (!light.Enabled) continue;
-        std::cout << "light.DirectionWS = ("
-            << light.DirectionWS.x << ", "
-            << light.DirectionWS.y << ", "
-            << light.DirectionWS.z << ");" << std::endl;
-        std::cout << "light.DirectionVS = ("
-            << light.DirectionVS.x << ", "
-            << light.DirectionVS.y << ", "
-            << light.DirectionVS.z << ");" << std::endl;
-        std::cout << std::endl;
-        */
+        // if (light.Enabled) 
+        // {
+        //     std::cout << "light.DirectionWS = ("
+        //         << light.DirectionWS.x << ", "
+        //         << light.DirectionWS.y << ", "
+        //         << light.DirectionWS.z << ", "
+        //         << light.DirectionWS.w << ");" << std::endl;
+        //     std::cout << "light.DirectionVS = ("
+        //         << light.DirectionVS.x << ", "
+        //         << light.DirectionVS.y << ", "
+        //         << light.DirectionVS.z << ");" << std::endl;
+        //     std::cout << std::endl;
+        // }
+        
     }
 }
 
