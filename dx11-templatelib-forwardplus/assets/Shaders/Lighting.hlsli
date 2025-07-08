@@ -54,7 +54,7 @@ LightingResult DoDirectionalLightWS(LightProperties light, float3 V, float3 N, f
 
 LightingResult DoDirectionalLightVS(LightProperties light, float3 V, float3 N, float specularPower)
 {
-    float3 L = normalize(light.DirectionVS.xyz); // buggy! Note: negative direction gets lit but still wrong
+    float3 L = normalize(light.DirectionVS.xyz);
     return _DoDirectionalLight(light, V, N, specularPower, L);
 }
 
@@ -116,9 +116,8 @@ LightingResult DoSpotLightVS(LightProperties light, float3 V, float3 P, float3 N
 
 LightingResult ComputeLightingVS(LightProperties Lights[MAX_LIGHTS], int lightCount, float3 positionVS, float3 normalVS, float specularPower)
 {
-    // view space calculation is still buggy!
-
-    float3 view = normalize(positionVS);
+    // we calculate view direction by cameraPos - positionVS, since cameraPos is (0, 0, 0) in view space, we can use -positionVS instead
+    float3 view = normalize(-positionVS);
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
@@ -154,9 +153,8 @@ LightingResult ComputeLightingVS(LightProperties Lights[MAX_LIGHTS], int lightCo
 
 LightingResult ComputeLightingVS_Single(LightProperties light, float3 positionVS, float3 normalVS, float specularPower)
 {
-    // view space calculation is still buggy!
-
-    float3 view = normalize(positionVS);
+    // we calculate view direction by cameraPos - positionVS, since cameraPos is (0, 0, 0) in view space, we can use -positionVS instead
+    float3 view = normalize(-positionVS);
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     

@@ -1023,6 +1023,7 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
         // set w = 0 since we does want to involve translation in view space conversion
         auto DirectionWS = Vector4(light.DirectionWS.x, light.DirectionWS.y, light.DirectionWS.z, 0.0);
         auto directionVS = Vector3(Vector4::Transform(DirectionWS, viewMatrix));
+        directionVS.Normalize();
         light.DirectionVS = Vector4(directionVS.x, directionVS.y, directionVS.z, 0.0f);
 
         // if (light.Enabled) 
