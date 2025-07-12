@@ -1470,6 +1470,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             m_frustums.resize(totalGroupCounts);
             m_opaqueLightIndexCounter.resize(totalGroupCounts);
             m_opaqueLightIndexList.resize(totalGroupCounts);
+            m_d3dOpaqueLightGrid.resize(totalGroupCounts);
 
             // TODO: Resize the buffer instead of re-create it
             hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(struct Frustum), totalGroupCounts, NULL, m_d3dFrustumBuffers.GetAddressOf());
@@ -1485,7 +1486,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightIndexCounterBuffers
         {
-            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(int), totalGroupCounts, NULL, m_d3dOpaqueLightIndexCounterBuffers.GetAddressOf());
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint), totalGroupCounts, NULL, m_d3dOpaqueLightIndexCounterBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexCounterBuffers");
 
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexCounterBuffers.Get(), m_d3dOpaqueLightIndexCounterBuffers_UAV.GetAddressOf());
@@ -1494,7 +1495,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightIndexListBuffers
         {
-            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(int), totalGroupCounts, NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint), totalGroupCounts, NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexListBuffers");
 
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexListBuffers.Get(), m_d3dOpaqueLightIndexListBuffers_UAV.GetAddressOf());
@@ -1556,12 +1557,12 @@ HRESULT SimpleObj::CreateConstantBuffer(int elementSize, ID3D11Buffer** outBuffe
     return m_d3dDevice->CreateBuffer(&frameConstantBufferDesc, nullptr, outBuffer);
 }
 
-ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* device, ID3D11DeviceContext* deviceContext, ID3D11Buffer* targetBuffer)
+ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* device, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer)
 {
     ID3D11Buffer* cpuReadBuffer = nullptr;
 
     D3D11_BUFFER_DESC desc = {};
-    targetBuffer->GetDesc(&desc);
+    pBuffer->GetDesc(&desc);
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     desc.Usage = D3D11_USAGE_STAGING;
     desc.BindFlags = 0;
@@ -1571,9 +1572,29 @@ ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* device, ID3D11DeviceContext* d
     AssertIfFailed(hr, "Read Buffer", "Unable to create cpuReadBuffer");
 
     // Copy data to CPU-read buffer
-    deviceContext->CopyResource(cpuReadBuffer, targetBuffer);
+    pd3dImmediateContext->CopyResource(cpuReadBuffer, pBuffer);
 
     return cpuReadBuffer;
+}
+
+ID3D11Texture2D* SimpleObj::ReadTexture2D(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Texture2D* pBuffer)
+{
+    ID3D11Texture2D* cpuReadTexture2D = nullptr;
+
+    D3D11_TEXTURE2D_DESC desc = {};
+    pBuffer->GetDesc(&desc);
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+
+    HRESULT hr = pDevice->CreateTexture2D(&desc, nullptr, &cpuReadTexture2D);
+    AssertIfFailed(hr, "Read Buffer", "Unable to create cpuReadTexture2D");
+
+    pd3dImmediateContext->CopyResource(cpuReadTexture2D, pBuffer);
+
+    return cpuReadTexture2D;
 }
 
 HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut)

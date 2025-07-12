@@ -63,6 +63,25 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
     {
         // Draw Regular Entities
         {
+            // Setup the vertex shader stage
+            m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
+            m_d3dDeviceContext->VSSetShader(
+                m_d3dRegularVertexShader.Get(),         // pointer to vertex shader
+                nullptr,                                // pointer to an array of class-instance interfaces, NULL means shader does not use any interface
+                0                                       // number of class-instance interfaces of previous param
+            );
+
+            ID3D11Buffer* vertexShaderConstantBuffers[] =
+            {
+                m_d3dConstantBuffers[CB_Frame].Get(),
+                m_d3dConstantBuffers[CB_Object].Get()
+            };
+            m_d3dDeviceContext->VSSetConstantBuffers(
+                0,                                      // start slot
+                _countof(vertexShaderConstantBuffers),  // number of buffers
+                vertexShaderConstantBuffers             // array of constant buffers
+            );
+
             // Setup the pixel stage stage
             m_d3dDeviceContext->PSSetShader(m_d3dForward_LoopLight_PixelShader.Get(), nullptr, 0);
             ID3D11Buffer* pixelShaderConstantBuffers[] =

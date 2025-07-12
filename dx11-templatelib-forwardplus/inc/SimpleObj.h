@@ -94,13 +94,15 @@ namespace Yr
 
         void ComputeFrustum(int width, int height, int blockSize);
         void RenderScene_FowardPlus_CullLightPass(int width, int height, int blockSize);
-
+        void RenderScene_FowardPlus_DepthPrePass();
 
         bool ResizeSwapChain(int width, int height);
 
         HRESULT CreateConstantBuffer(int elementSize, ID3D11Buffer** outBuffer);
 
-        ID3D11Buffer* SimpleObj::ReadBuffer(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer);
+        ID3D11Buffer* ReadBuffer(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Buffer* pBuffer);
+        ID3D11Texture2D* ReadTexture2D(ID3D11Device* pDevice, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Texture2D* pBuffer);
+
         HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
 
         HRESULT CreateStructuredBufferSRV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
@@ -243,14 +245,15 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dFrustumBuffers_UAV;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dFrustumBuffers_SRV;
 
-        std::vector<int> m_opaqueLightIndexCounter;
+        std::vector<uint> m_opaqueLightIndexCounter;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexCounterBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexCounterBuffers_UAV;
 
-        std::vector<int> m_opaqueLightIndexList;
+        std::vector<uint> m_opaqueLightIndexList;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexListBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexListBuffers_UAV;
 
+        std::vector<uint2> m_d3dOpaqueLightGrid;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dOpaqueLightGridBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightGrid_UAV;
 

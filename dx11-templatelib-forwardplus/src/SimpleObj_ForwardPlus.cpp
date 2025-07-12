@@ -66,7 +66,7 @@ HRESULT SimpleObj::CreateStructuredBufferUAV(ID3D11Device* pDevice, ID3D11Buffer
     return pDevice->CreateUnorderedAccessView(pBuffer, &desc, ppUAVOut);
 };
 
-HRESULT SimpleObj::CreateStructuredBuffer (ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut)
+HRESULT SimpleObj::CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut)
 {
     *ppBufOut = nullptr;
 
@@ -165,7 +165,130 @@ void SimpleObj::RenderScene_FowardPlus(RenderEventArgs& e)
     m_DispatchParamsConstantBuffer.numThreadGroups[2] = threadGroupCountZ;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
 
+    RenderScene_FowardPlus_DepthPrePass();
+
+    // for debug depth-prepass
+    // m_DeferredDebugMode = Deferred_DebugMode::Depth;
+    // RenderScene_Deferred_DebugPass();
+
     RenderScene_FowardPlus_CullLightPass(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+}
+
+void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
+{
+    AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
+    AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
+
+    // Setup the input assembler stage
+    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Setup the pixel stage stage
+    m_d3dDeviceContext->PSSetShader(nullptr, nullptr, 0);
+    m_d3dDeviceContext->PSSetConstantBuffers(0, 0, nullptr);
+    m_d3dDeviceContext->PSSetSamplers(0, 0, nullptr);
+    m_d3dDeviceContext->PSSetShaderResources(0, 0, nullptr);
+
+    // Setup the output merger 
+    m_d3dDeviceContext->OMSetRenderTargets(0, nullptr, m_d3dDepthStencilView_depth.Get());
+    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+
+    // set blend state to no blend
+    m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
+
+    // Draw Regular Entities
+    {
+        // Setup the vertex shader stage
+        m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
+        m_d3dDeviceContext->VSSetShader(m_d3dRegularVertexShader.Get(), nullptr, 0);
+        ID3D11Buffer* vertexShaderConstantBuffers[] =
+        {
+            m_d3dConstantBuffers[CB_Frame].Get(),
+            m_d3dConstantBuffers[CB_Object].Get()
+        };
+        m_d3dDeviceContext->VSSetConstantBuffers(
+            0,                                      // start slot
+            _countof(vertexShaderConstantBuffers),  // number of buffers
+            vertexShaderConstantBuffers             // array of constant buffers
+        );
+
+        UINT vertexStride = sizeof(VertexData);
+        UINT offset = 0;
+        for (auto entity : m_Scene.Entities)
+        {
+            if (entity->Instanced)
+                continue;
+
+            // Setup Object CB
+            m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
+            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
+            m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
+            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+
+            auto vertexBuffer = entity->Model->VertexBuffer();
+            m_d3dDeviceContext->IASetVertexBuffers(
+                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+                1,                                      // number of vertex buffers in the array
+                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &vertexStride,                          // pointer to stride values
+                &offset                                 // pointer to offset values
+            );
+
+            Draw(
+                entity->Model->VertexCount(),
+                0
+            );
+        }
+    }
+
+    // Draw Instanced Entities
+    {
+        m_d3dDeviceContext->IASetInputLayout(m_d3dInstancedInputLayout.Get());
+        m_d3dDeviceContext->VSSetShader(m_d3dInstancedVertexShader.Get(), nullptr, 0);
+        
+        ID3D11Buffer* vertexShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Frame].Get() };
+        m_d3dDeviceContext->VSSetConstantBuffers(
+            0,                                      // start slot
+            _countof(vertexShaderConstantBuffers),  // number of buffers
+            vertexShaderConstantBuffers             // array of constant buffers
+        );
+
+        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
+        const UINT offset[2] = { 0, 0 };
+        std::vector<InstancedObjectConstantBuffer> instanceData;
+        for (auto const& pair : m_Scene.InstancedEntity)
+        {
+            auto key = pair.first;
+            auto verticesCount = Model::GetVertexCount(key);
+            auto size = pair.second.size();
+
+            instanceData.clear();
+            for (auto const& instancedEntity : pair.second)
+            {
+                instanceData.push_back({
+                    instancedEntity->WorldMatrix,
+                    instancedEntity->InverseTransposeWorldMatrix,
+                    instancedEntity->InverseTransposeWorldViewMatrix,
+                    instancedEntity->Material
+                    });
+            }
+
+            m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
+
+            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
+            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
+
+            DrawInstanced(
+                verticesCount,
+                size,
+                0,
+                0
+            );
+        }
+    }
+
+    m_d3dDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+    m_d3dDeviceContext->OMSetDepthStencilState(nullptr, 0);
 }
 
 void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ)
@@ -251,7 +374,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
 
             D3D11_MAPPED_SUBRESOURCE MappedResource;
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
-            std::copy_n((int*)MappedResource.pData, m_opaqueLightIndexList.size(), m_opaqueLightIndexList.data());
+            std::copy_n((uint*)MappedResource.pData, m_opaqueLightIndexList.size(), m_opaqueLightIndexList.data());
 
             int zeroCount = 0;
             for (auto i : m_opaqueLightIndexList) {
@@ -263,6 +386,29 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
                 }
             }
             std::cout << "Zero Count = " << zeroCount << " / " << m_opaqueLightIndexList.size() << std::endl;
+
+            // Clean up
+            m_d3dDeviceContext->Unmap(tempBuffer, 0);
+            SafeRelease(tempBuffer);
+        }
+
+        {
+            // copy result back to m_d3dOpaqueLightGrid
+            auto tempBuffer = ReadTexture2D(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dOpaqueLightGridBuffers.Get());
+
+            D3D11_MAPPED_SUBRESOURCE MappedResource;
+            m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
+            std::copy_n((uint2*)MappedResource.pData, m_d3dOpaqueLightGrid.size(), m_d3dOpaqueLightGrid.data());
+
+            for (int i = 0; i < threadGroupCountX; ++i)
+            {
+                for (int j = 0; j < threadGroupCountY; ++j)
+                {
+                    std::cout << m_d3dOpaqueLightGrid[i * threadGroupCountY + j].y << ",";
+                }
+
+                std::cout << std::endl;
+            }
 
             // Clean up
             m_d3dDeviceContext->Unmap(tempBuffer, 0);
