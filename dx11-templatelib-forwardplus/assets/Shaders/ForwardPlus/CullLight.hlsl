@@ -84,12 +84,9 @@ bool SphereInsideFrustum( Sphere sphere, Frustum frustum, float zNear, float zFa
 {
     bool result = true;
  
-    // TODO: check z axis should be reversed?
-    // if ( (sphere.c.z - sphere.r) > zFar || (sphere.c.z + sphere.r) < zNear )
-
     // First check depth, note the sphere is in view space
     // Also, the view vector points in the -Z axis so the far depth value will be approaching -infinity.
-    if ( (sphere.c.z - sphere.r) > zNear || (sphere.c.z + sphere.r) < zFar )
+    if ( sphere.c.z - sphere.r > zNear || sphere.c.z + sphere.r < zFar )
     {
         result = false;
     }
@@ -181,6 +178,18 @@ float4 ClipToView( float4 clip )
     return view;
 }
 
+// Convert screen space coordinates to view space.
+float4 ScreenToView( float4 screen )
+{
+    // Convert to normalized texture coordinates
+    float2 texCoord = screen.xy / ScreenDimensions;
+
+    // Convert to clip space
+    float4 clip = float4( float2( texCoord.x, 1.0f - texCoord.y ) * 2.0f - 1.0f, screen.z, screen.w );
+
+    return ClipToView( clip );
+}
+
 float GetRadius(LightProperties light)
 {
     float lightMax = max(max(light.Color.x, light.Color.y), light.Color.z) * light.Strength;
@@ -238,10 +247,10 @@ void main(ComputeShaderInput IN)
     float fMaxDepth = asfloat( uMaxDepth );
  
     // Convert depth values to view space.
-    float minDepthVS = ClipToView( float4( 0, 0, fMinDepth, 1 ) ).z; // for opaque geometry
-    float maxDepthVS = ClipToView( float4( 0, 0, fMaxDepth, 1 ) ).z;
+    float minDepthVS = ScreenToView( float4( 0, 0, fMinDepth, 1 ) ).z; // for opaque geometry
+    float maxDepthVS = ScreenToView( float4( 0, 0, fMaxDepth, 1 ) ).z;
     
-    float nearClipVS = ClipToView( float4( 0, 0, 0, 1 ) ).z; // for transparent geometry
+    float nearClipVS = ScreenToView( float4( 0, 0, 0, 1 ) ).z; // for transparent geometry
  
     // Clipping plane for minimum depth value 
     // (used for testing lights within the bounds of opaque geometry).
