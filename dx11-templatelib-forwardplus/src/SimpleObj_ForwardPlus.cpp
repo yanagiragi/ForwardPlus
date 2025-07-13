@@ -167,9 +167,20 @@ void SimpleObj::RenderScene_FowardPlus(RenderEventArgs& e)
 
     RenderScene_FowardPlus_DepthPrePass();
 
-    // for debug depth-prepass
-    // m_DeferredDebugMode = Deferred_DebugMode::Depth;
-    // RenderScene_Deferred_DebugPass();
+    // // for debug depth-prepass
+    if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth)
+    {
+        if (m_DeferredDebugMode != Deferred_DebugMode::Depth) 
+        {
+            m_DeferredDebugMode = Deferred_DebugMode::Depth;
+            m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
+            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
+        }
+        
+        RenderScene_Deferred_DebugPass();
+
+        return;
+    }    
 
     RenderScene_FowardPlus_CullLightPass(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 }
@@ -194,6 +205,9 @@ void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
 
     // set blend state to no blend
     m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
+
+    // Clear depth first
+    m_d3dDeviceContext->ClearDepthStencilView(m_d3dDepthStencilView_depth.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     // Draw Regular Entities
     {
@@ -341,6 +355,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
     m_d3dDeviceContext->CSSetShaderResources(0, _countof(nullSRVs), nullSRVs);
 
 #ifdef _DEBUG
+    if (m_ForwardPlusPrintDebugInfo) 
     {
         {
             // copy result back to m_opaqueLightIndexCounter
@@ -400,16 +415,16 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
             std::copy_n((uint2*)MappedResource.pData, m_d3dOpaqueLightGrid.size(), m_d3dOpaqueLightGrid.data());
 
-            for (int i = 0; i < threadGroupCountX; ++i)
+            for (int j = 0; j < threadGroupCountY; ++j)
             {
-                for (int j = 0; j < threadGroupCountY; ++j)
+                for (int i = 0; i < threadGroupCountX; ++i)
                 {
                     std::cout << m_d3dOpaqueLightGrid[i * threadGroupCountY + j].y << ",";
                 }
-
+            
                 std::cout << std::endl;
             }
-
+            
             // Clean up
             m_d3dDeviceContext->Unmap(tempBuffer, 0);
             SafeRelease(tempBuffer);

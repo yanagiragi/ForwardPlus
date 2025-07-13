@@ -44,6 +44,14 @@ namespace Yr
         LEN_DEFERRED_DEBUGMODE
     };
 
+    enum class ForwardPlus_DebugMode
+    {
+        None,
+        Depth,
+        LightMap,
+        LEN_DEFERRED_DEBUGMODE
+    };
+
     enum class LightingSpace
     {
         World,

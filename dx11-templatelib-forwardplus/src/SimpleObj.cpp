@@ -689,9 +689,22 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             }
         }
 
-        int debugMode = (int)m_DeferredDebugMode;
-        if (m_RenderMode == RenderMode::Deferred)
+        if (m_RenderMode == RenderMode::ForwardPlus)
         {
+            int debugMode = (int)m_ForwardPlusDebugMode;
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\00Depth\0Lightmap\0"))
+            {
+                m_ForwardPlusDebugMode = (ForwardPlus_DebugMode)debugMode;
+            }
+
+            bool printDebugInfo = m_ForwardPlusPrintDebugInfo;
+            ImGui::Checkbox("PrintDebugInfo", &printDebugInfo);
+            m_ForwardPlusPrintDebugInfo = printDebugInfo;
+        }
+
+        else if (m_RenderMode == RenderMode::Deferred)
+        {
+            int debugMode = (int)m_DeferredDebugMode;
             if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0"))
             {
                 m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
@@ -1439,6 +1452,9 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
         textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
         
         shaderResourceViewDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+        shaderResourceViewDesc.Texture2D.MipLevels = 1;
         
         D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
         ZeroMemory(&depthStencilViewDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
