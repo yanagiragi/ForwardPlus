@@ -95,6 +95,7 @@ namespace Yr
         void ComputeFrustum(int width, int height, int blockSize);
         void RenderScene_FowardPlus_CullLightPass(int width, int height, int blockSize);
         void RenderScene_FowardPlus_DepthPrePass();
+        void RenderScene_Deferred_DebugLightMapPass();
 
         bool ResizeSwapChain(int width, int height);
 
@@ -185,6 +186,9 @@ namespace Yr
         __int64 m_d3dFowrardPlus_CullLightShaderSize = 0;
         Microsoft::WRL::ComPtr<ID3D11ComputeShader> m_d3dFowrardPlus_CullLightShader = nullptr;
 
+        __int64 m_d3dFowrardPlus_DebugLightMap_PixelShaderSize = 0;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dFowrardPlus_DebugLightMap_PixelShader = nullptr;
+
         // Primitive Batch
         std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
         std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -255,6 +259,7 @@ namespace Yr
 
         std::vector<uint2> m_d3dOpaqueLightGrid;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dOpaqueLightGridBuffers;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dOpaqueLightGridBuffers_SRV;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightGrid_UAV;
 
         std::vector <float> m_debugRWList;

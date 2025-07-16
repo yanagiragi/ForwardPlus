@@ -97,7 +97,7 @@ namespace Yr
         Matrix InverseView;
         Matrix InverseProjection;
         Vector2 ScreenDimensions;
-        float padding[2];
+        Vector2 ThreadGroups;
     };
 
     struct DebugProperties

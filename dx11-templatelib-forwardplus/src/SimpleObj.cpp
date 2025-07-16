@@ -424,6 +424,20 @@ void SimpleObj::LoadShaderResources()
             m_d3dFowrardPlus_CullLightShaderSize = size;
         }
     }
+
+    // Forward plus debug light map shader
+    {
+        // Load and compile the pixel shader
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/ForwardPlus/DebugLightmapPS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dFowrardPlus_DebugLightMap_PixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dFowrardPlus_DebugLightMap_PixelShader);
+            m_d3dFowrardPlus_DebugLightMap_PixelShaderSize = size;
+        }
+    }
 }
 
 /// <summary>
@@ -1113,6 +1127,11 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
     m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+
+    int threadGroupCountX = std::ceilf((float)m_ScreenDimensions.x / (float)BLOCK_SIZE);
+    int threadGroupCountY = std::ceilf((float)m_ScreenDimensions.y / (float)BLOCK_SIZE);
+    m_ScreenToViewParamsConstantBuffer.ThreadGroups = Vector2(threadGroupCountX, threadGroupCountY);
+
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
 
     // Set device context global settings
@@ -1535,6 +1554,18 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             
             hr = m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, &m_d3dOpaqueLightGridBuffers);
             AssertIfFailed(hr, "Failed to create texture", "m_d3dOpaqueLightGridBuffers");
+
+            shaderResourceViewDesc.Format = DXGI_FORMAT_R32G32_UINT;
+            shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+            shaderResourceViewDesc.Texture2D.MipLevels = 1;
+
+            hr = m_d3dDevice->CreateShaderResourceView(
+                m_d3dOpaqueLightGridBuffers.Get(),
+                &shaderResourceViewDesc,
+                &m_d3dOpaqueLightGridBuffers_SRV
+            );
+            AssertIfFailed(hr, "Failed to create light grid SRV", "m_d3dOpaqueLightGridBuffers_SRV");
 
             D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
