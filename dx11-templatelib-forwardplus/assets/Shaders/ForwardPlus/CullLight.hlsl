@@ -36,6 +36,14 @@ cbuffer LightProperties : register(b2)
     struct LightProperties Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:  
 
+cbuffer DebugProperties : register(b3)
+{
+    int DebugMode;                 // 4 bytes
+    float DepthPower;         // 4 bytes
+    float padding[2];         // 8 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
 // The depth from the screen space texture.
 Texture2D DepthTextureVS : register( t0 );
 
@@ -326,7 +334,18 @@ void main(ComputeShaderInput IN)
         // Update light grid for opaque geometry.
         InterlockedAdd( o_LightIndexCounter[0], o_LightCount, o_LightIndexStartOffset );
         o_LightGrid[IN.groupID.xy] = uint2( o_LightIndexStartOffset, o_LightCount );
- 
+
+        if (DebugMode == FP_DEBUG_MODE_UV)
+        {
+            o_LightGrid[IN.groupID.xy] = uint2( IN.groupID.x, IN.groupID.y );
+        }
+
+        else if (DebugMode == FP_DEBUG_MODE_DEPTH)
+        {
+            fDepth = pow(fDepth, DepthPower);
+            o_LightGrid[IN.groupID.xy] = uint2(fDepth * DepthPower, fDepth * DepthPower); // scale to integer range
+        }
+        
         // Update light grid for transparent geometry.
         // InterlockedAdd( t_LightIndexCounter[0], t_LightCount, t_LightIndexStartOffset );
         // t_LightGrid[IN.groupID.xy] = uint2( t_LightIndexStartOffset, t_LightCount );

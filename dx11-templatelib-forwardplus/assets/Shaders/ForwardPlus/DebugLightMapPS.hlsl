@@ -8,6 +8,14 @@ cbuffer ScreenToViewParams : register(b0)
     float2 ThreadGroups;
 }
 
+cbuffer DebugProperties : register(b1)
+{
+    int DebugMode;                 // 4 bytes
+    float DepthPower;         // 4 bytes
+    float padding[2];         // 8 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
 Texture2D<uint2> Lightmap : register(t0);
 
 sampler Sampler : register(s0);
@@ -21,12 +29,23 @@ struct PixelShaderInput
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float4 color;
-
     uint2 texValue = Lightmap.Load(int3(IN.uv * ThreadGroups, 0));
-    float lightCount = texValue.y / ThreadGroups.y;
 
-    // float lightCount = texValue.y / MAX_LIGHTS;
-    color = float4(texValue.x / ThreadGroups.x, lightCount, 0, 1);
+    if (DebugMode == FP_DEBUG_MODE_UV)
+    {
+        color = float4(texValue.x / ThreadGroups.x, texValue.y / ThreadGroups.y, 0, 1);
+    }
+
+    else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)
+    {
+        float lightCount = texValue.y / MAX_LIGHTS;
+        color = float4(lightCount, lightCount, 0, 1);
+    }
+
+    else if (DebugMode == FP_DEBUG_MODE_DEPTH)
+    {
+        color = float4(texValue.yyy / DepthPower, 1);
+    }
 
     return color;
 }

@@ -167,23 +167,18 @@ void SimpleObj::RenderScene_FowardPlus(RenderEventArgs& e)
 
     RenderScene_FowardPlus_DepthPrePass();
 
-    if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth)
+    if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::DepthTex)
     {
-        if (m_DeferredDebugMode != Deferred_DebugMode::Depth) 
-        {
-            m_DeferredDebugMode = Deferred_DebugMode::Depth;
-            m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
-        }
+        m_DebugPropertiesConstantBuffer.DebugMode = (int)Deferred_DebugMode::Depth;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
         
         RenderScene_Deferred_DebugPass();
-
         return;
     }
     
     RenderScene_FowardPlus_CullLightPass(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 
-    if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::LightMap)
+    if (m_ForwardPlusDebugMode != ForwardPlus_DebugMode::None)
     {
         RenderScene_Deferred_DebugLightMapPass();
 
@@ -336,10 +331,14 @@ void SimpleObj::RenderScene_Deferred_DebugLightMapPass()
     m_d3dDeviceContext->PSSetShader(m_d3dFowrardPlus_DebugLightMap_PixelShader.Get(), nullptr, 0);
 
     // Setup pixel shader cb
+    ID3D11Buffer* pixelShaderConstantBuffers[] = {
+        m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 
+        m_d3dConstantBuffers[CB_Debug].Get(),
+    };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,
-        1,
-        m_d3dConstantBuffers[CB_ScreenToViewParams].GetAddressOf()
+        _countof(pixelShaderConstantBuffers),
+        pixelShaderConstantBuffers
     );
 
     // Setup the input assembler stage
@@ -382,6 +381,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
         m_d3dConstantBuffers[CB_DispatchParams].Get(),
         m_d3dConstantBuffers[CB_ScreenToViewParams].Get(),
         m_d3dConstantBuffers[CB_Light].Get(),
+        m_d3dConstantBuffers[CB_Debug].Get(),
     };
 
     ComPtr<ID3D11ShaderResourceView> textures[] =

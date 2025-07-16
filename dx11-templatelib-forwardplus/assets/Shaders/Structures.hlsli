@@ -53,3 +53,9 @@ struct LightingResult
     float3 Diffuse;
     float3 Specular;
 };
+
+#define FP_DEBUG_MODE_NONE 0
+#define FP_DEBUG_MODE_UV 1
+#define FP_DEBUG_MODE_DEPTH_TEX 2
+#define FP_DEBUG_MODE_DEPTH 3
+#define FP_DEBUG_MODE_LIGHT_MAP 4

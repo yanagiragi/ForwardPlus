@@ -47,6 +47,8 @@ namespace Yr
     enum class ForwardPlus_DebugMode
     {
         None,
+        UV,
+        DepthTex,
         Depth,
         LightMap,
         LEN_DEFERRED_DEBUGMODE
@@ -102,8 +104,8 @@ namespace Yr
 
     struct DebugProperties
     {
-        int DeferredDebugMode = 0;
-        float DeferredDepthPower = 0;
+        int DebugMode = 0;
+        float DepthPower = 0;
         float padding[2];
     };
 

@@ -316,6 +316,7 @@ namespace Yr
         Deferred_DebugMode m_DeferredDebugMode = Deferred_DebugMode::None;
         ForwardPlus_DebugMode m_ForwardPlusDebugMode = ForwardPlus_DebugMode::None;
         bool m_ForwardPlusPrintDebugInfo = false;
+        float m_ForwardPlusDepthPower = 500.0f;
         float m_DeferredDepthPower = 500.0f;
         LightingSpace m_LightingSpace = LightingSpace::World;
         int m_LightCalculationCount = MAX_LIGHTS;

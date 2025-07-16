@@ -706,9 +706,16 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         if (m_RenderMode == RenderMode::ForwardPlus)
         {
             int debugMode = (int)m_ForwardPlusDebugMode;
-            if (ImGui::Combo("Debug Mode", &debugMode, "None\00Depth\0Lightmap\0"))
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\0UV\0DepthTex\0Depth\00Lightmap\0"))
             {
                 m_ForwardPlusDebugMode = (ForwardPlus_DebugMode)debugMode;
+            }
+
+            if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth)
+            {
+                float scale = m_ForwardPlusDepthPower;
+                ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_ForwardPlusDepthPower = scale;
             }
 
             bool printDebugInfo = m_ForwardPlusPrintDebugInfo;
@@ -729,6 +736,13 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             {
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
+
+            if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
+            {
+                float scale = m_DeferredDepthPower;
+                ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_DeferredDepthPower = scale;
+            }
         }
         
         else if (m_RenderMode == RenderMode::Forward)
@@ -738,13 +752,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             {
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
-        }
-
-        if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
-        {
-            float scale = m_DeferredDepthPower;
-            ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
-            m_DeferredDepthPower = scale;
         }
 
         ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
@@ -1113,8 +1120,12 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Light].Get(), 0, nullptr, &m_LightPropertiesConstantBuffer, 0, 0);
 
     // update Debug CB
-    m_DebugPropertiesConstantBuffer.DeferredDebugMode = (int)m_DeferredDebugMode;
-    m_DebugPropertiesConstantBuffer.DeferredDepthPower = m_DeferredDepthPower;
+    m_DebugPropertiesConstantBuffer.DebugMode = m_RenderMode == RenderMode::ForwardPlus
+        ? (int)m_ForwardPlusDebugMode 
+        : (int)m_DeferredDebugMode;
+    m_DebugPropertiesConstantBuffer.DepthPower = m_RenderMode == RenderMode::ForwardPlus
+        ? m_ForwardPlusDepthPower 
+        : m_DeferredDepthPower;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Debug].Get(), 0, nullptr, &m_DebugPropertiesConstantBuffer, 0, 0);
 
     // update LightCalculationOptions CB
