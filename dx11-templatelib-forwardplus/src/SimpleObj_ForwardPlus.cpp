@@ -137,6 +137,18 @@ void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
         m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
         std::copy_n((struct Frustum*)MappedResource.pData, m_frustums.size(), m_frustums.data());
 
+        int zeroCount = 0;
+        for (auto& frustum : m_frustums) {
+            for (int i = 0; i < 4; ++i)
+            {
+                if (frustum.plane[i].d < 0.00001) {
+                    zeroCount += 1;
+                }
+            }
+        }
+        std::cout << "Zero Count = " << zeroCount << " / " << m_frustums.size() * 4.0 << std::endl;
+
+
         // Clean up
         m_d3dDeviceContext->Unmap(tempBuffer, 0);
         SafeRelease(tempBuffer);

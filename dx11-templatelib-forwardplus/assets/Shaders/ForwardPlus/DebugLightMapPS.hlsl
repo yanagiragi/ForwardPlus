@@ -38,8 +38,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)
     {
-        float lightCount = texValue.y / MAX_LIGHTS;
-        color = float4(lightCount, lightCount, 0, 1);
+        float lightCount = texValue.y / (float)MAX_LIGHTS;
+        color = float4(lightCount, lightCount, lightCount, 1);
     }
 
     else if (DebugMode == FP_DEBUG_MODE_DEPTH)

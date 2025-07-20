@@ -1,7 +1,5 @@
 #include "Common.hlsli"
 
-#define BLOCK_SIZE 16
-
 //  =========================
 //      Constant Buffers
 //  =========================
@@ -27,40 +25,6 @@ cbuffer ScreenToViewParams : register(b1)
 }
 
 //  =========================
-//        Functions
-//  =========================
-
-// Convert clip space coordinates to view space
-float4 ClipToView( float4 clip )
-{
-    float4 view = mul( InverseProjection, clip );
-    view = view / view.w; 
-    return view;
-}
-
-// Convert screen space coordinates to view space.
-float4 ScreenToView( float4 screen )
-{
-    float2 texCoord = screen.xy / ScreenDimensions;
-    float4 clip = float4( float2( texCoord.x, 1.0f - texCoord.y ) * 2.0f - 1.0f, screen.z, screen.w); 
-    return ClipToView( clip );
-}
-
-// right-handed (counter-clockwise winding order), so the normal points to inside of the frustum
-Plane ComputePlane(float3 p0, float3 p1, float3 p2)
-{
-    Plane plane;
-
-    float3 v1 = p1 - p0;
-    float3 v2 = p2 - p0;
-
-    plane.N = normalize(cross(v1, v2));
-    plane.d = dot(plane.N, p0);
-
-    return plane;
-}
-
-//  =========================
 //      Main Functions
 //  =========================
 
@@ -80,16 +44,15 @@ void main(ComputeShaderInput IN)
     const float3 eyePos = float3(0, 0, 0);
 
     float4 screenSpace[4];
-    int z = 1; // z = 1 for left-hand coodinate system
-    screenSpace[0] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y    ) * BLOCK_SIZE, z, 1.0f); // top-left point
-    screenSpace[1] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y    ) * BLOCK_SIZE, z, 1.0f); // top-right point
-    screenSpace[2] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y + 1) * BLOCK_SIZE, z, 1.0f); // bottom-left point
-    screenSpace[3] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * BLOCK_SIZE, z, 1.0f); // bottom-right point
+    screenSpace[0] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y    ) * BLOCK_SIZE, -1.0, 1.0f); // top-left point
+    screenSpace[1] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y    ) * BLOCK_SIZE, -1.0, 1.0f); // top-right point
+    screenSpace[2] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y + 1) * BLOCK_SIZE, -1.0, 1.0f); // bottom-left point
+    screenSpace[3] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * BLOCK_SIZE, -1.0, 1.0f); // bottom-right point
 
     float3 viewSpace[4];
     for(int i = 0; i < 4; ++i)
     {
-        viewSpace[i] = ScreenToView(screenSpace[i]).xyz;
+        viewSpace[i] = ScreenToView(screenSpace[i], InverseProjection, ScreenDimensions).xyz;
     }
 
     Frustum frustum;
