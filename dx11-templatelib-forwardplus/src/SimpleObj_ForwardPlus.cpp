@@ -358,22 +358,9 @@ void SimpleObj::RenderScene_Deferred_DebugLightMapPass()
     m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     // setup textures
-    ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
-    m_d3dDeviceContext->PSSetSamplers(
-        0,                                      // start slot
-        1,                                      // number of sampler states
-        samplerStates->GetAddressOf()           // array of sampler states
-    );
-
-    ComPtr<ID3D11ShaderResourceView> textures[] =
-    {
-        m_d3dOpaqueLightGridBuffers_SRV
-    };
-    m_d3dDeviceContext->PSSetShaderResources(
-        0,                                      // start slot
-        _countof(textures),                     // number of resources
-        textures->GetAddressOf()                // array of resources
-    );
+    m_d3dDeviceContext->PSSetSamplers(0, 0, nullptr);
+    ComPtr<ID3D11ShaderResourceView> textures[] = { m_d3dOpaqueLightGridBuffers_SRV };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(textures), textures->GetAddressOf());
 
     Draw(4, 0);
 

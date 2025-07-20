@@ -304,8 +304,7 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         // Setup CB, leave InverseTransposeWorldMatrix, InverseTransposeWorldViewMatrix non - updated
-        auto radius = Light::GetRadius(light);
-        auto model = Matrix::CreateScale(radius) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
+        auto model = Matrix::CreateScale(light->Range) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
         auto WorldViewProjectionMatrix = model * viewProjectionMatrix;
         m_ObjectConstantBuffer.WorldMatrix = model;
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
@@ -334,7 +333,6 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         // Setup CB, leave InverseTransposeWorldMatrix, InverseTransposeWorldViewMatrix non - updated
-        auto radius = Light::GetRadius(light);
         auto spotAngleInDegree = DirectX::XMConvertToDegrees(light->SpotAngle);
         auto spotAngleScale = spotAngleInDegree;
 
@@ -343,8 +341,7 @@ void SimpleObj::DrawLightVolume(Light* light)
         if (reuseSphereLightVolume)
         {
             // or simply re-use light volume of sphere
-            auto radius = Light::GetRadius(light);
-            auto model = Matrix::CreateScale(radius) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
+            auto model = Matrix::CreateScale(light->Range) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
             auto WorldViewProjectionMatrix = model * viewProjectionMatrix;
             m_ObjectConstantBuffer.WorldMatrix = model;
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;

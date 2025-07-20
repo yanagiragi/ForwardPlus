@@ -505,7 +505,8 @@ void SimpleObj::LoadLight()
     struct Light point;
     point.LightType = (int)LightType::Point;
     point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
-    point.Strength = 8.0f;
+    point.Range = 3.8f;
+    point.Strength = 0.5f;
     point.Enabled = true;
 
     struct Light directional;
@@ -515,7 +516,6 @@ void SimpleObj::LoadLight()
     auto directionV3 = Vector3(1.0, 0.5, 0.25);
     directionV3.Normalize();
     directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-
     directional.Strength = 0.5f;
     directional.Enabled = true;
 
@@ -528,7 +528,8 @@ void SimpleObj::LoadLight()
     spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
 
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
-    spotlight.Strength = 75.0f;
+    spotlight.Range = 75.0f;
+    spotlight.Strength = 1.2f;
     spotlight.Enabled = true;
 
     m_Scene.Lights[0] = directional;
@@ -595,11 +596,10 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
 
             auto position = Vector3(light->PositionWS.x, light->PositionWS.y, light->PositionWS.z);
             auto type = (LightType)light->LightType;
-            auto strength = light->Strength;
-
+            
             if (type == LightType::Point)
             {
-                auto radius = Light::GetRadius(light);
+                auto radius = light->Range;
                 auto sphere = BoundingSphere(position, radius);
                 DX::Draw(m_d3dPrimitiveBatch.get(), sphere, DirectX::Colors::White);
             }
@@ -928,6 +928,11 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 light->DirectionWS.x = rotation[0];
                 light->DirectionWS.y = rotation[1];
                 light->DirectionWS.z = rotation[2];
+                
+                float range = light->Range;
+                ImGui::DragFloat("Range", &range, dragSpeed, 0.0f, 100.0f);
+                light->Range = range;
+
                 float strength = light->Strength;
                 ImGui::DragFloat("Strength", &strength, dragSpeed, 0.0f, 100.0f);
                 light->Strength = strength;

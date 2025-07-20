@@ -17,9 +17,14 @@ float4 DoSpecular(LightProperties light, float3 V, float3 L, float3 N, float spe
     return light.Color * pow(RdotV, specularPower);
 }
 
-float DoAttenuation(LightProperties light, float d)
+// float DoAttenuation(LightProperties light, float d)
+// {
+//     return 1.0f / (light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d);
+// }
+
+float DoAttenuation(LightProperties light, float d )
 {
-    return 1.0f / (light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d);
+    return 1.0f - smoothstep( light.Range * 0.75f, light.Range, d );
 }
 
 float DoSpotConeWS(LightProperties light, float3 L)

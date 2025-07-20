@@ -21,14 +21,12 @@ struct LightProperties
     float4      Color;                  // 16 bytes
     //----------------------------------- (16 byte boundary)
     float       SpotAngle;              // 4 bytes
-    float       ConstantAttenuation;    // 4 bytes
-    float       LinearAttenuation;      // 4 bytes
-    float       QuadraticAttenuation;   // 4 bytes
-    //----------------------------------- (16 byte boundary)
+    float       Range;                  // 4 bytes
     int         LightType;              // 4 bytes
     bool        Enabled;                // 4 bytes
+    //----------------------------------- (16 byte boundary)
     float       Strength;               // 4 bytes
-    int         Padding;                // 4 bytes
+    float3      Padding;                // 4 bytes
     //----------------------------------- (16 byte boundary)
 };  // Total:                           // 80 bytes (5 * 16)
 

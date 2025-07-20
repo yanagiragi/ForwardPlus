@@ -102,15 +102,6 @@ void o_AppendLight( uint lightIndex )
 //     }
 // }
 
-float GetRadius(LightProperties light)
-{
-    float lightMax = max(max(light.Color.x, light.Color.y), light.Color.z) * light.Strength;
-
-    // Reference: https://learnopengl.com/Advanced-Lighting/Deferred-Shading, we use 10/256 as dark threshold
-    float darkThreshold = (256.0f / 2.5f);
-    return (-light.LinearAttenuation + sqrt(light.LinearAttenuation * light.LinearAttenuation - 4.0f * light.QuadraticAttenuation * (light.ConstantAttenuation - darkThreshold * lightMax))) / (2.0f * light.QuadraticAttenuation);
-}
-
 //  =========================
 //      Main Functions
 //  =========================
@@ -179,8 +170,7 @@ void main(ComputeShaderInput IN)
             {
                 case POINT_LIGHT:
                 {
-                    float range = GetRadius(light);
-                    Sphere sphere = { light.PositionVS.xyz, range };
+                    Sphere sphere = { light.PositionVS.xyz, light.Range };
                     if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS ) )
                     {
                         // Add light to light list for transparent geometry.
@@ -197,9 +187,8 @@ void main(ComputeShaderInput IN)
 
                 case SPOT_LIGHT:
                 {
-                    float range = GetRadius(light);
-                    float coneRadius = tan( radians( light.SpotAngle ) ) * range;
-                    Cone cone = { light.PositionVS.xyz, range, light.DirectionVS.xyz, coneRadius };
+                    float coneRadius = tan( radians( light.SpotAngle ) ) * light.Range;
+                    Cone cone = { light.PositionVS.xyz, light.Range, light.DirectionVS.xyz, coneRadius };
                     if ( ConeInsideFrustum( cone, GroupFrustum, nearClipVS, maxDepthVS ) )
                     {
                         // Add light to light list for transparent geometry.

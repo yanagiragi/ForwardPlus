@@ -18,8 +18,6 @@ cbuffer DebugProperties : register(b1)
 
 Texture2D<uint2> Lightmap : register(t0);
 
-sampler Sampler : register(s0);
-
 struct PixelShaderInput
 {
     float4 position : SV_POSITION;
