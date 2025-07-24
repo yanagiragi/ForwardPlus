@@ -580,6 +580,7 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
 
     m_d3dEffect->SetWorld(Matrix::Identity);
     m_d3dEffect->SetView(m_Camera.get_ViewMatrix());
+    m_d3dEffect->SetProjection(m_Camera.get_ProjectionMatrix());
 
     m_d3dDeviceContext->IASetInputLayout(m_d3dPrimitiveBatchInputLayout.Get());
     m_d3dPrimitiveBatch->Begin();
