@@ -92,8 +92,8 @@ namespace Yr
         void RenderScene_Deferred_LightingPass_Stencil();
         void DrawLightVolume(Light* type);
 
-        void ComputeFrustum(int width, int height, int blockSize);
-        void RenderScene_FowardPlus_CullLightPass(int width, int height, int blockSize);
+        void ComputeFrustum();
+        void RenderScene_FowardPlus_CullLightPass();
         void RenderScene_FowardPlus_DepthPrePass();
         void RenderScene_Deferred_DebugLightMapPass();
 
@@ -326,6 +326,7 @@ namespace Yr
         Scene m_Scene;
         int m_DrawCallCount = 0;
         Vector2 m_ScreenDimensions;
+        bool m_frustumComputed = false;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;

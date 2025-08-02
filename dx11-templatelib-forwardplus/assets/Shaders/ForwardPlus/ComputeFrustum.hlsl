@@ -44,10 +44,12 @@ void main(ComputeShaderInput IN)
     const float3 eyePos = float3(0, 0, 0);
 
     float4 screenSpace[4];
-    screenSpace[0] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y    ) * BLOCK_SIZE, -1.0, 1.0f); // top-left point
-    screenSpace[1] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y    ) * BLOCK_SIZE, -1.0, 1.0f); // top-right point
-    screenSpace[2] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y + 1) * BLOCK_SIZE, -1.0, 1.0f); // bottom-left point
-    screenSpace[3] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * BLOCK_SIZE, -1.0, 1.0f); // bottom-right point
+    // Since we're using left hand coorindate, use 1.0 for z value since camera looking at +Z axis in view space
+    // For right hand coordintate, use -1.0 instead
+    screenSpace[0] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y    ) * BLOCK_SIZE, 1.0, 1.0f); // top-left point
+    screenSpace[1] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y    ) * BLOCK_SIZE, 1.0, 1.0f); // top-right point
+    screenSpace[2] = float4(float2(IN.dispatchThreadID.x    , IN.dispatchThreadID.y + 1) * BLOCK_SIZE, 1.0, 1.0f); // bottom-left point
+    screenSpace[3] = float4(float2(IN.dispatchThreadID.x + 1, IN.dispatchThreadID.y + 1) * BLOCK_SIZE, 1.0, 1.0f); // bottom-right point
 
     float3 viewSpace[4];
     for(int i = 0; i < 4; ++i)

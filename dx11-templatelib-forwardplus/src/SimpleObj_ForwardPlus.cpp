@@ -86,24 +86,31 @@ HRESULT SimpleObj::CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSi
         return pDevice->CreateBuffer(&desc, nullptr, ppBufOut);
 };
 
-void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
+void SimpleObj::ComputeFrustum()
 {
-    int threadGroupCountX = std::ceilf((float)width / (float)blockSize);
-    int threadGroupCountY = std::ceilf((float)height / (float)blockSize);
-    int threadGroupCountZ = 1;
-    int totalGroupCounts = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
-    
+    int screenWidth = max(m_ScreenDimensions.x, 1);
+    int screenHeight = max(m_ScreenDimensions.y, 1);
+
+    int numThreadsX = std::ceilf((float)screenWidth / (float)BLOCK_SIZE);
+    int numThreadsY = std::ceilf((float)screenHeight / (float)BLOCK_SIZE);
+    int numThreadsZ = 1;
+
+    int numThreadGroupsX = std::ceilf((float)numThreadsX / (float)BLOCK_SIZE);
+    int numThreadGroupsY = std::ceilf((float)numThreadsY / (float)BLOCK_SIZE);
+    int numThreadGroupsZ = 1;
+
     m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
-    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = Vector2(width, height);
+    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
 
-    m_DispatchParamsConstantBuffer.numThreads[0] = width;
-    m_DispatchParamsConstantBuffer.numThreads[1] = height;
-    m_DispatchParamsConstantBuffer.numThreads[2] = 1;
-    m_DispatchParamsConstantBuffer.numThreadGroups[0] = threadGroupCountX;
-    m_DispatchParamsConstantBuffer.numThreadGroups[1] = threadGroupCountY;
-    m_DispatchParamsConstantBuffer.numThreadGroups[2] = threadGroupCountZ;
+    m_DispatchParamsConstantBuffer.numThreads[0] = numThreadsX;
+    m_DispatchParamsConstantBuffer.numThreads[1] = numThreadsY;
+    m_DispatchParamsConstantBuffer.numThreads[2] = numThreadsZ;
+    m_DispatchParamsConstantBuffer.numThreadGroups[0] = numThreadGroupsX;
+    m_DispatchParamsConstantBuffer.numThreadGroups[1] = numThreadGroupsY;
+    m_DispatchParamsConstantBuffer.numThreadGroups[2] = numThreadGroupsZ;
+
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
 
     m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_ComputeFrustumShader.Get(), nullptr, 0);
@@ -117,7 +124,7 @@ void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
 
     m_d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, m_d3dFrustumBuffers_UAV.GetAddressOf(), nullptr);
 
-    m_d3dDeviceContext->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+    m_d3dDeviceContext->Dispatch(numThreadGroupsX, numThreadGroupsY, numThreadGroupsZ);
 
     // Clean up
     m_d3dDeviceContext->CSSetShader(nullptr, nullptr, 0);
@@ -158,24 +165,12 @@ void SimpleObj::ComputeFrustum(int width, int height, int blockSize)
 
 void SimpleObj::RenderScene_FowardPlus(RenderEventArgs& e)
 {
-    // update subResource first
-    int threadGroupCountX = std::ceilf((float)m_ScreenDimensions.x / (float)BLOCK_SIZE);
-    int threadGroupCountY = std::ceilf((float)m_ScreenDimensions.y / (float)BLOCK_SIZE);
-    int threadGroupCountZ = 1;
-    int totalGroupCounts = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
-
-    m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
-    m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
-    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
-
-    m_DispatchParamsConstantBuffer.numThreads[0] = m_ScreenDimensions.x;
-    m_DispatchParamsConstantBuffer.numThreads[1] = m_ScreenDimensions.y;
-    m_DispatchParamsConstantBuffer.numThreads[2] = 1;
-    m_DispatchParamsConstantBuffer.numThreadGroups[0] = threadGroupCountX;
-    m_DispatchParamsConstantBuffer.numThreadGroups[1] = threadGroupCountY;
-    m_DispatchParamsConstantBuffer.numThreadGroups[2] = threadGroupCountZ;
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
+    if (!m_frustumComputed)
+    {
+        ComputeFrustum();
+        
+        m_frustumComputed = true;
+    }
 
     RenderScene_FowardPlus_DepthPrePass();
 
@@ -188,7 +183,7 @@ void SimpleObj::RenderScene_FowardPlus(RenderEventArgs& e)
         return;
     }
     
-    RenderScene_FowardPlus_CullLightPass(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+    RenderScene_FowardPlus_CullLightPass();
 
     if (m_ForwardPlusDebugMode != ForwardPlus_DebugMode::None)
     {
@@ -369,9 +364,31 @@ void SimpleObj::RenderScene_Deferred_DebugLightMapPass()
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
-void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ)
+void SimpleObj::RenderScene_FowardPlus_CullLightPass()
 {
-    int totalGroupCounts = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
+    int screenWidth = max(m_ScreenDimensions.x, 1);
+    int screenHeight = max(m_ScreenDimensions.y, 1);
+
+    int numThreadsX = std::ceilf((float)screenWidth / (float)BLOCK_SIZE);
+    int numThreadsY = std::ceilf((float)screenHeight / (float)BLOCK_SIZE);
+    int numThreadsZ = 1;
+
+    int numThreadGroupsX = std::ceilf((float)screenWidth / (float)BLOCK_SIZE);
+    int numThreadGroupsY = std::ceilf((float)screenHeight / (float)BLOCK_SIZE);
+    int numThreadGroupsZ = 1;
+
+    m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
+    m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
+    m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
+
+    m_DispatchParamsConstantBuffer.numThreads[0] = m_ScreenDimensions.x;
+    m_DispatchParamsConstantBuffer.numThreads[1] = m_ScreenDimensions.y;
+    m_DispatchParamsConstantBuffer.numThreads[2] = 1;
+    m_DispatchParamsConstantBuffer.numThreadGroups[0] = numThreadGroupsX;
+    m_DispatchParamsConstantBuffer.numThreadGroups[1] = numThreadGroupsY;
+    m_DispatchParamsConstantBuffer.numThreadGroups[2] = numThreadGroupsZ;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
 
     m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_CullLightShader.Get(), nullptr, 0);
 
@@ -405,7 +422,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
     m_d3dDeviceContext->CSSetUnorderedAccessViews(0, _countof(buffers), buffers->GetAddressOf(), nullptr);
 
     // dispatch
-    m_d3dDeviceContext->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+    m_d3dDeviceContext->Dispatch(numThreadGroupsX, numThreadGroupsY, numThreadGroupsZ);
 
     // clean up
     m_d3dDeviceContext->CSSetShader(nullptr, nullptr, 0);
@@ -480,11 +497,11 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass(int threadGroupCountX, int 
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
             std::copy_n((uint2*)MappedResource.pData, m_d3dOpaqueLightGrid.size(), m_d3dOpaqueLightGrid.data());
 
-            for (int j = 0; j < threadGroupCountY; ++j)
+            for (int j = 0; j < numThreadGroupsY; ++j)
             {
-                for (int i = 0; i < threadGroupCountX; ++i)
+                for (int i = 0; i < numThreadGroupsX; ++i)
                 {
-                    std::cout << m_d3dOpaqueLightGrid[i * threadGroupCountY + j].y << ",";
+                    std::cout << m_d3dOpaqueLightGrid[i * numThreadGroupsY + j].y << ",";
                 }
             
                 std::cout << std::endl;

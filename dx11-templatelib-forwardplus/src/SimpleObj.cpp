@@ -511,7 +511,7 @@ void SimpleObj::LoadLight()
 
     struct Light directional;
     directional.LightType = (int)LightType::Directional;
-    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);    
+    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
     
     auto directionV3 = Vector3(1.0, 0.5, 0.25);
     directionV3.Normalize();
@@ -1602,8 +1602,8 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_d3dDebugRWListBuffers_UAV");
         }
 
-        // Prepare frustum for forward plus
-        ComputeFrustum(width, height, BLOCK_SIZE);
+        // force frustum re-compute
+        m_frustumComputed = false;
     }
     
     return true;

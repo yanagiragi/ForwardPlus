@@ -41,12 +41,18 @@ bool SphereInsideFrustum( Sphere sphere, Frustum frustum, float zNear, float zFa
     bool result = true;
  
     // First check depth, note the sphere is in view space
-    // Also, the view vector points in the -Z axis so the far depth value will be approaching -infinity.
-    if ( sphere.c.z - sphere.r > zNear || sphere.c.z + sphere.r < zFar )
+    // Since we use left hand coordintate, the view vector points in the +Z axis
+    if ( (sphere.c.z - sphere.r) < zNear || (sphere.c.z + sphere.r) > zFar)
     {
         result = false;
     }
- 
+
+    // Right hand coordinate version, the view vector points in the -Z axis so the far depth value will be approaching -infinity.
+    // if ( sphere.c.z - sphere.r > zNear || sphere.c.z + sphere.r < zFar )
+    // {
+    //     result = false;
+    // }
+
     // Then check frustum planes
     for ( int i = 0; i < 4 && result; i++ )
     {
