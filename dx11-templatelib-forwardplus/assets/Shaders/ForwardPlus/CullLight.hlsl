@@ -187,8 +187,13 @@ void main(ComputeShaderInput IN)
 
                 case SPOT_LIGHT:
                 {
-                    float coneRadius = tan( radians( light.SpotAngle ) ) * light.Range;
-                    Cone cone = { light.PositionVS.xyz, light.Range, light.DirectionVS.xyz, coneRadius };
+                    // SpotAngle is already in radian unit
+                    float coneRadius = tan( light.SpotAngle ) * light.Range;
+
+                    // Since we treat light direction as vector starts from point to light,
+                    // we need to negate the direction to get correct cone direction
+                    Cone cone = { light.PositionVS.xyz, light.Range, -light.DirectionVS.xyz, coneRadius };
+                    
                     if ( ConeInsideFrustum( cone, GroupFrustum, nearClipVS, maxDepthVS ) )
                     {
                         // Add light to light list for transparent geometry.

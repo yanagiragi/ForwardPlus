@@ -85,12 +85,20 @@ bool ConeInsidePlane( Cone cone, Plane plane )
     return PointInsidePlane( cone.T, plane ) && PointInsidePlane( Q, plane );
 }
 
+// Note this is a conservative culling, the cone can only be culled of origin
+// and the farest point and the circular end cap is fully behind the negative half
+// space of the plane.
+// See https://github.com/yanagiragi/ForwardPlus/issues/7 for more info.
 bool ConeInsideFrustum( Cone cone, Frustum frustum, float zNear, float zFar )
 {
     bool result = true;
  
-    Plane nearPlane = { float3( 0, 0, -1 ), -zNear };
-    Plane farPlane = { float3( 0, 0, 1 ), zFar };
+    Plane nearPlane = { float3( 0, 0, 1 ), zNear };
+    Plane farPlane = { float3( 0, 0, -1 ), -zFar };
+
+    // For right hand coordinate
+    // Plane nearPlane = { float3( 0, 0, -1 ), -zNear };
+    // Plane farPlane = { float3( 0, 0, 1 ), zFar };
  
     // First check the near and far clipping planes.
     if ( ConeInsidePlane( cone, nearPlane ) || ConeInsidePlane( cone, farPlane ) )
