@@ -5,7 +5,7 @@ cbuffer ScreenToViewParams : register(b0)
     float4x4 InverseView;
     float4x4 InverseProjection;
     float2 ScreenDimensions;
-    float2 ThreadGroups;
+    float ScreenToViewParams_padding[2];
 }
 
 cbuffer DebugProperties : register(b1)
@@ -15,6 +15,19 @@ cbuffer DebugProperties : register(b1)
     float padding[2];         // 8 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
+cbuffer DispatchParams : register(b2)
+{
+    // Number of groups dispatched
+    uint3 numThreadGroups;
+    uint padding1;
+
+    // Total number of threads dispatched
+    // Note this value may be less than the actual number of threads executed
+    // if the screen size is not divisible by the block size
+    uint3 numThreads;
+    uint padding2;
+}
 
 Texture2D<uint2> Lightmap : register(t0);
 
@@ -27,11 +40,11 @@ struct PixelShaderInput
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float4 color;
-    uint2 texValue = Lightmap.Load(int3(IN.uv * ThreadGroups, 0));
+    uint2 texValue = Lightmap.Load(int3(IN.uv * numThreadGroups, 0));
 
     if (DebugMode == FP_DEBUG_MODE_UV)
     {
-        color = float4(texValue.x / ThreadGroups.x, texValue.y / ThreadGroups.y, 0, 1);
+        color = float4(texValue.xy / (float2)numThreadGroups, 0, 1);
     }
 
     else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)

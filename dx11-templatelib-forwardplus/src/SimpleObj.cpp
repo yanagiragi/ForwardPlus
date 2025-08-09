@@ -1145,12 +1145,6 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
     m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
 
-    int threadGroupCountX = std::ceilf((float)m_ScreenDimensions.x / (float)BLOCK_SIZE);
-    int threadGroupCountY = std::ceilf((float)m_ScreenDimensions.y / (float)BLOCK_SIZE);
-    m_ScreenToViewParamsConstantBuffer.ThreadGroups = Vector2(threadGroupCountX, threadGroupCountY);
-
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
-
     // Set device context global settings
 
     // Setup the rasterizer stage
