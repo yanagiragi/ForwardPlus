@@ -96,6 +96,7 @@ namespace Yr
         void RenderScene_FowardPlus_CullLightPass();
         void RenderScene_FowardPlus_DepthPrePass();
         void RenderScene_Deferred_DebugLightMapPass();
+        void RenderScene_FowardPlus_FinalPass();
 
         bool ResizeSwapChain(int width, int height);
 
@@ -189,6 +190,12 @@ namespace Yr
         __int64 m_d3dFowrardPlus_DebugLightMap_PixelShaderSize = 0;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dFowrardPlus_DebugLightMap_PixelShader = nullptr;
 
+        __int64 m_d3dFowrardPlus_FinalPass_RegularPixelShaderSize = 0;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dFowrardPlus_FinalPass_RegularPixelShader = nullptr;
+
+        __int64 m_d3dFowrardPlus_FinalPass_InstancedPixelShaderSize = 0;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_d3dFowrardPlus_FinalPass_InstancedPixelShader = nullptr;
+
         // Primitive Batch
         std::unique_ptr<DirectX::CommonStates> m_d3dStates = nullptr;
         std::unique_ptr<DirectX::BasicEffect> m_d3dEffect;
@@ -256,11 +263,12 @@ namespace Yr
         std::vector<uint> m_opaqueLightIndexList;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexListBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexListBuffers_UAV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dOpaqueLightIndexListBuffers_SRV;
 
         std::vector<uint2> m_d3dOpaqueLightGrid;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_d3dOpaqueLightGridBuffers;
-        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dOpaqueLightGridBuffers_SRV;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightGrid_UAV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dOpaqueLightGridBuffers_SRV;
 
         std::vector <float> m_debugRWList;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dDebugRWListBuffers;

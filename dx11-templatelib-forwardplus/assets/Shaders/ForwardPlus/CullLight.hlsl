@@ -249,13 +249,20 @@ void main(ComputeShaderInput IN)
  
     GroupMemoryBarrierWithGroupSync();
 
-    // Now update the light index list (all threads).
+    // Now update the light index list (all threads).    
     // For opaque geometry.
     for ( i = IN.groupIndex; i < o_LightCount; i += BLOCK_SIZE * BLOCK_SIZE )
     {
         o_LightIndexList[o_LightIndexStartOffset + i] = o_LightList[i];
     }
     
+
+    // For transparent geometry.
+    // for ( i = IN.groupIndex; i < t_LightCount; i += BLOCK_SIZE * BLOCK_SIZE )
+    // {
+    //     t_LightIndexList[t_LightIndexStartOffset + i] = t_LightList[i];
+    // }
+
     // For transparent geometry.
     // for ( i = IN.groupIndex; i < t_LightCount; i += BLOCK_SIZE * BLOCK_SIZE )
     // {

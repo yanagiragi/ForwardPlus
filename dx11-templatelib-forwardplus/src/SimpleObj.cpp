@@ -154,7 +154,6 @@ void SimpleObj::LoadShaderResources()
 
     // Forward Single Light
     {
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/Forward/ForwardLighting_SingleLightPS.hlsl";
         _int64 size = GetFileSize(filename);
@@ -168,7 +167,6 @@ void SimpleObj::LoadShaderResources()
 
     // Forward Single Light Instanced
     {
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/Forward/ForwardLighting_SingleLightPS_Instanced.hlsl";
         _int64 size = GetFileSize(filename);
@@ -233,7 +231,6 @@ void SimpleObj::LoadShaderResources()
             AssertIfFailed(hr, "Load Content", "Unable to create input layout");
         }
 
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         filename = L"assets/Shaders/Deferred/DeferredGeometryRegularPS.hlsl";
         size = GetFileSize(filename);
@@ -299,7 +296,6 @@ void SimpleObj::LoadShaderResources()
             AssertIfFailed(hr, "Load Content", "Unable to create input layout");
         }
 
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         filename = L"assets/Shaders/Deferred/DeferredGeometryInstancedPS.hlsl";
         size = GetFileSize(filename);
@@ -323,7 +319,6 @@ void SimpleObj::LoadShaderResources()
             m_d3dDebugVertexShaderSize = size;
         }
 
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         filename = L"assets/Shaders/Deferred/DebugDeferredPS.hlsl";
         size = GetFileSize(filename);
@@ -347,7 +342,6 @@ void SimpleObj::LoadShaderResources()
             m_d3dDeferredLightingVertexShaderSize = size;
         }
 
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         filename = L"assets/Shaders/Deferred/DeferredLighting_LoopLightPS.hlsl";
         size = GetFileSize(filename);
@@ -374,7 +368,6 @@ void SimpleObj::LoadShaderResources()
 
     // Debug Unlit
     {
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/UnlitPS.hlsl";
         __int64 size = GetFileSize(filename);
@@ -427,7 +420,6 @@ void SimpleObj::LoadShaderResources()
 
     // Forward plus debug light map shader
     {
-        // Load and compile the pixel shader
         ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
         std::wstring filename = L"assets/Shaders/ForwardPlus/DebugLightmapPS.hlsl";
         _int64 size = GetFileSize(filename);
@@ -436,6 +428,28 @@ void SimpleObj::LoadShaderResources()
             pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
             CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dFowrardPlus_DebugLightMap_PixelShader);
             m_d3dFowrardPlus_DebugLightMap_PixelShaderSize = size;
+        }
+    }
+
+    // Forward plus final pass shader
+    {
+        ComPtr<ID3DBlob> pixelShaderBlob = nullptr;
+        std::wstring filename = L"assets/Shaders/ForwardPlus/ForwardPlus_Final_LightPS.hlsl";
+        _int64 size = GetFileSize(filename);
+        if (size != m_d3dFowrardPlus_FinalPass_RegularPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dFowrardPlus_FinalPass_RegularPixelShader);
+            m_d3dFowrardPlus_FinalPass_RegularPixelShaderSize = size;
+        }
+        
+        filename = L"assets/Shaders/ForwardPlus/ForwardPlus_Final_LightPS_Instanced.hlsl";
+        size = GetFileSize(filename);
+        if (size != m_d3dFowrardPlus_FinalPass_InstancedPixelShaderSize)
+        {
+            pixelShaderBlob = LoadShader<ID3D11PixelShader>(m_d3dDevice, filename, "main", "latest");
+            CreateShader(m_d3dDevice, pixelShaderBlob, nullptr, m_d3dFowrardPlus_FinalPass_InstancedPixelShader);
+            m_d3dFowrardPlus_FinalPass_InstancedPixelShaderSize = size;
         }
     }
 }
@@ -1546,6 +1560,20 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexListBuffers.Get(), m_d3dOpaqueLightIndexListBuffers_UAV.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_opaqueLightIndexListBuffersUAV");
+
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            ZeroMemory(&srvDesc, sizeof(srvDesc));
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = totalGroupCounts;
+
+            hr = m_d3dDevice->CreateShaderResourceView(
+                m_d3dOpaqueLightIndexListBuffers.Get(),
+                &srvDesc,
+                &m_d3dOpaqueLightIndexListBuffers_SRV
+            );
+            AssertIfFailed(hr, "Failed to create light list SRV", "m_d3dOpaqueLightIndexListBuffers_SRV");
         }
 
         // m_d3dOpaqueLightGrid
