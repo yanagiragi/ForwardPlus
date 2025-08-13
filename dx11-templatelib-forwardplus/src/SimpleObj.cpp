@@ -1528,15 +1528,11 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
         // m_d3dFrustumBuffers
         {
             m_frustums.resize(totalGroupCounts);
-            m_opaqueLightIndexCounter.resize(totalGroupCounts);
-            m_opaqueLightIndexList.resize(totalGroupCounts);
-            m_d3dOpaqueLightGrid.resize(totalGroupCounts);
 
             // TODO: Resize the buffer instead of re-create it
             hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(struct Frustum), totalGroupCounts, NULL, m_d3dFrustumBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_d3dFrustumBuffers");
 
-            // TODO: Resize the buffer instead of re-create it
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dFrustumBuffers.Get(), m_d3dFrustumBuffers_UAV.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer UAV", "Unable to create m_d3dFrustumBuffersUAV");
 
@@ -1546,7 +1542,9 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightIndexCounterBuffers
         {
-            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint), totalGroupCounts, NULL, m_d3dOpaqueLightIndexCounterBuffers.GetAddressOf());
+            m_opaqueLightIndexCounter.resize(1);
+
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint32_t), m_opaqueLightIndexCounter.size(), NULL, m_d3dOpaqueLightIndexCounterBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexCounterBuffers");
 
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexCounterBuffers.Get(), m_d3dOpaqueLightIndexCounterBuffers_UAV.GetAddressOf());
@@ -1555,7 +1553,9 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightIndexListBuffers
         {
-            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint), totalGroupCounts, NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
+            m_opaqueLightIndexList.resize(totalGroupCounts * AVERAGE_OVERLAPPING_LIGHTS_PER_TILE);
+            
+            hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint32_t), m_opaqueLightIndexList.size(), NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexListBuffers");
 
             hr = CreateStructuredBufferUAV(m_d3dDevice.Get(), m_d3dOpaqueLightIndexListBuffers.Get(), m_d3dOpaqueLightIndexListBuffers_UAV.GetAddressOf());
@@ -1566,7 +1566,7 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
             srvDesc.Format = DXGI_FORMAT_UNKNOWN;
             srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = totalGroupCounts;
+            srvDesc.Buffer.NumElements = m_opaqueLightIndexList.size();
 
             hr = m_d3dDevice->CreateShaderResourceView(
                 m_d3dOpaqueLightIndexListBuffers.Get(),
@@ -1578,6 +1578,8 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightGrid
         {
+            m_d3dOpaqueLightGrid.resize(totalGroupCounts);
+
             D3D11_TEXTURE2D_DESC textureDesc;
             ZeroMemory(&textureDesc, sizeof(textureDesc));
             textureDesc.Width = threadGroupCountX;

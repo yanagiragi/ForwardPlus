@@ -594,6 +594,10 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
     m_DispatchParamsConstantBuffer.numThreads[2] = 1;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
 
+    // clear light index counter, other structure buffer remains dirty after calculations
+    m_opaqueLightIndexCounter[0] = 0;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dOpaqueLightIndexCounterBuffers.Get(), 0, nullptr, m_opaqueLightIndexCounter.data(), 0, 0);
+
     m_d3dDeviceContext->CSSetShader(m_d3dFowrardPlus_CullLightShader.Get(), nullptr, 0);
 
     ID3D11Buffer* computeShaderConstantBuffers[] =
@@ -675,18 +679,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
 
             D3D11_MAPPED_SUBRESOURCE MappedResource;
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
-            std::copy_n((uint*)MappedResource.pData, m_opaqueLightIndexList.size(), m_opaqueLightIndexList.data());
-
-            int zeroCount = 0;
-            for (auto i : m_opaqueLightIndexList) {
-                if (i == 0) {
-                    zeroCount += 1;
-                }
-                else {
-                    std::cout << i << ",";
-                }
-            }
-            std::cout << "Zero Count = " << zeroCount << " / " << m_opaqueLightIndexList.size() << std::endl;
+            std::copy_n((uint32_t*)MappedResource.pData, m_opaqueLightIndexList.size(), m_opaqueLightIndexList.data());
 
             // Clean up
             m_d3dDeviceContext->Unmap(tempBuffer, 0);
@@ -701,11 +694,19 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
             m_d3dDeviceContext->Map(tempBuffer, 0, D3D11_MAP_READ, 0, &MappedResource);
             std::copy_n((uint2*)MappedResource.pData, m_d3dOpaqueLightGrid.size(), m_d3dOpaqueLightGrid.data());
 
-            for (int j = 0; j < numThreadGroupsY; ++j)
+            for (int i = 0; i < numThreadGroupsX; ++i)
             {
-                for (int i = 0; i < numThreadGroupsX; ++i)
+                for (int j = 0; j < numThreadGroupsY; ++j)
                 {
-                    std::cout << m_d3dOpaqueLightGrid[i * numThreadGroupsY + j].y << ",";
+                    auto startIndex = m_d3dOpaqueLightGrid[i * numThreadGroupsY + j].x;
+                    auto lightCount = m_d3dOpaqueLightGrid[i * numThreadGroupsY + j].y;
+                    
+                    std::cout << "(" << i << ", " << j << ") = [ ";
+                    for (int k = 0; k < lightCount; ++k)
+                    {
+                        std::cout << m_opaqueLightIndexList[startIndex + k] << ", ";
+                    }
+                    std::cout << "]" << std::endl;
                 }
             
                 std::cout << std::endl;

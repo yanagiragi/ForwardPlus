@@ -256,11 +256,11 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dFrustumBuffers_UAV;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dFrustumBuffers_SRV;
 
-        std::vector<uint> m_opaqueLightIndexCounter;
+        std::vector<uint32_t> m_opaqueLightIndexCounter;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexCounterBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexCounterBuffers_UAV;
 
-        std::vector<uint> m_opaqueLightIndexList;
+        std::vector<uint32_t> m_opaqueLightIndexList;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dOpaqueLightIndexListBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dOpaqueLightIndexListBuffers_UAV;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_d3dOpaqueLightIndexListBuffers_SRV;
@@ -335,6 +335,7 @@ namespace Yr
         int m_DrawCallCount = 0;
         Vector2 m_ScreenDimensions;
         bool m_frustumComputed = false;
+        const uint32_t AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200u;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;

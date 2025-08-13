@@ -66,7 +66,7 @@ struct PixelShaderInput
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     LightingResult lit = { {0, 0, 0}, {0, 0, 0}};
-    
+
     // Get the index of the current pixel in the light grid.
     uint2 tileIndex = uint2( floor(IN.PositionCS.xy / BLOCK_SIZE) );
 
@@ -74,19 +74,18 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     uint startOffset = LightGrid[tileIndex].x;
     uint lightCount = LightGrid[tileIndex].y;
 
-    LightingResult singleLightLit = { {0, 0, 0}, {0, 0, 0}};
+    LightingResult singleLightLit = { {0, 0, 0}, {0, 0, 0} };
     for ( uint i = 0; i < lightCount; i++ )
     {
-        // TODO: light index seems wrong, might need to take a look at CullLight.hlsl
-        uint lightIndex = LightIndexList[startOffset + i];
+        uint index = LightIndexList[startOffset + i];
 
         if (lightingSpace == WORLD_SPACE)
         {
-            singleLightLit = ComputeLightingWS_Single(Lights[lightIndex], IN.PositionWS, normalize(IN.NormalWS), Material.SpecularPower, EyePosition);
+            singleLightLit = ComputeLightingWS_Single(Lights[index], IN.PositionWS, normalize(IN.NormalWS), Material.SpecularPower, EyePosition);
         }
         else if (lightingSpace == VIEW_SPACE)
         {
-            singleLightLit = ComputeLightingVS_Single(Lights[lightIndex], IN.PositionVS, normalize(IN.NormalVS), Material.SpecularPower);
+            singleLightLit = ComputeLightingVS_Single(Lights[index], IN.PositionVS, normalize(IN.NormalVS), Material.SpecularPower);
         }
 
         lit.Diffuse += singleLightLit.Diffuse;

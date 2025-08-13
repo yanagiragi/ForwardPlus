@@ -70,24 +70,24 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     uint startOffset = LightGrid[tileIndex].x;
     uint lightCount = LightGrid[tileIndex].y;
 
-    LightingResult singleLightLit = { {0, 0, 0}, {0, 0, 0}};
+    LightingResult singleLightLit = { {0, 0, 0}, {0, 0, 0} };
     for ( uint i = 0; i < lightCount; i++ )
     {
-        // TODO: light index seems wrong, might need to take a look at CullLight.hlsl
-        uint lightIndex = LightIndexList[startOffset + i];
+        uint index = LightIndexList[startOffset + i];
 
         if (lightingSpace == WORLD_SPACE)
         {
-            singleLightLit = ComputeLightingWS_Single(Lights[lightIndex], IN.PositionWS, normalize(IN.NormalWS), IN.Material.SpecularPower, EyePosition);
+            singleLightLit = ComputeLightingWS_Single(Lights[index], IN.PositionWS, normalize(IN.NormalWS), IN.Material.SpecularPower, EyePosition);
         }
         else if (lightingSpace == VIEW_SPACE)
         {
-            singleLightLit = ComputeLightingVS_Single(Lights[lightIndex], IN.PositionVS, normalize(IN.NormalVS), IN.Material.SpecularPower);
+            singleLightLit = ComputeLightingVS_Single(Lights[index], IN.PositionVS, normalize(IN.NormalVS), IN.Material.SpecularPower);
         }
 
         lit.Diffuse += singleLightLit.Diffuse;
         lit.Specular += singleLightLit.Specular;
     }
+
     float3 emissive = IN.Material.Emissive;
     float3 ambient = IN.Material.Ambient * GlobalAmbient;
     float3 diffuse = IN.Material.Diffuse * lit.Diffuse;
