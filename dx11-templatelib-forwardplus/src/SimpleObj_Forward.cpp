@@ -345,4 +345,8 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             }
         }
     }
+
+    // Unbind SRVs
+    ID3D11ShaderResourceView* const pSRV[1] = { NULL };
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
