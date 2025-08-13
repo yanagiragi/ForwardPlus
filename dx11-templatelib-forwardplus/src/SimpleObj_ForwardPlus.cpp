@@ -392,8 +392,8 @@ void SimpleObj::RenderScene_FowardPlus_FinalPass()
     } 
 
     // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[3] = { NULL, NULL, NULL };
-    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
+    ID3D11ShaderResourceView* const pSRV[] = { NULL, NULL, NULL };
+    // m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
 void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
@@ -638,10 +638,10 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr, nullptr, nullptr };
     m_d3dDeviceContext->CSSetUnorderedAccessViews(0, _countof(nullUAVs), nullUAVs, nullptr);
 
-    ID3D11Buffer* nullConstantBuffers[4] = { nullptr, nullptr, nullptr, nullptr };
+    ID3D11Buffer* nullConstantBuffers[] = { nullptr, nullptr, nullptr, nullptr };
     m_d3dDeviceContext->CSSetConstantBuffers(0, _countof(nullConstantBuffers), nullConstantBuffers);
 
-    ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
+    ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr };
     m_d3dDeviceContext->CSSetShaderResources(0, _countof(nullSRVs), nullSRVs);
 
 #ifdef _DEBUG
