@@ -1158,6 +1158,7 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     m_ScreenToViewParamsConstantBuffer.InverseView = m_Camera.get_InverseViewMatrix();
     m_ScreenToViewParamsConstantBuffer.InverseProjection = m_Camera.get_InverseProjectionMatrix();
     m_ScreenToViewParamsConstantBuffer.ScreenDimensions = m_ScreenDimensions;
+    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 0, nullptr, &m_ScreenToViewParamsConstantBuffer, 0, 0);
 
     // Set device context global settings
 

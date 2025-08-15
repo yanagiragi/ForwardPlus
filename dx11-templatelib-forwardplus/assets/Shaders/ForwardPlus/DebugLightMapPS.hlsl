@@ -1,22 +1,6 @@
 #include "../Structures.hlsli"
 
-cbuffer ScreenToViewParams : register(b0)
-{
-    float4x4 InverseView;
-    float4x4 InverseProjection;
-    float2 ScreenDimensions;
-    float ScreenToViewParams_padding[2];
-}
-
-cbuffer DebugProperties : register(b1)
-{
-    int DebugMode;                 // 4 bytes
-    float DepthPower;         // 4 bytes
-    float padding[2];         // 8 bytes
-                              //----------(16 byte boundary)
-}; // Total:                  // 16 bytes (1 * 16 byte boundary)
-
-cbuffer DispatchParams : register(b2)
+cbuffer DispatchParams : register(b0)
 {
     // Number of groups dispatched
     uint3 numThreadGroups;
@@ -28,6 +12,14 @@ cbuffer DispatchParams : register(b2)
     uint3 numThreads;
     uint padding2;
 }
+
+cbuffer DebugProperties : register(b1)
+{
+    int DebugMode;                 // 4 bytes
+    float DepthPower;         // 4 bytes
+    float padding[2];         // 8 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
 
 Texture2D<uint2> Lightmap : register(t0);
 
@@ -44,7 +36,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     if (DebugMode == FP_DEBUG_MODE_UV)
     {
-        color = float4(texValue.xy / (float2)numThreadGroups, 0, 1);
+        color = float4(texValue.x / numThreadGroups.x, texValue.y / numThreadGroups.y, 0, 1);
     }
 
     else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)

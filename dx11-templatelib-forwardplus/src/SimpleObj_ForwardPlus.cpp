@@ -542,9 +542,8 @@ void SimpleObj::RenderScene_Deferred_DebugLightMapPass()
 
     // Setup pixel shader cb
     ID3D11Buffer* pixelShaderConstantBuffers[] = {
-        m_d3dConstantBuffers[CB_ScreenToViewParams].Get(), 
-        m_d3dConstantBuffers[CB_Debug].Get(),
         m_d3dConstantBuffers[CB_DispatchParams].Get(),
+        m_d3dConstantBuffers[CB_Debug].Get(),
     };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,

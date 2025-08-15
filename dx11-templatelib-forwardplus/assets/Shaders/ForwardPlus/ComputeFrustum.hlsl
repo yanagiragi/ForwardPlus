@@ -21,7 +21,7 @@ cbuffer ScreenToViewParams : register(b1)
     float4x4 InverseView;
     float4x4 InverseProjection;
     float2 ScreenDimensions;
-    float2 ThreadGroups;
+    float ScreenToViewParams_padding[2];
 }
 
 //  =========================
