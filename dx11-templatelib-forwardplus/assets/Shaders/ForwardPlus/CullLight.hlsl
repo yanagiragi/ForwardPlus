@@ -255,13 +255,6 @@ void main(ComputeShaderInput IN)
     {
         o_LightIndexList[o_LightIndexStartOffset + i] = o_LightList[i];
     }
-    
-
-    // For transparent geometry.
-    // for ( i = IN.groupIndex; i < t_LightCount; i += BLOCK_SIZE * BLOCK_SIZE )
-    // {
-    //     t_LightIndexList[t_LightIndexStartOffset + i] = t_LightList[i];
-    // }
 
     // For transparent geometry.
     // for ( i = IN.groupIndex; i < t_LightCount; i += BLOCK_SIZE * BLOCK_SIZE )

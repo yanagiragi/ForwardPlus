@@ -36,7 +36,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     if (DebugMode == FP_DEBUG_MODE_UV)
     {
-        color = float4(texValue.x / numThreadGroups.x, texValue.y / numThreadGroups.y, 0, 1);
+        color = float4(texValue.x / (float)numThreadGroups.x, texValue.y / (float)numThreadGroups.y, 0, 1);
     }
 
     else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)
