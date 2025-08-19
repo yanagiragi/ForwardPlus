@@ -42,7 +42,7 @@ bool SphereInsideFrustum( Sphere sphere, Frustum frustum, float zNear, float zFa
  
     // First check depth, note the sphere is in view space
     // Since we use left hand coordintate, the view vector points in the +Z axis
-    if ( (sphere.c.z - sphere.r) < zNear || (sphere.c.z + sphere.r) > zFar)
+    if ( (sphere.c.z + sphere.r) < zNear || (sphere.c.z - sphere.r) > zFar)
     {
         result = false;
     }
