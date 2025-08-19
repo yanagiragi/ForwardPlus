@@ -30,7 +30,8 @@ struct Light
     int         Enabled = false;                    // 4 bytes
     //--------------------------------------------------------- (16 byte boundary)
     float       Strength = 0.0f;                    // 4 bytes
-    Vector3     Padding;                            // 4 bytes
+    float       Bias;                               // 4 bytes
+    float       Padding[2];                         // 8 bytes
     //--------------------------------------------------------- (16 byte boundary)
 
 };  // Total:                                       // 112 bytes (7 * 16)

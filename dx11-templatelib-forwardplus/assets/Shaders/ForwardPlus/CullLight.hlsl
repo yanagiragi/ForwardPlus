@@ -36,11 +36,11 @@ cbuffer LightProperties : register(b2)
 
 cbuffer DebugProperties : register(b3)
 {
-    int DebugMode;                 // 4 bytes
-    float DepthPower;         // 4 bytes
-    float padding[2];         // 8 bytes
-                              //----------(16 byte boundary)
-}; // Total:                  // 16 bytes (1 * 16 byte boundary)
+    int DebugMode;                  // 4 bytes
+    float DepthPower;               // 4 bytes
+    float DebugPadding[2];          // 8 bytes
+                                    //----------(16 byte boundary)
+}; // Total:                        // 16 bytes (1 * 16 byte boundary)
 
 // The depth from the screen space texture.
 Texture2D DepthTextureVS : register( t0 );
@@ -170,8 +170,8 @@ void main(ComputeShaderInput IN)
             {
                 case POINT_LIGHT:
                 {
-                    Sphere sphere = { light.PositionVS.xyz, light.Range };
-                    if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS ) )
+                    Sphere sphere = { light.PositionVS.xyz, light.Range + light.Bias };
+                    if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS) )
                     {
                         // Add light to light list for transparent geometry.
                         // t_AppendLight( i );
@@ -188,7 +188,7 @@ void main(ComputeShaderInput IN)
                 case SPOT_LIGHT:
                 {
                     // SpotAngle is already in radian unit
-                    float coneRadius = tan( light.SpotAngle ) * light.Range;
+                    float coneRadius = tan( light.SpotAngle + light.Bias ) * light.Range;
 
                     // Since we treat light direction as vector starts from point to light,
                     // we need to negate the direction to get correct cone direction

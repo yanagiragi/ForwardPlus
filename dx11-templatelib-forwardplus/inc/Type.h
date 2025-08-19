@@ -106,7 +106,7 @@ namespace Yr
     {
         int DebugMode = 0;
         float DepthPower = 0;
-        float padding[2];
+        float DebugPadding[2];
     };
 
     struct LightingCalculationOptions

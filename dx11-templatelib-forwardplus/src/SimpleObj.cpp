@@ -516,40 +516,38 @@ void SimpleObj::LoadTexture()
 /// </summary>
 void SimpleObj::LoadLight()
 {
-    struct Light point;
-    point.LightType = (int)LightType::Point;
-    point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
-    point.Range = 3.8f;
-    point.Strength = 0.5f;
-    point.Enabled = true;
-
     struct Light directional;
     directional.LightType = (int)LightType::Directional;
     directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
-    
     auto directionV3 = Vector3(1.0, 0.5, 0.25);
     directionV3.Normalize();
     directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
     directional.Strength = 0.5f;
     directional.Enabled = true;
 
+    struct Light point;
+    point.LightType = (int)LightType::Point;
+    point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
+    point.Range = 3.8f;
+    point.Strength = 0.5f;
+    point.Enabled = true;
+    point.Bias = 1.0f; // expand range 1 unit
+
     struct Light spotlight;
     spotlight.LightType = (int)LightType::Spotlight;
     spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
-    
     directionV3 = Vector3(0.079, -0.285, 0.976f);
     directionV3.Normalize();
     spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Range = 75.0f;
     spotlight.Strength = 1.2f;
+    spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
     spotlight.Enabled = true;
 
     m_Scene.Lights[0] = directional;
     m_Scene.Lights[1] = point;
     m_Scene.Lights[2] = spotlight;
-    
 }
 
 /// <summary>
@@ -732,7 +730,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
                 m_ForwardPlusDepthPower = scale;
             }
-
             bool printDebugInfo = m_ForwardPlusPrintDebugInfo;
             ImGui::Checkbox("PrintDebugInfo", &printDebugInfo);
             m_ForwardPlusPrintDebugInfo = printDebugInfo;
@@ -962,6 +959,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     case 2: light->LightType = 2; break;
                     default: break;
                     }
+                }
+
+                if (light->LightType == 1)
+                {
+                    float scale = light->Bias;
+                    ImGui::DragFloat("Bias", &scale, dragSpeed, 0.0f, 10.0f);
+                    light->Bias = scale;
+                }
+                else if (light->LightType == 2)
+                {
+                    float scale = XMConvertToDegrees(light->Bias);
+                    ImGui::DragFloat("Bias", &scale, dragSpeed, 0.0f, 10.0f);
+                    light->Bias = XMConvertToRadians(scale);
                 }
 
                 ImGui::TreePop();

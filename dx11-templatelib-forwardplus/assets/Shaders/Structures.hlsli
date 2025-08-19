@@ -26,7 +26,8 @@ struct LightProperties
     bool        Enabled;                // 4 bytes
     //----------------------------------- (16 byte boundary)
     float       Strength;               // 4 bytes
-    float3      Padding;                // 4 bytes
+    float       Bias;                   // 4 bytes
+    float2      Padding;                // 8 bytes
     //----------------------------------- (16 byte boundary)
 };  // Total:                           // 80 bytes (5 * 16)
 
