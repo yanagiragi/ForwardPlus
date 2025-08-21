@@ -1,7 +1,15 @@
-# ForwardPlus
+# Forward+
 
-Learning and implement Forward+ using DX11 (wip)
+Learning and implement Forward+ using DX11 & DirectXMath. For more details please refer to [Project Readme](dx11-forwardplus/readme.md).
 
-## Update note:
+## Screenshots
 
-2022/02/26: Use DX11 instead of DX12
+* Cornell Box + Standford Bunny (Instanced) with v-sync, 3 lights
+    * Forward: Final pass (2 Draw Calls)
+    * Deferred: G-Buffer pass (2 Draw Calls) + Final pass (1 Draw Calls)
+    * Forward+: Depth Prepass (2 Draw Calls) + Cull Light pass (1) + Final pass (2 Draw Calls)
+    * No slight performance difference in this test scene (even if we don't uses v-sync)
+
+| Forward | Deferred | Forward+ |
+| --- | --- | --- |
+| ![](docs/cornell-bunny-forward.jpg) | ![](docs/cornell-bunny-deferred.jpg) | ![](docs/cornell-bunny-forwardplus.jpg) |
