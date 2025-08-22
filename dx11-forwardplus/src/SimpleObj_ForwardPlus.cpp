@@ -393,7 +393,7 @@ void SimpleObj::RenderScene_FowardPlus_FinalPass()
 
     // Unbind SRVs
     ID3D11ShaderResourceView* const pSRV[] = { NULL, NULL, NULL };
-    // m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
+    m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
 void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
