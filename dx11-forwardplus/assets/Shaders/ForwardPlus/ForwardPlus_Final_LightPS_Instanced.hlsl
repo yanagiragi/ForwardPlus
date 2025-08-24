@@ -36,7 +36,7 @@ cbuffer DispatchParams : register(b2)
 StructuredBuffer<uint> LightIndexList : register( t0 );
 Texture2D<uint2> LightGrid : register( t1 );
 
-// Since only DX12 supports bindless texture, manual declare potential need textures here
+// Since only DX12 supports bindless textures, potential textures need to be declared manually here
 Texture2D Texture0  : register(t2);
 Texture2D Texture1  : register(t3);
 Texture2D Texture2  : register(t4);

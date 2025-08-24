@@ -21,7 +21,7 @@ cbuffer LightingCalculationOptions : register(b1)
 
 sampler Sampler : register(s0);
 
-// Since only DX12 supports bindless texture, manual declare potential need textures here
+// Since only DX12 supports bindless textures, potential textures need to be declared manually here
 Texture2D Texture0 : register(t0);
 Texture2D Texture1 : register(t1);
 Texture2D Texture2 : register(t2);
