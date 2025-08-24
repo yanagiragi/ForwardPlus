@@ -1,3 +1,4 @@
+#define MAX_TEXTURE 64
 #define MAX_LIGHTS 8
 
 // Light types.
@@ -41,7 +42,7 @@ struct MaterialProperties
     //----------------------------------- (16 byte boundary)
     float4  Specular;       // 16 bytes
     //----------------------------------- (16 byte boundary)
-    bool    UseTexture;     // 4 bytes
+    int    TextureId;     // 4 bytes
     float   SpecularPower;  // 4 bytes
     float2  Padding;        // 8 bytes
     //----------------------------------- (16 byte boundary)

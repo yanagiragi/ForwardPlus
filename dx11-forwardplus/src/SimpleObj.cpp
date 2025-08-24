@@ -3,6 +3,7 @@
 #include "Window.h"
 #include "Shader.h"
 #include "Common.h"
+#include <DirectXTex.h>
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
@@ -469,7 +470,10 @@ void SimpleObj::LoadDebugDraw()
     hr = CreateInputLayoutFromEffect<VertexPositionColor>(m_d3dDevice.Get(), m_d3dEffect.get(), &m_d3dPrimitiveBatchInputLayout);
     AssertIfFailed(hr, "Create Primitive Batch Failed", "Unable to call CreateInputLayoutFromEffect()");
 
-    m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
+    if (m_d3dEffectFactory == nullptr)
+    {
+        m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
+    }
 
     // Create Primitive Batcher
     m_d3dPrimitiveBatch = std::make_unique<PrimitiveBatch<VertexPositionColor>>(m_d3dDeviceContext.Get());
@@ -478,37 +482,47 @@ void SimpleObj::LoadDebugDraw()
 /// <summary>
 /// Setup Texture data
 /// </summary>
-void SimpleObj::LoadTexture()
+int SimpleObj::LoadTexture(const wchar_t* filepath)
 {
-    try
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newTextureView = nullptr;
+
+    if (HasExtension(filepath, L".tga"))
     {
-        m_d3dEffectFactory->CreateTexture(L"assets\\Textures\\grid.png", m_d3dDeviceContext.Get(), &m_GridTexture);
+        DirectX::ScratchImage image;
+        HRESULT hr = DirectX::LoadFromTGAFile(filepath, nullptr, image);
+        if (FAILED(hr)) {
+            DisplayError("Failed to load tga texture");
+        }
 
-        // Create a sampler state for texture sampling in the pixel shader
-        D3D11_SAMPLER_DESC samplerDesc;
-        ZeroMemory(&samplerDesc, sizeof(D3D11_SAMPLER_DESC));
+        ComPtr<ID3D11ShaderResourceView> textureSRV;
+        hr = DirectX::CreateShaderResourceView(m_d3dDevice.Get(), image.GetImages(), image.GetImageCount(), image.GetMetadata(), &newTextureView);
+        if (FAILED(hr)) {
+            DisplayError("Failed to create tga texture");
+        }
 
-        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-        samplerDesc.MipLODBias = 0.0f;
-        samplerDesc.MaxAnisotropy = 1;
-        samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-        samplerDesc.BorderColor[0] = 1.0f;
-        samplerDesc.BorderColor[1] = 1.0f;
-        samplerDesc.BorderColor[2] = 1.0f;
-        samplerDesc.BorderColor[3] = 1.0f;
-        samplerDesc.MinLOD = -FLT_MAX;
-        samplerDesc.MaxLOD = FLT_MAX;
-
-        HRESULT hr = m_d3dDevice->CreateSamplerState(&samplerDesc, &m_d3dSamplerState);
-        AssertIfFailed(hr, "Load Texture", "Failed to create texture sampler.");
+        m_Textures.push_back(newTextureView);
+        return m_Textures.size() - 1;
     }
-    catch (std::exception&)
+    else 
     {
-        DisplayError("Failed to load texture: Textures\\grid.png");
+        if (m_d3dEffectFactory == nullptr)
+        {
+            m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
+        }
+
+        try
+        {
+            m_d3dEffectFactory->CreateTexture(filepath, m_d3dDeviceContext.Get(), &newTextureView);
+            m_Textures.push_back(newTextureView);
+            return m_Textures.size() - 1;
+        }
+        catch (std::exception&)
+        {
+            DisplayError("Failed to load texture");
+        }
     }
+
+    return -1;
 }
 
 /// <summary>
@@ -874,9 +888,8 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 entity->Material.Specular.y = specular[1];
                 entity->Material.Specular.z = specular[2];
 
-                bool UseTexture = entity->Material.UseTexture == 1;
-                ImGui::Checkbox("UseTexture", &UseTexture);
-                entity->Material.UseTexture = UseTexture ? 1 : 0;
+                int textureId = entity->Material.TextureId;
+                ImGui::Text("Texture Id: %d", textureId);
 
                 float specularPower = entity->Material.SpecularPower;
                 ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 128.0f);
@@ -1017,6 +1030,57 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
+void SimpleObj::LoadBasicScene()
+{
+    struct Material boxMaterial = {
+        Vector4::Zero,                          // Emissive
+        Vector4::One,                           // Ambient
+        Vector4::One,                           // Diffuse
+        Vector4::Zero,                          // Specular
+        LoadTexture(L"assets\\Textures\\grid.png")
+    };
+
+    struct Material bunny1Material = {
+        Vector4::Zero,                          // Emissive
+        Vector4::One,                           // Ambient
+        Vector4(115, 165, 245, 255) / 255.0,    // Diffuse
+        Vector4::One,                           // Specular
+        -1
+    };
+
+    struct Material bunny2Material = {
+        Vector4::Zero,                          // Emissive
+        Vector4::One,                           // Ambient
+        Vector4(245, 197, 115, 255) / 255.0,    // Diffuse
+        Vector4::One,                           // Specular
+        -1
+    };
+    
+    m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
+    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
+}
+
+void Yr::SimpleObj::LoadSponzaScene()
+{
+    struct Material testMaterial = {
+        Vector4::Zero,                          // Emissive
+        Vector4::One,                           // Ambient
+        Vector4::One,                           // Diffuse
+        Vector4::Zero,                          // Specular
+        LoadTexture(L"assets\\Sponza\\textures\\sponza_fabric_green_diff.tga")
+    };
+
+    m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), testMaterial));
+
+    // increase camera moving speed
+    normalMovingSpeedMultipler = 40.0f;
+    shiftMovingSpeedMultipler = 80.0f;
+
+    // increase far plane distance
+    farPlane = 10000.f;
+}
+
 SimpleObj::SimpleObj(Window& window)
     : base(window)
     , m_W(0)
@@ -1029,10 +1093,6 @@ SimpleObj::SimpleObj(Window& window)
     , m_Pitch(0.0f)
     , m_Yaw(0.0f)
 {
-    m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
-
     XMVECTOR cameraPos = XMVectorSet(-4.599999, 7.500000, 28.004011, 1);
     XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
     XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
@@ -1054,7 +1114,7 @@ SimpleObj::~SimpleObj()
 void SimpleObj::OnUpdate(UpdateEventArgs& e)
 {
     // Update camera position
-    float speedMultipler = (m_bShift ? 8.0f : 4.0f);
+    float speedMultipler = (m_bShift ? shiftMovingSpeedMultipler : normalMovingSpeedMultipler);
 
     XMVECTOR cameraTranslate = XMVectorSet(static_cast<float>(m_D - m_A), 0.0f, static_cast<float>(m_W - m_S), 1.0f) * speedMultipler * e.ElapsedTime;
     XMVECTOR cameraPan = XMVectorSet(0.0f, static_cast<float>(m_E - m_Q), 0.0f, 1.0f) * speedMultipler * e.ElapsedTime;
@@ -1094,6 +1154,7 @@ void SimpleObj::OnUpdate(UpdateEventArgs& e)
         directionVS.Normalize();
         light.DirectionVS = Vector4(directionVS.x, directionVS.y, directionVS.z, 0.0f);
 
+        // print debug messages
         // if (light.Enabled) 
         // {
         //     std::cout << "light.DirectionWS = ("
@@ -1779,6 +1840,9 @@ bool SimpleObj::LoadContent()
         return buffer;
     };
 
+    LoadBasicScene();
+    // LoadSponzaScene();
+
     // Setup models
     for (auto entity : m_Scene.Entities)
     {
@@ -1999,7 +2063,7 @@ bool SimpleObj::LoadContent()
     LoadShaderResources();
     LoadLight();
     LoadDebugDraw();
-    LoadTexture();
+    LoadSampler();
 
     // Force a resize event so the camera's projection matrix gets initialized.
     ResizeEventArgs resizeEventArgs(m_Window.get_ClientWidth(), m_Window.get_ClientHeight());
@@ -2008,6 +2072,30 @@ bool SimpleObj::LoadContent()
     SetupImgui();
 
     return true;
+}
+
+void SimpleObj::LoadSampler()
+{
+    // Create a sampler state for texture sampling in the pixel shader
+    D3D11_SAMPLER_DESC samplerDesc;
+    ZeroMemory(&samplerDesc, sizeof(D3D11_SAMPLER_DESC));
+
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.MipLODBias = 0.0f;
+    samplerDesc.MaxAnisotropy = 1;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.BorderColor[0] = 1.0f;
+    samplerDesc.BorderColor[1] = 1.0f;
+    samplerDesc.BorderColor[2] = 1.0f;
+    samplerDesc.BorderColor[3] = 1.0f;
+    samplerDesc.MinLOD = -FLT_MAX;
+    samplerDesc.MaxLOD = FLT_MAX;
+
+    HRESULT hr = m_d3dDevice->CreateSamplerState(&samplerDesc, &m_d3dSamplerState);
+    AssertIfFailed(hr, "Load Texture", "Failed to create texture sampler.");
 }
 
 void SimpleObj::UnloadContent()

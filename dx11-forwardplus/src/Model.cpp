@@ -1,6 +1,7 @@
 #include "Model.h"
 
 #include <iostream>
+#include <string>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
@@ -23,7 +24,12 @@ Model::~Model()
 bool Model::Load(const char* filepath)
 {
     tinyobj::ObjReaderConfig reader_config;
-    reader_config.mtl_search_path = "./"; // Path to material files
+
+    std::string path(filepath);
+    size_t pos = path.find_last_of("/\\");
+    std::string folder = (pos == std::string::npos) ? "./" : path.substr(0, pos);
+
+    reader_config.mtl_search_path = folder; // Path to material files
 
     tinyobj::ObjReader reader;
 

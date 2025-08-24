@@ -3,14 +3,13 @@
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 cmake_policy(VERSION 3.6)
 project("dx11-forwardplus"
-        VERSION 1.0.0.0
-        LANGUAGES C CXX
+    VERSION 1.0.0.0
+    LANGUAGES C CXX
 )
 
 # =============================================================
 
 # CMake Settings
-
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_SUPPRESS_REGENERATION true)
 set(DCMAKE_GENERATOR_PLATFORM "x64")
@@ -24,8 +23,9 @@ SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+
 if(NOT CMAKE_DEBUG_POSTFIX)
-  set(CMAKE_DEBUG_POSTFIX d)
+    set(CMAKE_DEBUG_POSTFIX d)
 endif()
 
 # =============================================================
@@ -57,10 +57,10 @@ file(COPY ../external/DirectXTK-DebugDraw DESTINATION ${CMAKE_CURRENT_SOURCE_DIR
 # Imgui
 message(STATUS "Installing Dear Imgui")
 file(GLOB IMGUI_FILES
-  "../external/imgui/*.h"
-  "../external/imgui/*.cpp"
-  "../external/imgui/backends/imgui_impl_win32*"
-  "../external/imgui/backends/imgui_impl_dx11*"
+    "../external/imgui/*.h"
+    "../external/imgui/*.cpp"
+    "../external/imgui/backends/imgui_impl_win32*"
+    "../external/imgui/backends/imgui_impl_dx11*"
 )
 file(COPY ${IMGUI_FILES} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 
@@ -77,10 +77,17 @@ INCLUDE_EXTERNAL_MSPROJECT(
 )
 set_property(TARGET DirectXTemplateLib PROPERTY FOLDER "Dependencies")
 
+# Add DirectXTex
+message(STATUS "Installing DirectXTex")
+file(COPY ../external/DirectXTex DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external)
+set(BUILD_DX12 OFF)
+add_subdirectory(external/DirectXTex)
+set_property(TARGET DirectXTex PROPERTY FOLDER "Dependencies")
+set_property(TARGET ddsview PROPERTY FOLDER "Dependencies")
+
 # =============================================================
 
 # Sources
-
 file(GLOB_RECURSE CPP_SOURCES RELATIVE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -126,7 +133,6 @@ endforeach()
 # =============================================================
 
 # Finalize App
-
 add_executable(
     ${PROJECT_NAME}
     WIN32
@@ -140,10 +146,10 @@ add_executable(
 # =============================================================
 
 # Finish Dependencies
-
 target_link_libraries(
     ${PROJECT_NAME}
     DirectXTK
+    DirectXTex
 )
 
 target_include_directories(
@@ -157,6 +163,7 @@ target_include_directories(
     PUBLIC external/imGuIZMO.quat
     PUBLIC external # for imGuIZMO.quat/imGuIZMOquat.cpp
     PUBLIC external/DirectXTemplateLib/inc
+    PUBLIC external/DirectXTex
 )
 
 add_dependencies(
@@ -173,6 +180,7 @@ add_dependencies(
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+
 # Change working directory to top dir to access `assets/shaders/` folder
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/..)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})

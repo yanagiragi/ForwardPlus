@@ -72,8 +72,11 @@ namespace Yr
         #pragma region Functions
         void LoadShaderResources();
         void LoadDebugDraw();
-        void LoadTexture();
+        int LoadTexture(const wchar_t* filepath);
         void LoadLight();
+        void LoadSampler();
+        void LoadBasicScene();
+        void LoadSponzaScene();
 
         void RenderScene(RenderEventArgs& e);
         void RenderDebug(RenderEventArgs& e);
@@ -110,6 +113,8 @@ namespace Yr
         HRESULT CreateStructuredBufferSRV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
         HRESULT CreateStructuredBufferUAV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut);
         HRESULT CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut);
+
+        bool HasExtension(const wchar_t* path, const std::wstring& ext);
 
         // Wrap to native API
         void Draw(UINT VertexCount, UINT StartVertexLocation);
@@ -206,8 +211,7 @@ namespace Yr
         // Texture data
         std::unique_ptr<DirectX::EffectFactory> m_d3dEffectFactory = nullptr;
         Microsoft::WRL::ComPtr<ID3D11SamplerState> m_d3dSamplerState = nullptr;
-        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_GridTexture = nullptr;
-
+        
         // Constant Buffers
         struct ObjectConstantBuffer m_ObjectConstantBuffer;
         struct FrameConstantBuffer m_FrameConstantBuffer;
@@ -217,7 +221,6 @@ namespace Yr
         struct ScreenToViewParams m_ScreenToViewParamsConstantBuffer;
         struct DispatchParams m_DispatchParamsConstantBuffer;
         struct LightingCalculationOptions m_LightingCalculationOptionsConstrantBuffer;
-
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
         // Deferred Render target views
@@ -275,37 +278,9 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dDebugRWListBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dDebugRWListBuffers_UAV;
 
-        // Materials
-        struct Material defaultMaterial;
-
-        struct Material diffuseMaterial = {
-            Vector4::Zero, // Emissive
-            Vector4::One, // Ambient
-            Vector4::One, // Diffuse
-            Vector4::Zero, // Specular
-        };
-
-        struct Material bunny1Material = {
-            Vector4::Zero, // Emissive
-            Vector4::One, // Ambient
-            Vector4(115, 165, 245, 255) / 255.0, // Diffuse
-            Vector4::One, // Specular
-        };
-
-        struct Material bunny2Material = {
-            Vector4::Zero, // Emissive
-            Vector4::One, // Ambient
-            Vector4(245, 197, 115, 255) / 255.0, // Diffuse
-            Vector4::One, // Specular
-        };
-
-        struct Material boxMaterial = {
-            Vector4::Zero, // Emissive
-            Vector4::One, // Ambient
-            Vector4::One, // Diffuse
-            Vector4::Zero, // Specular
-            true // use texture
-        };
+        // Global materials & texture settings
+        std::vector<struct Material> m_Materials;
+        std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> m_Textures;
 
         // Light Volume Settings
         Model* m_lightVolume_sphere;
@@ -318,7 +293,9 @@ namespace Yr
         Vector4 m_InitialCameraRot;
         const float fovInDegree = 45.0f;
         const float nearPlane = 0.1f;
-        const float farPlane = 100.f;
+        float farPlane = 100.f;
+        float normalMovingSpeedMultipler = 4.0f;
+        float shiftMovingSpeedMultipler = 8.0f;
 
         // Debug options
         RenderMode m_RenderMode = RenderMode::Forward;

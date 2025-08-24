@@ -13,3 +13,6 @@
 [submodule "external/imGuIZMO.quat"]
 	path = external/imGuIZMO.quat
 	url = https://github.com/BrutPitt/imGuIZMO.quat
+[submodule "external/DirectXTex"]
+	path = external/DirectXTex
+	url = https://github.com/microsoft/DirectXTex.git

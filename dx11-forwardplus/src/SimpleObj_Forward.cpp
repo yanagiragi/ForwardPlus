@@ -1,4 +1,5 @@
 #include "SimpleObj.h"
+#include <set>
 
 using namespace Microsoft::WRL;
 using namespace Yr;
@@ -37,7 +38,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         samplerStates->GetAddressOf()           // array of sampler states
     );
 
-    ComPtr<ID3D11ShaderResourceView> textures[] = { m_GridTexture };
+    ComPtr<ID3D11ShaderResourceView> textures[] = { m_Textures[0] }; // temp debug
     m_d3dDeviceContext->PSSetShaderResources(
         0,                                      // start slot
         1,                                      // number of resources
@@ -114,6 +115,19 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
                 m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
+                // Bind texture state
+                int textureId = entity->Material.TextureId;
+                if (textureId >= 0)
+                {
+                    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
+                    textures[textureId] = m_Textures[textureId];
+                    m_d3dDeviceContext->PSSetShaderResources(
+                        0,                                      // start slot
+                        _countof(textures),                     // number of resources
+                        textures->GetAddressOf()                // array of resources
+                    );
+                }
+
                 auto vertexBuffer = entity->Model->VertexBuffer();
                 m_d3dDeviceContext->IASetVertexBuffers(
                     0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
@@ -160,6 +174,8 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
             const UINT offset[2] = { 0, 0 };
             std::vector<InstancedObjectConstantBuffer> instanceData;
+            std::set<int> usedTextures;
+            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
             for (auto const& pair : m_Scene.InstancedEntity)
             {
                 auto key = pair.first;
@@ -169,6 +185,14 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 instanceData.clear();
                 for (auto const& instancedEntity : pair.second)
                 {
+                    // collect required textures
+                    int textureId = instancedEntity->Material.TextureId;
+                    if (textureId >= 0 && usedTextures.count(textureId) == 0)
+                    {
+                        usedTextures.insert(textureId);
+                        textures[textureId] = m_Textures[textureId];
+                    }
+
                     instanceData.push_back({
                         instancedEntity->WorldMatrix,
                         instancedEntity->InverseTransposeWorldMatrix,
@@ -176,9 +200,19 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                         instancedEntity->Material
                         });
                 }
-
+                
                 // update perInstanceBuffer
                 m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
+
+                // bind texture state
+                if (usedTextures.size() > 0)
+                {
+                    m_d3dDeviceContext->PSSetShaderResources(
+                        0,                                      // start slot
+                        _countof(textures),                     // number of resources
+                        textures->GetAddressOf()                // array of resources
+                    );
+                }
 
                 ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
                 m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
@@ -231,6 +265,19 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
                 m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
                 m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+
+                // Bind texture state
+                int textureId = entity->Material.TextureId;
+                if (textureId >= 0)
+                {
+                    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
+                    textures[textureId] = m_Textures[textureId];
+                    m_d3dDeviceContext->PSSetShaderResources(
+                        0,                                      // start slot
+                        _countof(textures),                                      // number of resources
+                        textures->GetAddressOf()                // array of resources
+                    );
+                }
 
                 auto vertexBuffer = entity->Model->VertexBuffer();
                 m_d3dDeviceContext->IASetVertexBuffers(
@@ -294,6 +341,8 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
             const UINT offset[2] = { 0, 0 };
             std::vector<InstancedObjectConstantBuffer> instanceData;
+            std::set<int> usedTextures;
+            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
             for (auto const& pair : m_Scene.InstancedEntity)
             {
                 auto key = pair.first;
@@ -303,6 +352,14 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 instanceData.clear();
                 for (auto const& instancedEntity : pair.second)
                 {
+                    // collect required textures
+                    int textureId = instancedEntity->Material.TextureId;
+                    if (textureId >= 0 && usedTextures.count(textureId) == 0)
+                    {
+                        usedTextures.insert(textureId);
+                        textures[textureId] = m_Textures[textureId];
+                    }
+
                     instanceData.push_back({
                         instancedEntity->WorldMatrix,
                         instancedEntity->InverseTransposeWorldMatrix,
@@ -313,6 +370,16 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
 
                 // update perInstanceBuffer
                 m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
+
+                // bind texture state
+                if (usedTextures.size() > 0)
+                {
+                    m_d3dDeviceContext->PSSetShaderResources(
+                        0,                                      // start slot
+                        _countof(textures),                     // number of resources
+                        textures->GetAddressOf()                // array of resources
+                    );
+                }
 
                 ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
                 m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
@@ -347,6 +414,6 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
     }
 
     // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[1] = { NULL };
+    ID3D11ShaderResourceView* const pSRV[MAX_TEXTURES] = { NULL };
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
