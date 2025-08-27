@@ -1,5 +1,7 @@
 #include "SimpleObj.h"
+
 #include <set>
+#include <functional>
 
 using namespace Microsoft::WRL;
 using namespace Yr;
@@ -60,6 +62,15 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
     UINT sampleMask = 0xffffffff;
     m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
 
+    // for forward shading both light calculation share same bind texture functions
+    std::function<void(ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate = [&](ComPtr<ID3D11ShaderResourceView> textures[]) -> void {
+        m_d3dDeviceContext->PSSetShaderResources(
+            0,                                      // start slot
+            MAX_TEXTURES,                           // number of resources
+            textures->GetAddressOf()                // array of resources
+        );
+    };
+
     if (m_LightCalculationMode == LightCalculationMode::Loop)
     {
         // Draw Regular Entities
@@ -97,50 +108,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 pixelShaderConstantBuffers              // array of constant buffers
             );
 
-            UINT vertexStride = sizeof(VertexData);
-            UINT offset = 0;
-            for (auto entity : m_Scene.Entities)
-            {
-                if (entity->Instanced)
-                    continue;
-
-                // Setup Material CB
-                m_MaterialPropertiesConstantBuffer.Material = entity->Material;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
-
-                // Setup Object CB
-                m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
-                m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-                // Bind texture state
-                int textureId = entity->Material.TextureId;
-                if (textureId >= 0)
-                {
-                    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-                    textures[textureId] = m_Textures[textureId];
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                     // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
-                }
-
-                auto vertexBuffer = entity->Model->VertexBuffer();
-                m_d3dDeviceContext->IASetVertexBuffers(
-                    0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                    1,                                      // number of vertex buffers in the array
-                    &vertexBuffer,                          // pointer to an array of vertex buffers
-                    &vertexStride,                          // pointer to stride values
-                    &offset                                 // pointer to offset values
-                );
-                Draw(
-                    entity->Model->VertexCount(),
-                    0
-                );
-            }
+            DrawRegularEntities(bindTextureDelegate);
         }
 
         // Draw Instanced Entities
@@ -171,59 +139,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
                 pixelShaderConstantBuffers              // array of constant buffers
             );
 
-            const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
-            const UINT offset[2] = { 0, 0 };
-            std::vector<InstancedObjectConstantBuffer> instanceData;
-            std::set<int> usedTextures;
-            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-            for (auto const& pair : m_Scene.InstancedEntity)
-            {
-                auto key = pair.first;
-                auto verticesCount = Model::GetVertexCount(key);
-                auto size = pair.second.size();
-
-                instanceData.clear();
-                for (auto const& instancedEntity : pair.second)
-                {
-                    // collect required textures
-                    int textureId = instancedEntity->Material.TextureId;
-                    if (textureId >= 0 && usedTextures.count(textureId) == 0)
-                    {
-                        usedTextures.insert(textureId);
-                        textures[textureId] = m_Textures[textureId];
-                    }
-
-                    instanceData.push_back({
-                        instancedEntity->WorldMatrix,
-                        instancedEntity->InverseTransposeWorldMatrix,
-                        instancedEntity->InverseTransposeWorldViewMatrix,
-                        instancedEntity->Material
-                        });
-                }
-                
-                // update perInstanceBuffer
-                m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
-
-                // bind texture state
-                if (usedTextures.size() > 0)
-                {
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                     // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
-                }
-
-                ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-                m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
-
-                DrawInstanced(
-                    verticesCount,
-                    size,
-                    0,
-                    0
-                );
-            }
+            DrawInstancedEntities(bindTextureDelegate);
         }
     }
     
@@ -248,73 +164,40 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
 
             );
 
-            UINT vertexStride = sizeof(VertexData);
-            UINT offset = 0;
-            for (auto entity : m_Scene.Entities)
-            {
-                if (entity->Instanced)
-                    continue;
-
-                // Setup Material CB
-                m_MaterialPropertiesConstantBuffer.Material = entity->Material;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
-
-                // Setup Object CB
-                m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
-                m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-                // Bind texture state
-                int textureId = entity->Material.TextureId;
-                if (textureId >= 0)
-                {
-                    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-                    textures[textureId] = m_Textures[textureId];
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                                      // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
-                }
-
-                auto vertexBuffer = entity->Model->VertexBuffer();
-                m_d3dDeviceContext->IASetVertexBuffers(
-                    0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                    1,                                      // number of vertex buffers in the array
-                    &vertexBuffer,                          // pointer to an array of vertex buffers
-                    &vertexStride,                          // pointer to stride values
-                    &offset                                 // pointer to offset values
+            std::function<void(ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate = [&](ComPtr<ID3D11ShaderResourceView> textures[]) -> void {
+                m_d3dDeviceContext->PSSetShaderResources(
+                    0,                                      // start slot
+                    MAX_TEXTURES,                     // number of resources
+                    textures->GetAddressOf()                // array of resources
                 );
+            };
 
-                for (int i = -1; i < MAX_LIGHTS; ++i)
+            for (int i = -1; i < MAX_LIGHTS; ++i)
+            {
+                if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
                 {
-                    if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
-                    {
-                        continue;
-                    }
-
-                    // i = -1 for first pass: ambient + emission
-                    if (!hasDrawAnyModel)
-                    {
-                        m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
-                        m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
-                        hasDrawAnyModel = true;
-                    }
-
-                    // other pass: additive blend diffuse and specular
-                    else
-                    {
-                        m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_Overlay.Get(), 1);
-                        m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, sampleMask);
-                    }
-
-                    m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
-                    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
-
-                    Draw(entity->Model->VertexCount(), 0);
+                    continue;
                 }
+
+                // i = -1 for first pass: ambient + emission
+                if (!hasDrawAnyModel)
+                {
+                    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+                    m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
+                    hasDrawAnyModel = true;
+                }
+
+                // other pass: additive blend diffuse and specular
+                else
+                {
+                    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_Overlay.Get(), 1);
+                    m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, sampleMask);
+                }
+
+                m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
+                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
+
+                DrawRegularEntities(bindTextureDelegate);
             }
         }
 
@@ -338,77 +221,30 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             };
             m_d3dDeviceContext->PSSetConstantBuffers(0, _countof(pixelShaderConstantBuffers), pixelShaderConstantBuffers);
 
-            const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
-            const UINT offset[2] = { 0, 0 };
-            std::vector<InstancedObjectConstantBuffer> instanceData;
-            std::set<int> usedTextures;
-            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-            for (auto const& pair : m_Scene.InstancedEntity)
+            bool hasDrawAnyModel = false;
+            for (int i = -1; i < MAX_LIGHTS; ++i)
             {
-                auto key = pair.first;
-                auto verticesCount = Model::GetVertexCount(key);
-                auto size = pair.second.size();
-
-                instanceData.clear();
-                for (auto const& instancedEntity : pair.second)
+                if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
                 {
-                    // collect required textures
-                    int textureId = instancedEntity->Material.TextureId;
-                    if (textureId >= 0 && usedTextures.count(textureId) == 0)
-                    {
-                        usedTextures.insert(textureId);
-                        textures[textureId] = m_Textures[textureId];
-                    }
-
-                    instanceData.push_back({
-                        instancedEntity->WorldMatrix,
-                        instancedEntity->InverseTransposeWorldMatrix,
-                        instancedEntity->InverseTransposeWorldViewMatrix,
-                        instancedEntity->Material
-                        });
+                    continue;
                 }
 
-                // update perInstanceBuffer
-                m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
-
-                // bind texture state
-                if (usedTextures.size() > 0)
+                if (!hasDrawAnyModel)
                 {
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                     // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
+                    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+                    m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
+                    hasDrawAnyModel = true;
+                }
+                else
+                {
+                    m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_Overlay.Get(), 1);
+                    m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, sampleMask);
                 }
 
-                ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-                m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
+                m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
+                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
 
-                bool hasDrawAnyModel = false;
-                for (int i = -1; i < MAX_LIGHTS; ++i)
-                {
-                    if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
-                    {
-                        continue;
-                    }
-
-                    if (!hasDrawAnyModel)
-                    {
-                        m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
-                        m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
-                        hasDrawAnyModel = true;
-                    }
-                    else
-                    {
-                        m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_Overlay.Get(), 1);
-                        m_d3dDeviceContext->OMSetBlendState(m_d3dBlendState_Add.Get(), nullptr, sampleMask);
-                    }
-
-                    m_LightingCalculationOptionsConstrantBuffer.LightIndex = i;
-                    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_LightCalculationOptions].Get(), 0, nullptr, &m_LightingCalculationOptionsConstrantBuffer, 0, 0);
-
-                    DrawInstanced(verticesCount, size, 0, 0);
-                }
+                DrawInstancedEntities(bindTextureDelegate);
             }
         }
     }

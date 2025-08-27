@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 // DirectX includes
 #include <DirectXMath.h>
 
@@ -77,6 +79,9 @@ namespace Yr
         void LoadSampler();
         void LoadBasicScene();
         void LoadSponzaScene();
+
+        void DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate);
+        void DrawInstancedEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate);
 
         void RenderScene(RenderEventArgs& e);
         void RenderDebug(RenderEventArgs& e);

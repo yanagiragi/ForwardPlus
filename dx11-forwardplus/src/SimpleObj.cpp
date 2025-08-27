@@ -4,6 +4,7 @@
 #include "Shader.h"
 #include "Common.h"
 #include <DirectXTex.h>
+#include <set>
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
@@ -751,6 +752,8 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             bool printDebugInfo = m_ForwardPlusPrintDebugInfo;
             ImGui::Checkbox("PrintDebugInfo", &printDebugInfo);
             m_ForwardPlusPrintDebugInfo = printDebugInfo;
+
+            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
         }
 
         else if (m_RenderMode == RenderMode::Deferred)
@@ -761,10 +764,15 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
             }
 
-            int lightCalculationMode = (int)m_LightCalculationMode;
-            if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
+            if (m_DeferredDebugMode == Deferred_DebugMode::None)
             {
-                m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
+                int lightCalculationMode = (int)m_LightCalculationMode;
+                if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
+                {
+                    m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
+                }
+
+                ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
             }
 
             if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
@@ -782,9 +790,9 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             {
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
-        }
 
-        ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+        }
     }
     ImGui::PopID();
 
@@ -1079,6 +1087,113 @@ void Yr::SimpleObj::LoadSponzaScene()
 
     // increase far plane distance
     farPlane = 10000.f;
+}
+
+void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate)
+{
+    UINT vertexStride = sizeof(VertexData);
+    UINT offset = 0;
+    for (auto entity : m_Scene.Entities)
+    {
+        if (entity->Instanced)
+            continue;
+
+        // Setup Material CB
+        m_MaterialPropertiesConstantBuffer.Material = entity->Material;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
+
+        // Setup Object CB
+        m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
+        m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
+        m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
+        m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+
+        // Bind texture state
+        int textureId = entity->Material.TextureId;
+        if (textureId >= 0)
+        {
+            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
+            textures[textureId] = m_Textures[textureId];
+            bindTextureDelegate(textures);
+        }
+
+        auto model = entity->Model;
+        for (auto const& key : model->keys)
+        {
+            auto vertexBuffer = model->GetVertexBuffer(key);
+            m_d3dDeviceContext->IASetVertexBuffers(
+                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+                1,                                      // number of vertex buffers in the array
+                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &vertexStride,                          // pointer to stride values
+                &offset                                 // pointer to offset values
+            );
+            Draw(
+                entity->Model->GetVertexCount(key),
+                0
+            );
+        }
+    }
+}
+
+void Yr::SimpleObj::DrawInstancedEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate)
+{
+    const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
+    const UINT offset[2] = { 0, 0 };
+    std::vector<InstancedObjectConstantBuffer> instanceData;
+    std::set<int> usedTextures;
+    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
+    for (auto const& pair : m_Scene.InstancedEntity)
+    {
+        auto instanceCount = pair.second.size();
+        auto& model = pair.second.front()->Model;
+
+        for (auto const& key : model->keys)
+        {
+            usedTextures.clear();
+            instanceData.clear();
+
+            for (auto const& entity : pair.second)
+            {
+                // collect required textures
+                int textureId = entity->Material.TextureId;
+                if (textureId >= 0 && usedTextures.count(textureId) == 0)
+                {
+                    usedTextures.insert(textureId);
+                    textures[textureId] = m_Textures[textureId];
+                }
+
+                instanceData.push_back({
+                    entity->WorldMatrix,
+                    entity->InverseTransposeWorldMatrix,
+                    entity->InverseTransposeWorldViewMatrix,
+                    entity->Material
+                    });
+            }
+
+            // update perInstanceBuffer
+            auto resource = Model::GetInstancedVertexBuffer(key);
+            m_d3dDeviceContext->UpdateSubresource(resource, 0, nullptr, instanceData.data(), 0, 0);
+
+            // bind texture state
+            if (usedTextures.size() > 0)
+            {
+                bindTextureDelegate(textures);
+            }
+
+            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
+            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
+
+            auto verticesCount = Model::GetVertexCount(key);
+            DrawInstanced(
+                verticesCount,
+                instanceCount,
+                0,
+                0
+            );
+        }
+    }
 }
 
 SimpleObj::SimpleObj(Window& window)
@@ -1802,89 +1917,83 @@ bool SimpleObj::LoadContent()
 
     HRESULT hr;
 
-    auto LoadModel = [&](std::string filepath, Model*& target) -> ID3D11Buffer*
-    {
-        target = new Model();
-        target->Load(filepath.c_str());
-
-        auto key = target->Key();
-        if (Model::ContainsVertexBuffer(key))
-        {
-            return Model::GetVertexBuffer(key);
-        }
-
-        // Create an initialize the vertex buffer.
-        D3D11_BUFFER_DESC vertexBufferDesc;
-        ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-        vertexBufferDesc.ByteWidth = sizeof(VertexData) * target->VertexCount();    // size of the buffer in bytes
-        vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
-        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
-        vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
-
-        D3D11_SUBRESOURCE_DATA resourceData;
-        ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-        resourceData.pSysMem = target->Head();                                   // pointer to the data to initialize the buffer with
-        resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline.
-                                                                                        // No used for now.
-        resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. 
-                                                                                        // no used for now.
-        ID3D11Buffer* buffer = nullptr;
-        HRESULT hr = m_d3dDevice->CreateBuffer(
-            &vertexBufferDesc,                                                          // buffer description
-            &resourceData,                                                              // pointer to the initialization data
-            &buffer                                                                     // pointer to the created buffer object
-        );
-        std::string message = "Unable to create vertex buffer of " + filepath;
-        AssertIfFailed(hr, "Load Content", message.c_str());
-
-        return buffer;
-    };
-
     LoadBasicScene();
     // LoadSponzaScene();
 
     // Setup models
     for (auto entity : m_Scene.Entities)
     {
-        auto buffer = LoadModel(entity->ModelPath.c_str(), entity->Model);
-        Model::AddVertexBuffer(entity->Model->Key(), buffer);
+        entity->Model = new Model();
+        entity->Model->Load(entity->ModelPath.c_str());
+
+        auto model = entity->Model;
+        for (auto const& key : model->keys)
+        {
+            // Create an initialize the vertex buffer.
+            D3D11_BUFFER_DESC vertexBufferDesc;
+            ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+            vertexBufferDesc.ByteWidth = sizeof(VertexData) * model->GetVertexCount(key);           // size of the buffer in bytes
+            vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+            vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+            vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+
+            D3D11_SUBRESOURCE_DATA resourceData;
+            ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+            resourceData.pSysMem = Model::Head(key);                                        // pointer to the data to initialize the buffer with
+            resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline. No used for now.
+            resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. No used for now.
+            
+            ID3D11Buffer* buffer = nullptr;
+            HRESULT hr = m_d3dDevice->CreateBuffer(
+                &vertexBufferDesc,                                                          // buffer description
+                &resourceData,                                                              // pointer to the initialization data
+                &buffer                                                                     // pointer to the created buffer object
+            );
+            std::string message = "Unable to create vertex buffer of " + key;
+            AssertIfFailed(hr, "Load Content", message.c_str());
+
+            Model::AddVertexBuffer(key, buffer);
+        }
     }
 
     for (auto pair : m_Scene.InstancedEntity)
     {
-        auto key = pair.first;
         auto instanceCount = pair.second.size();
 
-        std::vector<InstancedObjectConstantBuffer> instanceData;
-        for (auto const& instancedEntity : pair.second)
+        auto model = pair.second.front()->Model;
+        for (auto const& key : model->keys)
         {
-            instanceData.push_back({
-                instancedEntity->WorldMatrix,
-                instancedEntity->InverseTransposeWorldMatrix,
-                instancedEntity->InverseTransposeWorldViewMatrix,
-                instancedEntity->Material
+            std::vector<InstancedObjectConstantBuffer> instanceData;
+            for (auto const& entity : pair.second)
+            {
+                instanceData.push_back({
+                    entity->WorldMatrix,
+                    entity->InverseTransposeWorldMatrix,
+                    entity->InverseTransposeWorldViewMatrix,
+                    entity->Material
                 });
+            }
+
+            // Create the per-instance vertex buffer.
+            D3D11_BUFFER_DESC instanceBufferDesc;
+            ZeroMemory(&instanceBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+            instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            instanceBufferDesc.ByteWidth = sizeof(InstancedObjectConstantBuffer) * instanceCount;
+            instanceBufferDesc.CPUAccessFlags = 0;
+            instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+            D3D11_SUBRESOURCE_DATA resourceData;
+            ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+            resourceData.pSysMem = instanceData.data();
+            resourceData.SysMemPitch = 0;
+            resourceData.SysMemSlicePitch = 0;
+
+            ID3D11Buffer* buffer;
+            hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &buffer);
+
+            Model::AddInstancedVertexBuffer(key, buffer);
         }
-
-        // Create the per-instance vertex buffer.
-        D3D11_BUFFER_DESC instanceBufferDesc;
-        ZeroMemory(&instanceBufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-        instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        instanceBufferDesc.ByteWidth = sizeof(InstancedObjectConstantBuffer) * instanceCount;
-        instanceBufferDesc.CPUAccessFlags = 0;
-        instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-        D3D11_SUBRESOURCE_DATA resourceData;
-        ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-        resourceData.pSysMem = instanceData.data();
-        resourceData.SysMemPitch = 0;
-        resourceData.SysMemSlicePitch = 0;
-
-        ID3D11Buffer* buffer;
-        hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &buffer);
-
-        Model::AddInstancedVertexBuffer(key, buffer);
     }
 
     // setup CB
@@ -2053,11 +2162,44 @@ bool SimpleObj::LoadContent()
 
     // load light volume models
     {
-        auto buffer = LoadModel("assets/Models/UnitSphere.obj", m_lightVolume_sphere);
-        Model::AddVertexBuffer(m_lightVolume_sphere->Key(), buffer);
+        auto AddVertexBuffer = [&](Model*& target) -> void
+        {
+            for (auto const& key : target->keys)
+            {
+                // Create an initialize the vertex buffer.
+                D3D11_BUFFER_DESC vertexBufferDesc;
+                ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+                vertexBufferDesc.ByteWidth = sizeof(VertexData) * target->GetVertexCount(key);           // size of the buffer in bytes
+                vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
+                vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
+                vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
+
+                D3D11_SUBRESOURCE_DATA resourceData;
+                ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+                resourceData.pSysMem = Model::Head(key);                                        // pointer to the data to initialize the buffer with
+                resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline. No used for now.
+                resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. No used for now.
+
+                ID3D11Buffer* buffer = nullptr;
+                HRESULT hr = m_d3dDevice->CreateBuffer(
+                    &vertexBufferDesc,                                                          // buffer description
+                    &resourceData,                                                              // pointer to the initialization data
+                    &buffer                                                                     // pointer to the created buffer object
+                );
+                std::string message = "Unable to create vertex buffer of " + key;
+                AssertIfFailed(hr, "Load Content", message.c_str());
+
+                Model::AddVertexBuffer(key, buffer);
+            }
+        };
+
+        m_lightVolume_sphere = new Model();
+        m_lightVolume_sphere->Load("assets/Models/UnitSphere.obj");
+        AddVertexBuffer(m_lightVolume_sphere);
         
-        buffer = LoadModel("assets/Models/UnitCone.obj", m_lightVolume_cone);
-        Model::AddVertexBuffer(m_lightVolume_sphere->Key(), buffer);
+        m_lightVolume_cone = new Model();
+        m_lightVolume_cone->Load("assets/Models/UnitCone.obj");
+        AddVertexBuffer(m_lightVolume_cone);
     }
 
     LoadShaderResources();

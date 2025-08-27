@@ -20,29 +20,14 @@ class Model
 public:
     ~Model();
     bool Load(const char* filepath);
-
-    int VertexCount()
-    {
-        return GetVertexCount(m_Key);
-    }
-
-    struct VertexData* Head()
-    {
-        return m_Resources[m_Key].data();
-    }
-
-    std::string Key()
-    {
-        return m_Key;
-    }
-
-    ID3D11Buffer* VertexBuffer()
-    {
-        return GetVertexBuffer(m_Key);
-    }
-
+    
     // static methods
 
+    static struct VertexData* Head(std::string key)
+    {
+        return m_Resources[key].data();
+    }    
+    
     static bool ContainsVertexBuffer(std::string key)
     {
         return m_VertexBuffers.find(key) != m_VertexBuffers.end();
@@ -101,9 +86,9 @@ public:
         m_PerInstanceVertexBuffers.clear();
     }
 
+    std::vector<std::string> keys;
+
 private:
-    std::string m_Key;
-    int m_Id;
 
     static int m_ResourceCount;
     static std::map<std::string, std::vector<struct VertexData>> m_Resources;

@@ -86,6 +86,7 @@ HRESULT SimpleObj::CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSi
     else
         return pDevice->CreateBuffer(&desc, nullptr, ppBufOut);
 }
+
 bool Yr::SimpleObj::HasExtension(const wchar_t* path, const std::wstring& ext)
 {
     std::wstring filename(path);
@@ -255,6 +256,25 @@ void SimpleObj::RenderScene_FowardPlus_FinalPass()
     UINT sampleMask = 0xffffffff;
     m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
 
+    const int textureStartOffset = 2;
+    ComPtr<ID3D11ShaderResourceView> texturesWithStartOffset[MAX_TEXTURES + textureStartOffset] = {
+        m_d3dOpaqueLightIndexListBuffers_SRV.Get(),
+        m_d3dOpaqueLightGridBuffers_SRV.Get()
+    };
+
+    std::function<void(ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate = [&](ComPtr<ID3D11ShaderResourceView> textures[]) -> void {
+        for (int i = 0; i < MAX_TEXTURES; ++i) // memcpy not suitable for ComPtr!
+        {
+            texturesWithStartOffset[textureStartOffset + i] = textures[i];
+        }
+        
+        m_d3dDeviceContext->PSSetShaderResources(
+            0,                                      // start slot
+            MAX_TEXTURES + textureStartOffset,      // number of resources
+            texturesWithStartOffset->GetAddressOf() // array of resources
+        );
+    };
+
     {
         // Draw Regular Entities
         {
@@ -292,54 +312,7 @@ void SimpleObj::RenderScene_FowardPlus_FinalPass()
                 pixelShaderConstantBuffers              // array of constant buffers
             );
 
-            UINT vertexStride = sizeof(VertexData);
-            UINT offset = 0;
-            for (auto entity : m_Scene.Entities)
-            {
-                if (entity->Instanced)
-                    continue;
-
-                // Setup Material CB
-                m_MaterialPropertiesConstantBuffer.Material = entity->Material;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
-
-                // Setup Object CB
-                m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
-                m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
-                m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
-                m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-                // Bind texture state
-                int textureId = entity->Material.TextureId;
-                if (textureId >= 0)
-                {
-                    const int textureStartOffset = 2;
-                    ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES + textureStartOffset] = {
-                        m_d3dOpaqueLightIndexListBuffers_SRV.Get(),
-                        m_d3dOpaqueLightGridBuffers_SRV.Get()
-                    };
-                    textures[textureId + textureStartOffset] = m_Textures[textureId];
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                     // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
-                }
-
-                auto vertexBuffer = entity->Model->VertexBuffer();
-                m_d3dDeviceContext->IASetVertexBuffers(
-                    0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                    1,                                      // number of vertex buffers in the array
-                    &vertexBuffer,                          // pointer to an array of vertex buffers
-                    &vertexStride,                          // pointer to stride values
-                    &offset                                 // pointer to offset values
-                );
-                Draw(
-                    entity->Model->VertexCount(),
-                    0
-                );
-            }
+            DrawRegularEntities(bindTextureDelegate);
         }
 
         // Draw Instanced Entities
@@ -371,68 +344,12 @@ void SimpleObj::RenderScene_FowardPlus_FinalPass()
                 pixelShaderConstantBuffers              // array of constant buffers
             );
 
-            const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
-            const UINT offset[2] = { 0, 0 };
-            std::vector<InstancedObjectConstantBuffer> instanceData;
-            std::set<int> usedTextures;
-            const int textureStartOffset = 2;
-            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES + textureStartOffset] = {
-                m_d3dOpaqueLightIndexListBuffers_SRV.Get(),
-                m_d3dOpaqueLightGridBuffers_SRV.Get()
-            };
-            for (auto const& pair : m_Scene.InstancedEntity)
-            {
-                auto key = pair.first;
-                auto verticesCount = Model::GetVertexCount(key);
-                auto size = pair.second.size();
-
-                instanceData.clear();
-                for (auto const& instancedEntity : pair.second)
-                {
-                    // collect required textures
-                    int textureId = instancedEntity->Material.TextureId;
-                    if (textureId >= 0 && usedTextures.count(textureId) == 0)
-                    {
-                        usedTextures.insert(textureId);
-                        textures[textureId + textureStartOffset] = m_Textures[textureId];
-                    }
-
-                    instanceData.push_back({
-                        instancedEntity->WorldMatrix,
-                        instancedEntity->InverseTransposeWorldMatrix,
-                        instancedEntity->InverseTransposeWorldViewMatrix,
-                        instancedEntity->Material
-                        });
-                }
-
-                // update perInstanceBuffer
-                m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
-
-                // bind texture state
-                if (usedTextures.size() > 0)
-                {
-                    m_d3dDeviceContext->PSSetShaderResources(
-                        0,                                      // start slot
-                        _countof(textures),                     // number of resources
-                        textures->GetAddressOf()                // array of resources
-                    );
-                }
-
-                ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-                m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
-
-                DrawInstanced(
-                    verticesCount,
-                    size,
-                    0,
-                    0
-                );
-            }
+            DrawInstancedEntities(bindTextureDelegate);
         }
     } 
 
     // Unbind SRVs
-    ID3D11ShaderResourceView* const pSRV[] = { NULL, NULL, NULL };
+    ID3D11ShaderResourceView* const pSRV[MAX_TEXTURES + 2] = { NULL };
     m_d3dDeviceContext->PSSetShaderResources(0, _countof(pSRV), pSRV);
 }
 
@@ -460,6 +377,10 @@ void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
     // Clear depth first
     m_d3dDeviceContext->ClearDepthStencilView(m_d3dDepthStencilView_depth.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+    std::function<void(ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate = [&](ComPtr<ID3D11ShaderResourceView> textures[]) -> void {
+        // do nothing since we don't need texture in depth pre pass
+    };
+
     // Draw Regular Entities
     {
         // Setup the vertex shader stage
@@ -476,34 +397,7 @@ void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
             vertexShaderConstantBuffers             // array of constant buffers
         );
 
-        UINT vertexStride = sizeof(VertexData);
-        UINT offset = 0;
-        for (auto entity : m_Scene.Entities)
-        {
-            if (entity->Instanced)
-                continue;
-
-            // Setup Object CB
-            m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
-            m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-            auto vertexBuffer = entity->Model->VertexBuffer();
-            m_d3dDeviceContext->IASetVertexBuffers(
-                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                1,                                      // number of vertex buffers in the array
-                &vertexBuffer,                          // pointer to an array of vertex buffers
-                &vertexStride,                          // pointer to stride values
-                &offset                                 // pointer to offset values
-            );
-
-            Draw(
-                entity->Model->VertexCount(),
-                0
-            );
-        }
+        DrawRegularEntities(bindTextureDelegate);
     }
 
     // Draw Instanced Entities
@@ -518,38 +412,7 @@ void SimpleObj::RenderScene_FowardPlus_DepthPrePass()
             vertexShaderConstantBuffers             // array of constant buffers
         );
 
-        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
-        const UINT offset[2] = { 0, 0 };
-        std::vector<InstancedObjectConstantBuffer> instanceData;
-        for (auto const& pair : m_Scene.InstancedEntity)
-        {
-            auto key = pair.first;
-            auto verticesCount = Model::GetVertexCount(key);
-            auto size = pair.second.size();
-
-            instanceData.clear();
-            for (auto const& instancedEntity : pair.second)
-            {
-                instanceData.push_back({
-                    instancedEntity->WorldMatrix,
-                    instancedEntity->InverseTransposeWorldMatrix,
-                    instancedEntity->InverseTransposeWorldViewMatrix,
-                    instancedEntity->Material
-                    });
-            }
-
-            m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
-
-            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
-
-            DrawInstanced(
-                verticesCount,
-                size,
-                0,
-                0
-            );
-        }
+        DrawInstancedEntities(bindTextureDelegate);
     }
 
     m_d3dDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);

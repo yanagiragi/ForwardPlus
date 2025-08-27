@@ -14,10 +14,13 @@ std::map<std::string, ID3D11Buffer*> Model::m_PerInstanceVertexBuffers;
 
 Model::~Model()
 {
-    m_RefCount[m_Key] -= 1;
-    if (m_RefCount[m_Key] == 0) {
-        m_Resources.erase(m_Key);
-        m_RefCount.erase(m_Key);
+    for (auto key : keys)
+    {
+        m_RefCount[key] -= 1;
+        if (m_RefCount[key] == 0) {
+            m_Resources.erase(key);
+            m_RefCount.erase(key);
+        }
     }
 }
 
@@ -44,15 +47,6 @@ bool Model::Load(const char* filepath)
         std::cout << "TinyObjReader: " << reader.Warning();
     }
 
-    m_Key = std::string(filepath);
-
-    if (m_Resources.find(m_Key) != m_Resources.end())
-    {
-        m_RefCount[m_Key] += 1;
-        m_Id = m_RefCount[m_Key];
-        return true;
-    }
-
     std::vector<struct VertexData> vertices;
 
     auto& attrib = reader.GetAttrib();
@@ -61,6 +55,16 @@ bool Model::Load(const char* filepath)
 
     // Loop over shapes
     for (size_t s = 0; s < shapes.size(); s++) {
+
+        vertices.clear();
+        auto key = std::string(filepath) + std::string("-") + std::string(shapes[s].name);
+        
+        if (m_Resources.find(key) != m_Resources.end())
+        {
+            keys.push_back(key);
+            m_RefCount[key] += 1;
+            continue; // return true;
+        }
 
         // Loop over faces(polygon)
         size_t index_offset = 0;
@@ -102,24 +106,23 @@ bool Model::Load(const char* filepath)
                     vertex.uv[1] = ty;
                 }
 
-                // Optional: vertex colors
-                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+                if (f >= shapes[s].mesh.material_ids.size())
+                {
+                    break;
+                }
+
+                vertex.material = shapes[s].mesh.material_ids[f];
 
                 vertices.push_back(vertex);
             }
 
             index_offset += fv;
-
-            // per-face material
-            shapes[s].mesh.material_ids[f];
         }
-    }
 
-    m_Resources.insert({ m_Key, vertices });
-    m_RefCount.insert({ m_Key, 1 });
-    m_Id = 1;
+        keys.push_back(key);
+        m_Resources.insert({ key, vertices });
+        m_RefCount.insert({ key, 1 });
+    }
 
     return true;
 }

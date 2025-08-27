@@ -48,53 +48,18 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     // set blend state to no blend
     m_d3dDeviceContext->OMSetBlendState(NULL, NULL, 0xffffffff);
 
+    std::function<void(ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate = [&](ComPtr<ID3D11ShaderResourceView> textures[]) -> void {
+        m_d3dDeviceContext->PSSetShaderResources(
+            0,                                      // start slot
+            MAX_TEXTURES,                           // number of resources
+            textures->GetAddressOf()                // array of resources
+        );
+    };
+
+
     // Draw Regular Entities
     {
-        UINT vertexStride = sizeof(VertexData);
-        UINT offset = 0;
-        for (auto entity : m_Scene.Entities)
-        {
-            if (entity->Instanced)
-                continue;
-
-            // Setup Material CB
-            m_MaterialPropertiesConstantBuffer.Material = entity->Material;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
-
-            // Setup Object CB
-            m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
-            m_ObjectConstantBuffer.InverseTransposeWorldViewMatrix = entity->InverseTransposeWorldViewMatrix;
-            m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-            // Bind texture state
-            int textureId = entity->Material.TextureId;
-            if (textureId >= 0)
-            {
-                ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-                textures[textureId] = m_Textures[textureId];
-                m_d3dDeviceContext->PSSetShaderResources(
-                    0,                                      // start slot
-                    _countof(textures),                     // number of resources
-                    textures->GetAddressOf()                // array of resources
-                );
-            }
-            
-            auto vertexBuffer = entity->Model->VertexBuffer();
-            m_d3dDeviceContext->IASetVertexBuffers(
-                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                1,                                      // number of vertex buffers in the array
-                &vertexBuffer,                          // pointer to an array of vertex buffers
-                &vertexStride,                          // pointer to stride values
-                &offset                                 // pointer to offset values
-            );
-
-            Draw(
-                entity->Model->VertexCount(),
-                0
-            );
-        }
+        DrawRegularEntities(bindTextureDelegate);
     }
 
     // Draw Instanced Entities
@@ -117,57 +82,7 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
             pixelShaderConstantBuffers              // array of constant buffers
         );
 
-        const UINT vertexStride[2] = { sizeof(VertexData), sizeof(InstancedObjectConstantBuffer) };
-        const UINT offset[2] = { 0, 0 };
-        std::vector<InstancedObjectConstantBuffer> instanceData;
-        std::set<int> usedTextures;
-        ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-        for (auto const& pair : m_Scene.InstancedEntity)
-        {
-            auto key = pair.first;
-            auto verticesCount = Model::GetVertexCount(key);
-            auto size = pair.second.size();
-
-            instanceData.clear();
-            for (auto const& instancedEntity : pair.second)
-            {
-                // collect required textures
-                int textureId = instancedEntity->Material.TextureId;
-                if (textureId >= 0 && usedTextures.count(textureId) == 0)
-                {
-                    usedTextures.insert(textureId);
-                    textures[textureId] = m_Textures[textureId];
-                }
-
-                instanceData.push_back({
-                    instancedEntity->WorldMatrix,
-                    instancedEntity->InverseTransposeWorldMatrix,
-                    instancedEntity->InverseTransposeWorldViewMatrix,
-                    instancedEntity->Material
-                    });
-            }
-            m_d3dDeviceContext->UpdateSubresource(Model::GetInstancedVertexBuffer(key), 0, nullptr, instanceData.data(), 0, 0);
-
-            // bind texture state
-            if (usedTextures.size() > 0)
-            {
-                m_d3dDeviceContext->PSSetShaderResources(
-                    0,                                      // start slot
-                    _countof(textures),                     // number of resources
-                    textures->GetAddressOf()                // array of resources
-                );
-            }
-
-            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
-
-            DrawInstanced(
-                verticesCount,
-                size,
-                0,
-                0
-            );
-        }
+        DrawInstancedEntities(bindTextureDelegate);
     }
 }
 
@@ -336,7 +251,8 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
         m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-        auto vertexBuffer = m_lightVolume_sphere->VertexBuffer();
+        auto key = m_lightVolume_sphere->keys.front();
+        auto vertexBuffer = m_lightVolume_sphere->GetVertexBuffer(key);
         m_d3dDeviceContext->IASetVertexBuffers(
             0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
             1,                                      // number of vertex buffers in the array
@@ -345,7 +261,7 @@ void SimpleObj::DrawLightVolume(Light* light)
             &offset                                 // pointer to offset values
         );
 
-        Draw(m_lightVolume_sphere->VertexCount(), 0);
+        Draw(m_lightVolume_sphere->GetVertexCount(key), 0);
     }
 
     else if (light->LightType == (int)LightType::Spotlight)
@@ -373,7 +289,8 @@ void SimpleObj::DrawLightVolume(Light* light)
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-            auto vertexBuffer = m_lightVolume_sphere->VertexBuffer();
+            auto key = m_lightVolume_sphere->keys.front();
+            auto vertexBuffer = m_lightVolume_sphere->GetVertexBuffer(key);
             m_d3dDeviceContext->IASetVertexBuffers(
                 0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
                 1,                                      // number of vertex buffers in the array
@@ -382,7 +299,7 @@ void SimpleObj::DrawLightVolume(Light* light)
                 &offset                                 // pointer to offset values
             );
 
-            Draw(m_lightVolume_sphere->VertexCount(), 0);
+            Draw(m_lightVolume_sphere->GetVertexCount(key), 0);
         }
         else 
         {
@@ -413,7 +330,8 @@ void SimpleObj::DrawLightVolume(Light* light)
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-            auto vertexBuffer = m_lightVolume_cone->VertexBuffer();
+            auto key = m_lightVolume_cone->keys.front();
+            auto vertexBuffer = m_lightVolume_cone->GetVertexBuffer(key);
             m_d3dDeviceContext->IASetVertexBuffers(
                 0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
                 1,                                      // number of vertex buffers in the array
@@ -421,7 +339,8 @@ void SimpleObj::DrawLightVolume(Light* light)
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
-            Draw(m_lightVolume_cone->VertexCount(), 0);
+            
+            Draw(m_lightVolume_cone->GetVertexCount(key), 0);
 
             /* TEST END START */
         }
