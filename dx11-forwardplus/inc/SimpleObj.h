@@ -74,7 +74,6 @@ namespace Yr
         #pragma region Functions
         void LoadShaderResources();
         void LoadDebugDraw();
-        int LoadTexture(const wchar_t* filepath);
         void LoadLight();
         void LoadSampler();
         void LoadBasicScene();
@@ -118,8 +117,6 @@ namespace Yr
         HRESULT CreateStructuredBufferSRV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11ShaderResourceView** ppSRVOut);
         HRESULT CreateStructuredBufferUAV(ID3D11Device* pDevice, ID3D11Buffer* pBuffer, ID3D11UnorderedAccessView** ppUAVOut);
         HRESULT CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSize, UINT uCount, void* pInitData, ID3D11Buffer** ppBufOut);
-
-        bool HasExtension(const wchar_t* path, const std::wstring& ext);
 
         // Wrap to native API
         void Draw(UINT VertexCount, UINT StartVertexLocation);
@@ -283,14 +280,10 @@ namespace Yr
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dDebugRWListBuffers;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_d3dDebugRWListBuffers_UAV;
 
-        // Global materials & texture settings
-        std::vector<struct Material> m_Materials;
-        std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> m_Textures;
-
         // Light Volume Settings
-        Model* m_lightVolume_sphere;
+        struct BatchedVertices m_lightVolume_sphere;
         const float m_lightVolume_coneSpotAngle = 26.565f * 2.0f;
-        Model* m_lightVolume_cone;
+        struct BatchedVertices m_lightVolume_cone;
 
         // Camera Settings
         Camera m_Camera;

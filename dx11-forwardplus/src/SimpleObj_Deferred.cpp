@@ -251,17 +251,15 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
         m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-        auto key = m_lightVolume_sphere->keys.front();
-        auto vertexBuffer = m_lightVolume_sphere->GetVertexBuffer(key);
         m_d3dDeviceContext->IASetVertexBuffers(
             0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
             1,                                      // number of vertex buffers in the array
-            &vertexBuffer,                          // pointer to an array of vertex buffers
+            &m_lightVolume_sphere.buffer,                          // pointer to an array of vertex buffers
             &vertexStride,                          // pointer to stride values
             &offset                                 // pointer to offset values
         );
 
-        Draw(m_lightVolume_sphere->GetVertexCount(key), 0);
+        Draw(m_lightVolume_sphere.count, 0);
     }
 
     else if (light->LightType == (int)LightType::Spotlight)
@@ -289,17 +287,15 @@ void SimpleObj::DrawLightVolume(Light* light)
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-            auto key = m_lightVolume_sphere->keys.front();
-            auto vertexBuffer = m_lightVolume_sphere->GetVertexBuffer(key);
             m_d3dDeviceContext->IASetVertexBuffers(
                 0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
                 1,                                      // number of vertex buffers in the array
-                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &m_lightVolume_sphere.buffer,                          // pointer to an array of vertex buffers
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
 
-            Draw(m_lightVolume_sphere->GetVertexCount(key), 0);
+            Draw(m_lightVolume_sphere.count, 0);
         }
         else 
         {
@@ -330,17 +326,15 @@ void SimpleObj::DrawLightVolume(Light* light)
             m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
             m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-            auto key = m_lightVolume_cone->keys.front();
-            auto vertexBuffer = m_lightVolume_cone->GetVertexBuffer(key);
             m_d3dDeviceContext->IASetVertexBuffers(
                 0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
                 1,                                      // number of vertex buffers in the array
-                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &m_lightVolume_cone.buffer,                          // pointer to an array of vertex buffers
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
             
-            Draw(m_lightVolume_cone->GetVertexCount(key), 0);
+            Draw(m_lightVolume_cone.count, 0);
 
             /* TEST END START */
         }

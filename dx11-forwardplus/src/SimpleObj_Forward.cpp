@@ -22,29 +22,11 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
         0                                       // number of class-instance interfaces of previous param
     );
 
-    ID3D11Buffer* vertexShaderConstantBuffers[] = 
-    { 
-        m_d3dConstantBuffers[CB_Frame].Get(), 
-        m_d3dConstantBuffers[CB_Object].Get()
-    };
-    m_d3dDeviceContext->VSSetConstantBuffers(
-        0,                                      // start slot
-        _countof(vertexShaderConstantBuffers),  // number of buffers
-        vertexShaderConstantBuffers             // array of constant buffers
-    );
-
     ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
     m_d3dDeviceContext->PSSetSamplers(
         0,                                      // start slot
         1,                                      // number of sampler states
         samplerStates->GetAddressOf()           // array of sampler states
-    );
-
-    ComPtr<ID3D11ShaderResourceView> textures[] = { m_Textures[0] }; // temp debug
-    m_d3dDeviceContext->PSSetShaderResources(
-        0,                                      // start slot
-        1,                                      // number of resources
-        textures->GetAddressOf()                // array of resources
     );
 
     // Setup the output merger stage

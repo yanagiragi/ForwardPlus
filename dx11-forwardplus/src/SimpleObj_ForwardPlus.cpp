@@ -87,15 +87,6 @@ HRESULT SimpleObj::CreateStructuredBuffer(ID3D11Device* pDevice, UINT uElementSi
         return pDevice->CreateBuffer(&desc, nullptr, ppBufOut);
 }
 
-bool Yr::SimpleObj::HasExtension(const wchar_t* path, const std::wstring& ext)
-{
-    std::wstring filename(path);
-    if (filename.length() >= ext.length()) {
-        return (0 == filename.compare(filename.length() - ext.length(), ext.length(), ext));
-    }
-    return false;
-}
-
 void SimpleObj::ComputeFrustum()
 {
     int screenWidth = max(m_ScreenDimensions.x, 1);

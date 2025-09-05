@@ -3,8 +3,11 @@
 #include "Window.h"
 #include "Shader.h"
 #include "Common.h"
-#include <DirectXTex.h>
+#include "Material.h"
+
 #include <set>
+
+#include <DirectXTex.h>
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
@@ -481,52 +484,6 @@ void SimpleObj::LoadDebugDraw()
 }
 
 /// <summary>
-/// Setup Texture data
-/// </summary>
-int SimpleObj::LoadTexture(const wchar_t* filepath)
-{
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newTextureView = nullptr;
-
-    if (HasExtension(filepath, L".tga"))
-    {
-        DirectX::ScratchImage image;
-        HRESULT hr = DirectX::LoadFromTGAFile(filepath, nullptr, image);
-        if (FAILED(hr)) {
-            DisplayError("Failed to load tga texture");
-        }
-
-        ComPtr<ID3D11ShaderResourceView> textureSRV;
-        hr = DirectX::CreateShaderResourceView(m_d3dDevice.Get(), image.GetImages(), image.GetImageCount(), image.GetMetadata(), &newTextureView);
-        if (FAILED(hr)) {
-            DisplayError("Failed to create tga texture");
-        }
-
-        m_Textures.push_back(newTextureView);
-        return m_Textures.size() - 1;
-    }
-    else 
-    {
-        if (m_d3dEffectFactory == nullptr)
-        {
-            m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
-        }
-
-        try
-        {
-            m_d3dEffectFactory->CreateTexture(filepath, m_d3dDeviceContext.Get(), &newTextureView);
-            m_Textures.push_back(newTextureView);
-            return m_Textures.size() - 1;
-        }
-        catch (std::exception&)
-        {
-            DisplayError("Failed to load texture");
-        }
-    }
-
-    return -1;
-}
-
-/// <summary>
 /// Setup light data
 /// </summary>
 void SimpleObj::LoadLight()
@@ -872,36 +829,85 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 entity->RotateAxisSpeed.y = rotationAxisSpeed[1];
                 entity->RotateAxisSpeed.z = rotationAxisSpeed[2];
 
-                float emissive[3] = { entity->Material.Emissive.x, entity->Material.Emissive.y, entity->Material.Emissive.z };
-                ImGui::ColorEdit3("Emissive", emissive);
-                entity->Material.Emissive.x = emissive[0];
-                entity->Material.Emissive.y = emissive[1];
-                entity->Material.Emissive.z = emissive[2];
+                if (entity->Instanced)
+                {
+                    auto& material = entity->InstancedMaterial;
 
-                float ambient[3] = { entity->Material.Ambient.x, entity->Material.Ambient.y, entity->Material.Ambient.z };
-                ImGui::ColorEdit3("Ambient", ambient);
-                entity->Material.Ambient.x = ambient[0];
-                entity->Material.Ambient.y = ambient[1];
-                entity->Material.Ambient.z = ambient[2];
+                    float emissive[3] = { material.Emissive.x, material.Emissive.y, material.Emissive.z };
+                    ImGui::ColorEdit3("Emissive", emissive);
+                    material.Emissive.x = emissive[0];
+                    material.Emissive.y = emissive[1];
+                    material.Emissive.z = emissive[2];
 
-                float diffuse[3] = { entity->Material.Diffuse.x, entity->Material.Diffuse.y, entity->Material.Diffuse.z };
-                ImGui::ColorEdit3("Diffuse", diffuse);
-                entity->Material.Diffuse.x = diffuse[0];
-                entity->Material.Diffuse.y = diffuse[1];
-                entity->Material.Diffuse.z = diffuse[2];
+                    float ambient[3] = { material.Ambient.x, material.Ambient.y, material.Ambient.z };
+                    ImGui::ColorEdit3("Ambient", ambient);
+                    material.Ambient.x = ambient[0];
+                    material.Ambient.y = ambient[1];
+                    material.Ambient.z = ambient[2];
 
-                float specular[3] = { entity->Material.Specular.x, entity->Material.Specular.y, entity->Material.Specular.z };
-                ImGui::ColorEdit3("Specular", specular);
-                entity->Material.Specular.x = specular[0];
-                entity->Material.Specular.y = specular[1];
-                entity->Material.Specular.z = specular[2];
+                    float diffuse[3] = { material.Diffuse.x, material.Diffuse.y, material.Diffuse.z };
+                    ImGui::ColorEdit3("Diffuse", diffuse);
+                    material.Diffuse.x = diffuse[0];
+                    material.Diffuse.y = diffuse[1];
+                    material.Diffuse.z = diffuse[2];
 
-                int textureId = entity->Material.TextureId;
-                ImGui::Text("Texture Id: %d", textureId);
+                    float specular[3] = { material.Specular.x, material.Specular.y, material.Specular.z };
+                    ImGui::ColorEdit3("Specular", specular);
+                    material.Specular.x = specular[0];
+                    material.Specular.y = specular[1];
+                    material.Specular.z = specular[2];
 
-                float specularPower = entity->Material.SpecularPower;
-                ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 128.0f);
-                entity->Material.SpecularPower = specularPower;
+                    int textureId = material.TextureId;
+                    ImGui::Text("Texture Id: %d", textureId);
+
+                    float specularPower = material.SpecularPower;
+                    ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 128.0f);
+                    material.SpecularPower = specularPower;
+                }
+                else
+                {
+                    for (auto& batchedVertices : entity->batchedVertices)
+                    {
+                        auto materialName = batchedVertices.materialName;
+                        if (ImGui::TreeNode(materialName.c_str()))
+                        {
+                            auto& material = batchedVertices.material;
+
+                            float emissive[3] = { material.Emissive.x, material.Emissive.y, material.Emissive.z };
+                            ImGui::ColorEdit3("Emissive", emissive);
+                            material.Emissive.x = emissive[0];
+                            material.Emissive.y = emissive[1];
+                            material.Emissive.z = emissive[2];
+
+                            float ambient[3] = { material.Ambient.x, material.Ambient.y, material.Ambient.z };
+                            ImGui::ColorEdit3("Ambient", ambient);
+                            material.Ambient.x = ambient[0];
+                            material.Ambient.y = ambient[1];
+                            material.Ambient.z = ambient[2];
+
+                            float diffuse[3] = { material.Diffuse.x, material.Diffuse.y, material.Diffuse.z };
+                            ImGui::ColorEdit3("Diffuse", diffuse);
+                            material.Diffuse.x = diffuse[0];
+                            material.Diffuse.y = diffuse[1];
+                            material.Diffuse.z = diffuse[2];
+
+                            float specular[3] = { material.Specular.x, material.Specular.y, material.Specular.z };
+                            ImGui::ColorEdit3("Specular", specular);
+                            material.Specular.x = specular[0];
+                            material.Specular.y = specular[1];
+                            material.Specular.z = specular[2];
+
+                            float specularPower = material.SpecularPower;
+                            ImGui::DragFloat("Specular Power", &specularPower, fastDragSpeed, 5.0f, 128.0f);
+                            material.SpecularPower = specularPower;
+
+                            int textureId = material.TextureId;
+                            ImGui::Text("Texture Id: %d", textureId);
+
+                            ImGui::TreePop();
+                        }
+                    }
+                }
 
                 ImGui::TreePop();
             }
@@ -1040,15 +1046,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
 void SimpleObj::LoadBasicScene()
 {
-    struct Material boxMaterial = {
+    auto box = new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0));
+    box->batchedVertices[0].materialName = "boxMaterial";
+    box->batchedVertices[0].material = {
         Vector4::Zero,                          // Emissive
         Vector4::One,                           // Ambient
         Vector4::One,                           // Diffuse
         Vector4::Zero,                          // Specular
-        LoadTexture(L"assets\\Textures\\grid.png")
-    };
+        Model::LoadTexture(L"assets\\Textures\\grid.png")
+    };;
 
-    struct Material bunny1Material = {
+    auto bunnyBase = new Entity("bunny", "assets/Models/bunny.obj", Vector3(0, 0, 0), Quaternion::Identity, false, nullptr, 2);
+    auto bunny1 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(4.5, 0, -4.5), Quaternion::Identity, true, bunnyBase);
+    bunny1->InstancedMaterial = {
         Vector4::Zero,                          // Emissive
         Vector4::One,                           // Ambient
         Vector4(115, 165, 245, 255) / 255.0,    // Diffuse
@@ -1056,34 +1066,27 @@ void SimpleObj::LoadBasicScene()
         -1
     };
 
-    struct Material bunny2Material = {
+    auto bunny2 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), true, bunnyBase);
+    bunny2->InstancedMaterial = {
         Vector4::Zero,                          // Emissive
         Vector4::One,                           // Ambient
         Vector4(245, 197, 115, 255) / 255.0,    // Diffuse
         Vector4::One,                           // Specular
         -1
     };
-    
-    m_Scene.Add(new Entity("cornelBox", "assets/Models/cornelBox.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), boxMaterial));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(4.5, 0, -4.5), Quaternion::Identity, bunny1Material, true));
-    m_Scene.Add(new Entity("bunny", "assets/Models/bunny.obj", Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), bunny2Material, true));
+
+    m_Scene.Add(box);
+    m_Scene.Add(bunny1); // no need to add bunnyBase to scene since it was only a reference entity
+    m_Scene.Add(bunny2);
 }
 
 void Yr::SimpleObj::LoadSponzaScene()
 {
-    struct Material testMaterial = {
-        Vector4::Zero,                          // Emissive
-        Vector4::One,                           // Ambient
-        Vector4::One,                           // Diffuse
-        Vector4::Zero,                          // Specular
-        LoadTexture(L"assets\\Sponza\\textures\\sponza_fabric_green_diff.tga")
-    };
-
-    m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), testMaterial));
+    m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0)));
 
     // increase camera moving speed
-    normalMovingSpeedMultipler = 40.0f;
-    shiftMovingSpeedMultipler = 80.0f;
+    normalMovingSpeedMultipler = 400.0f;
+    shiftMovingSpeedMultipler = 800.0f;
 
     // increase far plane distance
     farPlane = 10000.f;
@@ -1098,10 +1101,6 @@ void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID
         if (entity->Instanced)
             continue;
 
-        // Setup Material CB
-        m_MaterialPropertiesConstantBuffer.Material = entity->Material;
-        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
-
         // Setup Object CB
         m_ObjectConstantBuffer.WorldMatrix = entity->WorldMatrix;
         m_ObjectConstantBuffer.InverseTransposeWorldMatrix = entity->InverseTransposeWorldMatrix;
@@ -1109,28 +1108,39 @@ void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = entity->WorldViewProjectionMatrix;
         m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-        // Bind texture state
-        int textureId = entity->Material.TextureId;
-        if (textureId >= 0)
+        bool hasTexture = false;
+        ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
+        for (auto const& batchedVertices : entity->batchedVertices)
         {
-            ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
-            textures[textureId] = m_Textures[textureId];
-            bindTextureDelegate(textures);
+            auto textureId = batchedVertices.material.TextureId;
+            if (textureId >= 0)
+            {
+                hasTexture = true;
+                textures[textureId] = Model::GetTexture(textureId);
+            }
         }
 
-        auto model = entity->Model;
-        for (auto const& key : model->keys)
+        // Bind texture state
+        if (hasTexture)
         {
-            auto vertexBuffer = model->GetVertexBuffer(key);
+            bindTextureDelegate(textures);
+        }
+        
+        for (auto const& batchedVertices : entity->batchedVertices)
+        {
+            // Setup Material CB
+            m_MaterialPropertiesConstantBuffer.Material = batchedVertices.material;
+            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Material].Get(), 0, nullptr, &m_MaterialPropertiesConstantBuffer, 0, 0);
+
             m_d3dDeviceContext->IASetVertexBuffers(
                 0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
                 1,                                      // number of vertex buffers in the array
-                &vertexBuffer,                          // pointer to an array of vertex buffers
+                &batchedVertices.buffer,                          // pointer to an array of vertex buffers
                 &vertexStride,                          // pointer to stride values
                 &offset                                 // pointer to offset values
             );
             Draw(
-                entity->Model->GetVertexCount(key),
+                batchedVertices.count,
                 0
             );
         }
@@ -1146,53 +1156,54 @@ void Yr::SimpleObj::DrawInstancedEntities(std::function<void(Microsoft::WRL::Com
     ComPtr<ID3D11ShaderResourceView> textures[MAX_TEXTURES];
     for (auto const& pair : m_Scene.InstancedEntity)
     {
+        Entity* baseEntity = pair.second.front()->InstancedReference;
         auto instanceCount = pair.second.size();
-        auto& model = pair.second.front()->Model;
-
-        for (auto const& key : model->keys)
+        if (instanceCount != baseEntity->InstancedCount)
         {
-            usedTextures.clear();
-            instanceData.clear();
-
-            for (auto const& entity : pair.second)
-            {
-                // collect required textures
-                int textureId = entity->Material.TextureId;
-                if (textureId >= 0 && usedTextures.count(textureId) == 0)
-                {
-                    usedTextures.insert(textureId);
-                    textures[textureId] = m_Textures[textureId];
-                }
-
-                instanceData.push_back({
-                    entity->WorldMatrix,
-                    entity->InverseTransposeWorldMatrix,
-                    entity->InverseTransposeWorldViewMatrix,
-                    entity->Material
-                    });
-            }
-
-            // update perInstanceBuffer
-            auto resource = Model::GetInstancedVertexBuffer(key);
-            m_d3dDeviceContext->UpdateSubresource(resource, 0, nullptr, instanceData.data(), 0, 0);
-
-            // bind texture state
-            if (usedTextures.size() > 0)
-            {
-                bindTextureDelegate(textures);
-            }
-
-            ID3D11Buffer* buffers[] = { Model::GetVertexBuffer(key), Model::GetInstancedVertexBuffer(key) };
-            m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
-
-            auto verticesCount = Model::GetVertexCount(key);
-            DrawInstanced(
-                verticesCount,
-                instanceCount,
-                0,
-                0
-            );
+            DisplayError("instanceCount not match!");
         }
+        
+        usedTextures.clear();
+        instanceData.clear();
+
+        for (auto const& entity : pair.second)
+        {
+            // collect required textures
+            int textureId = entity->InstancedMaterial.TextureId;
+            if (textureId >= 0 && usedTextures.count(textureId) == 0)
+            {
+                usedTextures.insert(textureId);
+                textures[textureId] = Model::GetTexture(textureId);
+            }
+
+            instanceData.push_back({
+                entity->WorldMatrix,
+                entity->InverseTransposeWorldMatrix,
+                entity->InverseTransposeWorldViewMatrix,
+                entity->InstancedMaterial
+                });
+        }
+
+        // update perInstanceBuffer
+        m_d3dDeviceContext->UpdateSubresource(baseEntity->InstanceDataBuffer, 0, nullptr, instanceData.data(), 0, 0);
+
+        // bind texture state
+        if (usedTextures.size() > 0)
+        {
+            bindTextureDelegate(textures);
+        }
+
+        // only support one submesh when instancing
+        auto vertices = baseEntity->batchedVertices.front();
+        ID3D11Buffer* buffers[] = { vertices.buffer, baseEntity->InstanceDataBuffer};
+        m_d3dDeviceContext->IASetVertexBuffers(0, _countof(buffers), buffers, vertexStride, offset);
+
+        DrawInstanced(
+            vertices.count,
+            instanceCount,
+            0,
+            0
+        );
     }
 }
 
@@ -1913,88 +1924,18 @@ HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11B
 
 bool SimpleObj::LoadContent()
 {
+    HRESULT hr;
     AssertIfFailed(m_d3dDevice == nullptr, "Load Content", "Device is null");
 
-    HRESULT hr;
-
-    LoadBasicScene();
-    // LoadSponzaScene();
-
-    // Setup models
-    for (auto entity : m_Scene.Entities)
+    // Setup global d3d states before load any model or texture
+    if (m_d3dEffectFactory == nullptr)
     {
-        entity->Model = new Model();
-        entity->Model->Load(entity->ModelPath.c_str());
-
-        auto model = entity->Model;
-        for (auto const& key : model->keys)
-        {
-            // Create an initialize the vertex buffer.
-            D3D11_BUFFER_DESC vertexBufferDesc;
-            ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-            vertexBufferDesc.ByteWidth = sizeof(VertexData) * model->GetVertexCount(key);           // size of the buffer in bytes
-            vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
-            vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
-            vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
-
-            D3D11_SUBRESOURCE_DATA resourceData;
-            ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-            resourceData.pSysMem = Model::Head(key);                                        // pointer to the data to initialize the buffer with
-            resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline. No used for now.
-            resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. No used for now.
-            
-            ID3D11Buffer* buffer = nullptr;
-            HRESULT hr = m_d3dDevice->CreateBuffer(
-                &vertexBufferDesc,                                                          // buffer description
-                &resourceData,                                                              // pointer to the initialization data
-                &buffer                                                                     // pointer to the created buffer object
-            );
-            std::string message = "Unable to create vertex buffer of " + key;
-            AssertIfFailed(hr, "Load Content", message.c_str());
-
-            Model::AddVertexBuffer(key, buffer);
-        }
+        m_d3dEffectFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
     }
+    Model::Setup(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dEffectFactory.get());
 
-    for (auto pair : m_Scene.InstancedEntity)
-    {
-        auto instanceCount = pair.second.size();
-
-        auto model = pair.second.front()->Model;
-        for (auto const& key : model->keys)
-        {
-            std::vector<InstancedObjectConstantBuffer> instanceData;
-            for (auto const& entity : pair.second)
-            {
-                instanceData.push_back({
-                    entity->WorldMatrix,
-                    entity->InverseTransposeWorldMatrix,
-                    entity->InverseTransposeWorldViewMatrix,
-                    entity->Material
-                });
-            }
-
-            // Create the per-instance vertex buffer.
-            D3D11_BUFFER_DESC instanceBufferDesc;
-            ZeroMemory(&instanceBufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-            instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            instanceBufferDesc.ByteWidth = sizeof(InstancedObjectConstantBuffer) * instanceCount;
-            instanceBufferDesc.CPUAccessFlags = 0;
-            instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-            D3D11_SUBRESOURCE_DATA resourceData;
-            ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-            resourceData.pSysMem = instanceData.data();
-            resourceData.SysMemPitch = 0;
-            resourceData.SysMemSlicePitch = 0;
-
-            ID3D11Buffer* buffer;
-            hr = m_d3dDevice->CreateBuffer(&instanceBufferDesc, &resourceData, &buffer);
-
-            Model::AddInstancedVertexBuffer(key, buffer);
-        }
-    }
+    // LoadBasicScene();
+    LoadSponzaScene();
 
     // setup CB
     {
@@ -2162,44 +2103,14 @@ bool SimpleObj::LoadContent()
 
     // load light volume models
     {
-        auto AddVertexBuffer = [&](Model*& target) -> void
-        {
-            for (auto const& key : target->keys)
-            {
-                // Create an initialize the vertex buffer.
-                D3D11_BUFFER_DESC vertexBufferDesc;
-                ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-                vertexBufferDesc.ByteWidth = sizeof(VertexData) * target->GetVertexCount(key);           // size of the buffer in bytes
-                vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;                                           // how the buffer is expected to be read from and written to
-                vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;                                  // how the buffer will be bound to the pipeline
-                vertexBufferDesc.CPUAccessFlags = 0;                                                    // no CPI access is necessary
-
-                D3D11_SUBRESOURCE_DATA resourceData;
-                ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-                resourceData.pSysMem = Model::Head(key);                                        // pointer to the data to initialize the buffer with
-                resourceData.SysMemPitch = 0;                                                   // distance from the beginning of one line of a texture to the nextline. No used for now.
-                resourceData.SysMemSlicePitch = 0;                                              // distance from the beginning of one depth level to the next. No used for now.
-
-                ID3D11Buffer* buffer = nullptr;
-                HRESULT hr = m_d3dDevice->CreateBuffer(
-                    &vertexBufferDesc,                                                          // buffer description
-                    &resourceData,                                                              // pointer to the initialization data
-                    &buffer                                                                     // pointer to the created buffer object
-                );
-                std::string message = "Unable to create vertex buffer of " + key;
-                AssertIfFailed(hr, "Load Content", message.c_str());
-
-                Model::AddVertexBuffer(key, buffer);
-            }
-        };
-
-        m_lightVolume_sphere = new Model();
-        m_lightVolume_sphere->Load("assets/Models/UnitSphere.obj");
-        AddVertexBuffer(m_lightVolume_sphere);
+        std::vector<struct BatchedVertices> batchVertices;
         
-        m_lightVolume_cone = new Model();
-        m_lightVolume_cone->Load("assets/Models/UnitCone.obj");
-        AddVertexBuffer(m_lightVolume_cone);
+        Model::Load("assets/Models/UnitSphere.obj", batchVertices);
+        m_lightVolume_sphere = batchVertices.front();
+
+        batchVertices.clear();
+        Model::Load("assets/Models/UnitCone.obj", batchVertices);
+        m_lightVolume_cone = batchVertices.front();
     }
 
     LoadShaderResources();
@@ -2242,6 +2153,20 @@ void SimpleObj::LoadSampler()
 
 void SimpleObj::UnloadContent()
 {
+    for (auto& entity : m_Scene.Entities)
+    {
+        for (auto& batchVertices : entity->batchedVertices)
+        {
+            SafeRelease(batchVertices.buffer);
+        }
+
+        if (entity->Instanced)
+        {
+            SafeRelease(entity->InstancedReference->batchedVertices.front().buffer);
+            SafeRelease(entity->InstancedReference->InstanceDataBuffer);
+        }
+    }
+
     Model::UnloadStaticResources();
 }
 

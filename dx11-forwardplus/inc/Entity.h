@@ -13,26 +13,35 @@ using namespace DirectX::SimpleMath;
 class Entity
 {
 public:
-    Entity(std::string name, std::string path, Vector3 position, Quaternion rotation, struct Material material, bool instanced = false) :
+    Entity(std::string name, std::string path, Vector3 position, Quaternion rotation, bool instanced = false, Entity* instancedReference = nullptr, int instancedCount = 0) :
         Name(name),
         ModelPath(path),
         PositionWS(position),
         Rotation(rotation),
-        Material(material),
-        Instanced(instanced)
+        Instanced(instanced),
+        InstancedReference(instancedReference),
+        InstancedCount(instancedCount)
     {
+        Setup();
     }
+
+    void Setup();
 
     std::string Name;
     std::string ModelPath;
+
+    std::vector<struct BatchedVertices> batchedVertices;
     
     bool Instanced = false;
-    Model* Model = nullptr;
+    int InstancedCount = 0;
+    Entity* InstancedReference = nullptr;
+    ID3D11Buffer* InstanceDataBuffer = nullptr;
+    struct Material InstancedMaterial;
+    
     Vector3 PositionWS = Vector3::Zero;
     Quaternion Rotation = Quaternion::Identity;
-    Vector3 RotateAxisSpeed = Vector3::Zero;;
+    Vector3 RotateAxisSpeed = Vector3::Zero;
     
-    struct Material Material;
     Matrix WorldMatrix = Matrix::Identity;
     Matrix InverseTransposeWorldMatrix = Matrix::Identity;
     Matrix InverseTransposeWorldViewMatrix = Matrix::Identity;
