@@ -718,10 +718,20 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             int debugMode = (int)m_DeferredDebugMode;
             if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0"))
             {
+                // Reset light calculation mode when switch back from "LightVolume" option
+                if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume && (Deferred_DebugMode)debugMode != Deferred_DebugMode::LightVolume)
+                {
+                    m_LightCalculationMode = LightCalculationMode::Loop;
+                }
+                
                 m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
             }
 
-            if (m_DeferredDebugMode == Deferred_DebugMode::None)
+            if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
+            {
+                m_LightCalculationMode = LightCalculationMode::Stencil;
+            }
+            else if (m_DeferredDebugMode == Deferred_DebugMode::None)
             {
                 int lightCalculationMode = (int)m_LightCalculationMode;
                 if (ImGui::Combo("Light Calc Mode", &lightCalculationMode, "Loop\0Single\0Stencil\0"))
@@ -729,13 +739,16 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
                 }
 
-                ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+                if (m_DeferredDebugMode == Deferred_DebugMode::None)
+                {
+                    ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+                }
             }
-
+            
             if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
             {
                 float scale = m_DeferredDepthPower;
-                ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 2000.0f);
                 m_DeferredDepthPower = scale;
             }
         }
@@ -1934,8 +1947,8 @@ bool SimpleObj::LoadContent()
     }
     Model::Setup(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dEffectFactory.get());
 
-    // LoadBasicScene();
-    LoadSponzaScene();
+    LoadBasicScene();
+    // LoadSponzaScene();
 
     // setup CB
     {
