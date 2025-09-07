@@ -124,7 +124,7 @@ bool Game::ResizeSwapChain( int width, int height )
     m_d3dDepthStencilBuffer.Reset();
 
     // Resize the swap chain buffers.
-    m_d3dSwapChain->ResizeBuffers( 1, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0 );
+    m_d3dSwapChain->ResizeBuffers( 2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0 );
 
     // Next initialize the back buffer of the swap chain and associate it to a 
     // render target view.
@@ -250,14 +250,14 @@ bool Game::Initialize()
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
     ZeroMemory( &swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC1) );
 
-    swapChainDesc.BufferCount = 1;
+    swapChainDesc.BufferCount = 2;
     swapChainDesc.Width = m_Window.get_ClientWidth();
     swapChainDesc.Height = m_Window.get_ClientHeight();
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SampleDesc.Quality = 0;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH; // Use Alt-Enter to switch between full screen and windowed mode.
 
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullScreenDesc;
