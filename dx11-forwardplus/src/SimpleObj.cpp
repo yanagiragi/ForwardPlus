@@ -739,10 +739,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
                 }
 
-                if (m_DeferredDebugMode == Deferred_DebugMode::None)
-                {
-                    ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
-                }
+                ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
             }
             
             if (m_DeferredDebugMode == Deferred_DebugMode::Depth)

@@ -9,31 +9,6 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
     AssertIfNull(m_d3dDevice, "Render Scene", "Device is null");
     AssertIfNull(m_d3dDeviceContext, "Render Scene", "Device Context is null");
 
-
-    // Setup the input assembler stage
-    m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_RegularInputLayout.Get());
-    m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    // Setup the vertex shader stage
-    m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_RegularVertexShader.Get(), nullptr, 0);
-    m_d3dDeviceContext->VSSetConstantBuffers(0, 1, m_d3dConstantBuffers[CB_Object].GetAddressOf());
-
-    // Setup the pixel stage stage
-    m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometry_RegularPixelShader.Get(), nullptr, 0);
-    ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Material].Get(), m_d3dConstantBuffers[CB_Light].Get() };
-    m_d3dDeviceContext->PSSetConstantBuffers(
-        0,                                      // start slot
-        2,                                      // number of buffers
-        pixelShaderConstantBuffers              // array of constant buffers
-    );
-
-    ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
-    m_d3dDeviceContext->PSSetSamplers(
-        0,                                      // start slot
-        1,                                      // number of sampler states
-        samplerStates->GetAddressOf()           // array of sampler states
-    );
-
     // Setup the output merger 
     ID3D11RenderTargetView* renderTargetViews[] = {
         m_d3dRenderTargetView_lightAccumulation.Get(),
@@ -56,9 +31,32 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
         );
     };
 
-
     // Draw Regular Entities
     {
+        // Setup the input assembler stage
+        m_d3dDeviceContext->IASetInputLayout(m_d3dDeferredGeometry_RegularInputLayout.Get());
+        m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        // Setup the vertex shader stage
+        m_d3dDeviceContext->VSSetShader(m_d3dDeferredGeometry_RegularVertexShader.Get(), nullptr, 0);
+        m_d3dDeviceContext->VSSetConstantBuffers(0, 1, m_d3dConstantBuffers[CB_Object].GetAddressOf());
+
+        // Setup the pixel stage stage
+        m_d3dDeviceContext->PSSetShader(m_d3dDeferredGeometry_RegularPixelShader.Get(), nullptr, 0);
+        ID3D11Buffer* pixelShaderConstantBuffers[] = { m_d3dConstantBuffers[CB_Material].Get(), m_d3dConstantBuffers[CB_Light].Get() };
+        m_d3dDeviceContext->PSSetConstantBuffers(
+            0,                                      // start slot
+            2,                                      // number of buffers
+            pixelShaderConstantBuffers              // array of constant buffers
+        );
+
+        ComPtr<ID3D11SamplerState> samplerStates[] = { m_d3dSamplerState };
+        m_d3dDeviceContext->PSSetSamplers(
+            0,                                      // start slot
+            1,                                      // number of sampler states
+            samplerStates->GetAddressOf()           // array of sampler states
+        );
+
         DrawRegularEntities(bindTextureDelegate);
     }
 
@@ -84,6 +82,9 @@ void SimpleObj::RenderScene_Deferred_GeometryPass()
 
         DrawInstancedEntities(bindTextureDelegate);
     }
+
+    ID3D11RenderTargetView* pRTVs[] = { nullptr, nullptr, nullptr, nullptr };
+    m_d3dDeviceContext->OMSetRenderTargets(_countof(pRTVs), pRTVs, nullptr);
 }
 
 void SimpleObj::RenderScene_Deferred_DebugPass()
