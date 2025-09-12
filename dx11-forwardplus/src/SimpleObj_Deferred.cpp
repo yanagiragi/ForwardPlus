@@ -222,15 +222,6 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
 
 void SimpleObj::DrawLightVolume(Light* light)
 {
-    auto ToVector3 = [](Vector4 vec4, bool isNormalized=false)
-    {
-        auto res = Vector3(vec4);
-        if (isNormalized) {
-            res.Normalize();
-        }
-        return res;
-    };
-
     UINT vertexStride = sizeof(VertexData);
     UINT offset = 0;
     Matrix viewProjectionMatrix = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
@@ -246,7 +237,7 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         // Setup CB, leave InverseTransposeWorldMatrix, InverseTransposeWorldViewMatrix non - updated
-        auto model = Matrix::CreateScale(light->Range) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
+        auto model = Matrix::CreateScale(light->Range) * Matrix::CreateTranslation(Vector3(light->PositionWS)); // point light has no rotation
         auto WorldViewProjectionMatrix = model * viewProjectionMatrix;
         m_ObjectConstantBuffer.WorldMatrix = model;
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
@@ -273,77 +264,27 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
         m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        // Setup CB, leave InverseTransposeWorldMatrix, InverseTransposeWorldViewMatrix non - updated
-        auto spotAngleInDegree = DirectX::XMConvertToDegrees(light->SpotAngle);
-        auto spotAngleScale = spotAngleInDegree;
+        float coneRadius = tan(light->SpotAngle + light->Bias) * light->Range * 2; // TODO: calc correct radius
+        Matrix model = Matrix::CreateScale(coneRadius, coneRadius, light->Range) * Matrix::CreateWorld(Vector3(light->PositionWS), Vector3(light->DirectionWS), Vector3::Up);;
 
-        auto reuseSphereLightVolume = true;
+        Matrix WorldViewProjectionMatrix = model * viewProjectionMatrix;
+        m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
+        m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
 
-        if (reuseSphereLightVolume)
-        {
-            // or simply re-use light volume of sphere
-            auto model = Matrix::CreateScale(light->Range) * Matrix::CreateTranslation(ToVector3(light->PositionWS)); // point light has no rotation
-            auto WorldViewProjectionMatrix = model * viewProjectionMatrix;
-            m_ObjectConstantBuffer.WorldMatrix = model;
-            m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
+        m_d3dDeviceContext->IASetVertexBuffers(
+            0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
+            1,                                      // number of vertex buffers in the array
+            &m_lightVolume_cone.buffer,                          // pointer to an array of vertex buffers
+            &vertexStride,                          // pointer to stride values
+            &offset                                 // pointer to offset values
+        );
 
-            m_d3dDeviceContext->IASetVertexBuffers(
-                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                1,                                      // number of vertex buffers in the array
-                &m_lightVolume_sphere.buffer,                          // pointer to an array of vertex buffers
-                &vertexStride,                          // pointer to stride values
-                &offset                                 // pointer to offset values
-            );
-
-            Draw(m_lightVolume_sphere.count, 0);
-        }
-        else 
-        {
-            // WIP: Still buggy!
-            /* TEST CODE START */
-            Quaternion rotation = Quaternion::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), light->DirectionWS.x);
-            rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), light->DirectionWS.y);
-            rotation *= Quaternion::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), light->DirectionWS.z);
-
-            auto direction = rotation.ToEuler();
-            direction.Normalize();
-
-            Quaternion quat = Quaternion(ToVector3(light->DirectionWS, true));
-
-            Matrix quat1 = Matrix::CreateFromQuaternion(quat);
-
-            Matrix quat2 = Matrix::CreateFromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), light->DirectionWS.x);
-            quat2 *= Matrix::CreateFromAxisAngle(Vector3(0.0f, 1.0f, 0.0f), light->DirectionWS.y);
-            quat2 *= Matrix::CreateFromAxisAngle(Vector3(0.0f, 0.0f, 1.0f), light->DirectionWS.z);
-
-            direction = ToVector3(light->DirectionWS, true);
-            DirectX::XMVECTOR cameraUp = DirectX::XMVectorSet(0, 1, 0, 0);
-            Matrix quat3 = XMMatrixLookAtLH(Vector3::Zero, direction, cameraUp);
-
-            Matrix model = Matrix::CreateScale(1.0f) * quat3 * Matrix::CreateTranslation(ToVector3(light->PositionWS));
-
-            Matrix WorldViewProjectionMatrix = model * viewProjectionMatrix;
-            m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;
-            m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object].Get(), 0, nullptr, &m_ObjectConstantBuffer, 0, 0);
-
-            m_d3dDeviceContext->IASetVertexBuffers(
-                0,                                      // start slot, should equal to slot we use when CreateInputLayout in LoadContent()
-                1,                                      // number of vertex buffers in the array
-                &m_lightVolume_cone.buffer,                          // pointer to an array of vertex buffers
-                &vertexStride,                          // pointer to stride values
-                &offset                                 // pointer to offset values
-            );
-            
-            Draw(m_lightVolume_cone.count, 0);
-
-            /* TEST END START */
-        }
+        Draw(m_lightVolume_cone.count, 0);
     }
 
     else if (light->LightType == (int)LightType::Directional)
     {
-        // backup current state
+        // backup current state since we'll draw full screen without using any stencil states
         ComPtr<ID3D11DepthStencilState> depthStencilState;
         UINT stencilRef;
         m_d3dDeviceContext->OMGetDepthStencilState(depthStencilState.GetAddressOf(), &stencilRef);
@@ -372,6 +313,50 @@ void SimpleObj::DrawLightVolume(Light* light)
 
 void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
 {
+    if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
+    {
+        Clear(DirectX::Colors::CornflowerBlue, 1.0, 0);
+
+        m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
+
+        // Setup target view to main RTV
+        m_d3dDeviceContext->OMSetRenderTargets(1, m_d3dRenderTargetView.GetAddressOf(), m_d3dDepthStencilView.Get());
+
+        // Setup depth state
+        m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
+
+        
+        D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
+        m_d3dDeviceContext->RSSetViewports(1, &viewport);
+
+        // Setup the pixel stage stage
+        m_d3dDeviceContext->PSSetShader(m_d3dUnlitPixelShader.Get(), nullptr, 0);
+
+        for (int i = 0; i < m_LightCalculationCount; ++i)
+        {
+            auto light = &m_Scene.Lights[i];
+            if (!light->Enabled)
+            {
+                continue;
+            }
+
+            // skip draw directional light light volume when debugging since it is a full screen quad and covers every thing
+            if (light->LightType == (int)LightType::Directional)
+            {
+                continue;
+            }
+
+            // TODO: which rs to use?
+            // m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
+            // m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_UnmarkPixels.Get(), 1);
+            m_d3dDeviceContext->RSSetState(m_d3dCullFrontRasterizerState.Get());
+            
+            DrawLightVolume(light);
+        }
+
+        return;
+    }
+
     Matrix viewProjectionMatrix = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
     UINT vertexStride = sizeof(VertexData);
     UINT offset = 0;
@@ -389,37 +374,8 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
     for (int i = 0; i < m_LightCalculationCount; ++i)
     {
         auto light = &m_Scene.Lights[i];
-        
         if (!light->Enabled)
         {
-            continue;
-        }
-
-        if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
-        {
-            // 0. Draw light volume for debugging
-            {
-                Clear(DirectX::Colors::CornflowerBlue, 1.0, 0);
-                m_d3dDeviceContext->OMSetBlendState(NULL, nullptr, 0xffffffff);
-
-                // Setup target view to main RTV
-                m_d3dDeviceContext->OMSetRenderTargets(1, m_d3dRenderTargetView.GetAddressOf(), m_d3dDepthStencilView.Get());
-
-                // Setup depth state
-                m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
-
-                // Setup the rasterizer stage
-                m_d3dDeviceContext->RSSetState(m_d3dCullFrontRasterizerState.Get());
-
-                D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
-                m_d3dDeviceContext->RSSetViewports(1, &viewport);
-
-                // Setup the pixel stage stage
-                m_d3dDeviceContext->PSSetShader(m_d3dUnlitPixelShader.Get(), nullptr, 0);
-
-                DrawLightVolume(light);
-            }
-
             continue;
         }
 
