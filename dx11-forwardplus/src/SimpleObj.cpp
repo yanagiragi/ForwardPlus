@@ -716,18 +716,20 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         else if (m_RenderMode == RenderMode::Deferred)
         {
             int debugMode = (int)m_DeferredDebugMode;
-            if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0"))
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\0LightAccumulation\0Diffuse\0Specular\0Normal\0Depth\0LightVolume\0LightVolumeExact\0"))
             {
                 // Reset light calculation mode when switch back from "LightVolume" option
-                if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume && (Deferred_DebugMode)debugMode != Deferred_DebugMode::LightVolume)
+                auto previousUsesStencilMode = m_LightCalculationMode == LightCalculationMode::Stencil;
+                auto currentUsesStencilMode = (Deferred_DebugMode)debugMode == Deferred_DebugMode::LightVolume || (Deferred_DebugMode)debugMode == Deferred_DebugMode::LightVolumeExact;
+                if (previousUsesStencilMode && !currentUsesStencilMode)
                 {
                     m_LightCalculationMode = LightCalculationMode::Loop;
                 }
-                
+
                 m_DeferredDebugMode = (Deferred_DebugMode)debugMode;
             }
 
-            if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
+            if (m_DeferredDebugMode == Deferred_DebugMode::LightVolume || m_DeferredDebugMode == Deferred_DebugMode::LightVolumeExact)
             {
                 m_LightCalculationMode = LightCalculationMode::Stencil;
             }

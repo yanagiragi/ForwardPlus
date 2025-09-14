@@ -324,7 +324,6 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
 
         // Setup depth state
         m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState.Get(), 1);
-
         
         D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
         m_d3dDeviceContext->RSSetViewports(1, &viewport);
@@ -346,10 +345,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
                 continue;
             }
 
-            // TODO: which rs to use?
-            // m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
-            // m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_UnmarkPixels.Get(), 1);
-            m_d3dDeviceContext->RSSetState(m_d3dCullFrontRasterizerState.Get());
+            m_d3dDeviceContext->RSSetState(m_d3dRasterizerState.Get());
             
             DrawLightVolume(light);
         }
@@ -425,7 +421,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
             // Shader pixels with stencil ref = 1
             m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState_ShadePixels.Get(), 1);
 
-            // Cull back and disable Depth Clipping
+            // Cull front face and disable Depth Clipping
             m_d3dDeviceContext->RSSetState(m_d3dCullFrontRasterizerState.Get());
 
             // disable depth test and use additive blend
@@ -457,6 +453,17 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
             };
             m_d3dDeviceContext->PSSetShaderResources(0, _countof(textures), textures->GetAddressOf());
             m_d3dDeviceContext->PSSetSamplers(0, 1, m_d3dSamplerState.GetAddressOf());
+
+            // override pixle shader for debugging
+            if (m_DeferredDebugMode == Deferred_DebugMode::LightVolumeExact)
+            {
+                if (light->LightType == (int)LightType::Directional)
+                {
+                    continue;
+                }
+
+                m_d3dDeviceContext->PSSetShader(m_d3dUnlitPixelShader.Get(), nullptr, 0);
+            }
 
             DrawLightVolume(light);
 
@@ -561,7 +568,7 @@ void SimpleObj::RenderScene_Deferred(RenderEventArgs& e)
 {
     RenderScene_Deferred_GeometryPass();
 
-    if (m_DeferredDebugMode == Deferred_DebugMode::None || m_DeferredDebugMode == Deferred_DebugMode::LightVolume)
+    if (m_DeferredDebugMode == Deferred_DebugMode::None || m_DeferredDebugMode == Deferred_DebugMode::LightVolume || m_DeferredDebugMode == Deferred_DebugMode::LightVolumeExact)
     {
         if (m_LightCalculationMode == LightCalculationMode::Loop)
         {

@@ -41,6 +41,7 @@ namespace Yr
         Normal,
         Depth,
         LightVolume,
+        LightVolumeExact,
         LEN_DEFERRED_DEBUGMODE
     };
 
