@@ -264,8 +264,12 @@ void SimpleObj::DrawLightVolume(Light* light)
         m_d3dDeviceContext->IASetInputLayout(m_d3dRegularInputLayout.Get());
         m_d3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        float coneRadius = tan(light->SpotAngle + light->Bias) * light->Range * 2; // TODO: calc correct radius
-        Matrix model = Matrix::CreateScale(coneRadius, coneRadius, light->Range) * Matrix::CreateWorld(Vector3(light->PositionWS), Vector3(light->DirectionWS), Vector3::Up);;
+        // hard code number of the model
+        const float baseRange = 2.0f;
+        const float baseRadius = 1.0; // spot angle = 0.463647609 rad ~= 26.35 degrees
+        
+        const float coneRadius = tan(light->SpotAngle) * light->Range;
+        Matrix model = Matrix::CreateScale(coneRadius / baseRadius, coneRadius / baseRadius, light->Range / baseRange) * Matrix::CreateWorld(Vector3(light->PositionWS), Vector3(light->DirectionWS), Vector3::Up);
 
         Matrix WorldViewProjectionMatrix = model * viewProjectionMatrix;
         m_ObjectConstantBuffer.WorldViewProjectionMatrix = WorldViewProjectionMatrix;

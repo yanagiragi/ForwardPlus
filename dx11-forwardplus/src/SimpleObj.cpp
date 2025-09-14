@@ -512,7 +512,7 @@ void SimpleObj::LoadLight()
     directionV3.Normalize();
     spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
-    spotlight.Range = 75.0f;
+    spotlight.Range = 15.0f;
     spotlight.Strength = 1.2f;
     spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
     spotlight.Enabled = true;
@@ -589,11 +589,11 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
                 DX::Draw(m_d3dPrimitiveBatch.get(), sphere, DirectX::Colors::White);
             }
 
-            else if (type == LightType::Directional || type == LightType::Spotlight)
+            else if (type == LightType::Directional)
             {
                 auto direction = Vector3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
                 direction.Normalize();
-                
+
                 auto color = Colors::LightPink;
                 if (type == LightType::Spotlight)
                 {
@@ -609,10 +609,41 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
                 direction.Cross(Vector3::Up, perpendicular);
                 auto v3 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 + perpendicular * 0.1, color);
                 auto v4 = VertexPositionColor(position - direction * directionalLightDebugLength * 0.9 - perpendicular * 0.1, color);
-                
+
                 m_d3dPrimitiveBatch->DrawLine(v1, v2);
                 m_d3dPrimitiveBatch->DrawLine(v2, v3);
                 m_d3dPrimitiveBatch->DrawLine(v2, v4);
+            }
+
+            else if (type == LightType::Spotlight)
+            {
+                auto direction = Vector3(light->DirectionWS.x, light->DirectionWS.y, light->DirectionWS.z);
+                direction.Normalize();
+                
+                auto color = Colors::LightPink;
+                if (type == LightType::Spotlight)
+                {
+                    color = Colors::PaleGreen;
+                }
+
+                // use negative direction to visual actual light dir calculation in shader
+                auto v1 = VertexPositionColor(position, color);
+                auto v2 = VertexPositionColor(position - direction * light->Range, color);
+
+                auto perpendicular = Vector3::Zero;
+                direction.Cross(Vector3::Up, perpendicular);
+                
+                float coneRadius = tan(light->SpotAngle) * light->Range;
+                auto v3 = VertexPositionColor(position - direction * light->Range + perpendicular * coneRadius, color);
+                auto v4 = VertexPositionColor(position - direction * light->Range - perpendicular * coneRadius, color);
+
+                m_d3dPrimitiveBatch->DrawLine(v1, v2);
+                
+                m_d3dPrimitiveBatch->DrawLine(v2, v3);
+                m_d3dPrimitiveBatch->DrawLine(v2, v4);
+
+                m_d3dPrimitiveBatch->DrawLine(v1, v3);
+                m_d3dPrimitiveBatch->DrawLine(v1, v4);
             }
         }
     }
