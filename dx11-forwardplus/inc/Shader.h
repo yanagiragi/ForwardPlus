@@ -3,6 +3,7 @@
 #include <wrl.h>
 #include <d3d11.h>
 #include <string>
+#include <chrono>
 
 #include "Common.h"
 
@@ -248,6 +249,9 @@ ComPtr<ID3DBlob> LoadShader(ComPtr<ID3D11Device> d3dDevice, const std::wstring& 
     ComPtr<ID3DBlob> pShaderBlob = nullptr;
     ComPtr<ID3DBlob> pErrorBlob = nullptr;
 
+    std::wcout << L"Start Compile Shader: " << fileName << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+
     std::string profile = _profile;
     if (profile == "latest")
     {
@@ -271,6 +275,9 @@ ComPtr<ID3DBlob> LoadShader(ComPtr<ID3D11Device> d3dDevice, const std::wstring& 
         &pErrorBlob                             // pointer to the error messages
     );
 
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
     if (FAILED(hr))
     {
         if (pErrorBlob)
@@ -286,6 +293,8 @@ ComPtr<ID3DBlob> LoadShader(ComPtr<ID3D11Device> d3dDevice, const std::wstring& 
     }
 
     SafeRelease(pErrorBlob);
+
+    std::wcout << L"Shader Compiled     : " << fileName << L", elapsed: " << elapsed.count() << "s" << std::endl;
 
     return pShaderBlob;
 }

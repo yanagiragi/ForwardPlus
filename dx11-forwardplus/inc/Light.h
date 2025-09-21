@@ -4,7 +4,7 @@
 
 using namespace DirectX::SimpleMath;
 
-#define MAX_LIGHTS 8
+#define MAX_LIGHTS 32
 
 enum class LightType
 {

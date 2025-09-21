@@ -1121,6 +1121,42 @@ void SimpleObj::LoadBasicScene()
     m_Scene.Add(box);
     m_Scene.Add(bunny1); // no need to add bunnyBase to scene since it was only a reference entity
     m_Scene.Add(bunny2);
+
+    // Load Lights
+    {
+        struct Light directional;
+        directional.LightType = (int)LightType::Directional;
+        directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
+        auto directionV3 = Vector3(1.0, 0.5, 0.25);
+        directionV3.Normalize();
+        directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+        directional.Strength = 0.5f;
+        directional.Enabled = true;
+
+        struct Light point;
+        point.LightType = (int)LightType::Point;
+        point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
+        point.Range = 3.8f;
+        point.Strength = 0.5f;
+        point.Enabled = true;
+        point.Bias = 1.0f; // expand range 1 unit
+
+        struct Light spotlight;
+        spotlight.LightType = (int)LightType::Spotlight;
+        spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
+        directionV3 = Vector3(0.079, -0.285, 0.976f);
+        directionV3.Normalize();
+        spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+        spotlight.SpotAngle = XMConvertToRadians(16.0f);
+        spotlight.Range = 15.0f;
+        spotlight.Strength = 1.2f;
+        spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
+        spotlight.Enabled = true;
+
+        m_Scene.Lights[0] = directional;
+        m_Scene.Lights[1] = point;
+        m_Scene.Lights[2] = spotlight;
+    }
 }
 
 void Yr::SimpleObj::LoadSponzaScene()
@@ -1128,11 +1164,102 @@ void Yr::SimpleObj::LoadSponzaScene()
     m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0)));
 
     // increase camera moving speed
-    normalMovingSpeedMultipler = 400.0f;
-    shiftMovingSpeedMultipler = 800.0f;
+    normalMovingSpeedMultipler = 800.0f;
+    shiftMovingSpeedMultipler = 1600.0f;
 
     // increase far plane distance
     farPlane = 10000.f;
+
+    // Load Lights
+    {
+        struct Light directional;
+        directional.LightType = (int)LightType::Directional;
+        directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
+        auto directionV3 = Vector3(1.0, 0.5, 0.25);
+        directionV3.Normalize();
+        directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+        directional.Strength = 0.5f;
+        directional.Enabled = true;
+
+        m_Scene.Lights[0] = directional;
+
+        const int randomPointLightCount = MAX_LIGHTS / 2;
+        const int randomSpotLightCount = MAX_LIGHTS / 2 - 1;
+
+        Vector3 positionRandomRangeCenter = Vector3(0, 500, 0);
+        Vector3 positionRandomRangeExtents = Vector3(1400, 600, 400);
+        
+        float pointLightRangeRandomBase = 100.0f;
+        float pointLightRangeRandomRange = 200.0f;
+        
+        float spotLightAngleRandomBase = 30.0f;
+        float spotLightAngleRandomRange = 30.0f;
+        float spotLightRangeRandomBase = 200.0f;
+        float spotLightRangeRandomRange = 200.0f;
+        
+        float pointLightStrength = 3.0f;
+        float spotlightStrength = 5.0f;
+
+        for (int i = 0; i < randomPointLightCount; ++i)
+        {
+            float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+            Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
+            Vector3 position = randOneNegativeOne * positionRandomRangeExtents + positionRandomRangeCenter;
+
+            struct Light point;
+            point.LightType = (int)LightType::Point;
+            point.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
+            point.Range = pointLightRangeRandomBase + r4 * pointLightRangeRandomRange;
+            point.Strength = pointLightStrength;
+            point.Enabled = true;
+            point.Bias = 1.0f; // expand range 1 unit
+
+            if ((1 + i) < MAX_LIGHTS)
+            {
+                m_Scene.Lights[1 + i] = point;
+            }
+        }
+
+        for (int i = 0; i < randomSpotLightCount; ++i)
+        {
+            float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            
+            float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r5 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r6 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+            float r7 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            float r8 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+            Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
+            Vector3 position = randOneNegativeOne * positionRandomRangeExtents + positionRandomRangeCenter;
+
+            struct Light spotlight;
+            spotlight.LightType = (int)LightType::Spotlight;
+            spotlight.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
+            
+            Vector3 directionV3 = Vector3(1, 1, 1);
+            directionV3.Normalize();
+            spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+            
+            spotlight.SpotAngle = XMConvertToRadians(spotLightAngleRandomBase + r7 * spotLightAngleRandomRange);
+            spotlight.Range = spotLightRangeRandomBase + r8 * spotLightRangeRandomRange;
+            spotlight.Strength = spotlightStrength;
+            spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
+            spotlight.Enabled = true;
+
+            if ((1 + randomPointLightCount + i) < MAX_LIGHTS)
+            {
+                m_Scene.Lights[1 + randomPointLightCount + i] = spotlight;
+            }
+        }
+    }
 }
 
 void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate)
@@ -1799,7 +1926,8 @@ bool SimpleObj::ResizeSwapChain(int width, int height)
 
         // m_d3dOpaqueLightIndexListBuffers
         {
-            m_opaqueLightIndexList.resize(totalGroupCounts * AVERAGE_OVERLAPPING_LIGHTS_PER_TILE);
+            int opaqueLightIndexListLength = totalGroupCounts * AVERAGE_OVERLAPPING_LIGHTS_PER_TILE;
+            m_opaqueLightIndexList.resize(opaqueLightIndexListLength);
             
             hr = CreateStructuredBuffer(m_d3dDevice.Get(), sizeof(uint32_t), m_opaqueLightIndexList.size(), NULL, m_d3dOpaqueLightIndexListBuffers.GetAddressOf());
             AssertIfFailed(hr, "Create Buffer", "Unable to create m_opaqueLightIndexListBuffers");
@@ -1977,8 +2105,8 @@ bool SimpleObj::LoadContent()
     }
     Model::Setup(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dEffectFactory.get());
 
-    LoadBasicScene();
-    // LoadSponzaScene();
+    // LoadBasicScene();
+    LoadSponzaScene();
 
     // setup CB
     {
@@ -2157,7 +2285,6 @@ bool SimpleObj::LoadContent()
     }
 
     LoadShaderResources();
-    LoadLight();
     LoadDebugDraw();
     LoadSampler();
 

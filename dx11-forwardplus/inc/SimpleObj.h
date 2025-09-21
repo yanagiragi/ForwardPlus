@@ -312,7 +312,7 @@ namespace Yr
         int m_DispatchCallCount = 0;
         Vector2 m_ScreenDimensions;
         bool m_frustumComputed = false;
-        const uint32_t AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200u;
+        const int AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;

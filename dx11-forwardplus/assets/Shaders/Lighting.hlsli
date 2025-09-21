@@ -126,7 +126,6 @@ LightingResult ComputeLightingVS(LightProperties Lights[MAX_LIGHTS], int lightCo
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
-    [unroll]
     for (int i = 0; i < lightCount; ++i)
     {
         if (!Lights[i].Enabled)
@@ -195,7 +194,7 @@ LightingResult ComputeLightingWS(LightProperties Lights[MAX_LIGHTS], int lightCo
     
     LightingResult totalResult = { {0, 0, 0}, {0, 0, 0} };
     
-    [unroll]
+    
     for (int i = 0; i < lightCount; ++i)
     {
         if (!Lights[i].Enabled)

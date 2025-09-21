@@ -1,5 +1,5 @@
 #define MAX_TEXTURE 64
-#define MAX_LIGHTS 8
+#define MAX_LIGHTS 32
 
 // Light types.
 #define DIRECTIONAL_LIGHT 0
