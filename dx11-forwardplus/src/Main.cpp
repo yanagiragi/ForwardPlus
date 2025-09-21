@@ -10,7 +10,7 @@
 const char* g_WindowName = "Forward+";
 int g_WindowWidth = 1280;
 int g_WindowHeight = 720;
-bool g_VSync = true;
+bool g_VSync = false;
 bool g_Windowed = true;
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, LPWSTR cmdLine, int cmdShow)

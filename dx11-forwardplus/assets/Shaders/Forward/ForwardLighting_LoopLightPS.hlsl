@@ -9,11 +9,11 @@ cbuffer MaterialProperties : register(b0)
 cbuffer LightProperties : register(b1)
 {
     float4 EyePosition;                 // 16 bytes
-    //----------------------------------- (16 byte boundary)
     float4 GlobalAmbient;               // 16 bytes
     //----------------------------------- (16 byte boundary)
-    struct LightProperties Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
-};  // Total:                           // 672 bytes (42 * 16 byte boundary)
+    //----------------------------------- (16 byte boundary)
+    struct Light Lights[MAX_LIGHTS];
+};
 
 cbuffer LightingCalculationOptions : register(b2)
 {

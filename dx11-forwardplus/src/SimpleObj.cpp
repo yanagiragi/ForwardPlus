@@ -495,16 +495,13 @@ void SimpleObj::LoadLight()
     directionV3.Normalize();
     directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
     directional.Strength = 0.5f;
-    directional.Enabled = true;
 
     struct Light point;
     point.LightType = (int)LightType::Point;
     point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
     point.Range = 3.8f;
     point.Strength = 0.5f;
-    point.Enabled = true;
-    point.Bias = 1.0f; // expand range 1 unit
-
+    
     struct Light spotlight;
     spotlight.LightType = (int)LightType::Spotlight;
     spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
@@ -514,9 +511,7 @@ void SimpleObj::LoadLight()
     spotlight.SpotAngle = XMConvertToRadians(16.0f);
     spotlight.Range = 15.0f;
     spotlight.Strength = 1.2f;
-    spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
-    spotlight.Enabled = true;
-
+    
     m_Scene.Lights[0] = directional;
     m_Scene.Lights[1] = point;
     m_Scene.Lights[2] = spotlight;
@@ -574,7 +569,7 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
         {
             auto light = &m_Scene.Lights[i];
 
-            if (!light->Enabled)
+            if (light->Strength < LIGHT_EPSILON)
             {
                 continue;
             }
@@ -806,6 +801,14 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         m_Scene.GlobalAmbient.y = ambient[1];
         m_Scene.GlobalAmbient.z = ambient[2];
 
+        float scale = m_Scene.CullLightBiasSetting.PointLightBias;
+        ImGui::DragFloat("Point Light Bias", &scale, dragSpeed, 0.0f, 100.0f);
+        m_Scene.CullLightBiasSetting.PointLightBias = scale;
+
+        scale = XMConvertToDegrees(m_Scene.CullLightBiasSetting.SpotLightBias);
+        ImGui::DragFloat("Spot Light Bias", &scale, dragSpeed, 0.0f, 30.0f);
+        m_Scene.CullLightBiasSetting.SpotLightBias = XMConvertToRadians(scale);
+
         ImGui::PopID();
     }
 
@@ -972,9 +975,11 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
             if (ImGui::TreeNode(name))
             {
-                bool enabled = light->Enabled == 1;
+
+                ImGui::BeginDisabled();
+                bool enabled = light->Strength > LIGHT_EPSILON;
                 ImGui::Checkbox("Enabled", &enabled);
-                light->Enabled = enabled ? 1 : 0;
+                ImGui::EndDisabled();
 
                 if ((LightType)light->LightType == LightType::Directional || (LightType)light->LightType == LightType::Spotlight)
                 {
@@ -1033,19 +1038,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     case 2: light->LightType = 2; break;
                     default: break;
                     }
-                }
-
-                if (light->LightType == 1)
-                {
-                    float scale = light->Bias;
-                    ImGui::DragFloat("Bias", &scale, dragSpeed, 0.0f, 10.0f);
-                    light->Bias = scale;
-                }
-                else if (light->LightType == 2)
-                {
-                    float scale = XMConvertToDegrees(light->Bias);
-                    ImGui::DragFloat("Bias", &scale, dragSpeed, 0.0f, 10.0f);
-                    light->Bias = XMConvertToRadians(scale);
                 }
 
                 ImGui::TreePop();
@@ -1131,16 +1123,13 @@ void SimpleObj::LoadBasicScene()
         directionV3.Normalize();
         directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
         directional.Strength = 0.5f;
-        directional.Enabled = true;
-
+        
         struct Light point;
         point.LightType = (int)LightType::Point;
         point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
         point.Range = 3.8f;
         point.Strength = 0.5f;
-        point.Enabled = true;
-        point.Bias = 1.0f; // expand range 1 unit
-
+        
         struct Light spotlight;
         spotlight.LightType = (int)LightType::Spotlight;
         spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
@@ -1150,9 +1139,7 @@ void SimpleObj::LoadBasicScene()
         spotlight.SpotAngle = XMConvertToRadians(16.0f);
         spotlight.Range = 15.0f;
         spotlight.Strength = 1.2f;
-        spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
-        spotlight.Enabled = true;
-
+        
         m_Scene.Lights[0] = directional;
         m_Scene.Lights[1] = point;
         m_Scene.Lights[2] = spotlight;
@@ -1179,7 +1166,6 @@ void Yr::SimpleObj::LoadSponzaScene()
         directionV3.Normalize();
         directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
         directional.Strength = 0.5f;
-        directional.Enabled = true;
 
         m_Scene.Lights[0] = directional;
 
@@ -1215,9 +1201,7 @@ void Yr::SimpleObj::LoadSponzaScene()
             point.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
             point.Range = pointLightRangeRandomBase + r4 * pointLightRangeRandomRange;
             point.Strength = pointLightStrength;
-            point.Enabled = true;
-            point.Bias = 1.0f; // expand range 1 unit
-
+            
             if ((1 + i) < MAX_LIGHTS)
             {
                 m_Scene.Lights[1 + i] = point;
@@ -1251,9 +1235,7 @@ void Yr::SimpleObj::LoadSponzaScene()
             spotlight.SpotAngle = XMConvertToRadians(spotLightAngleRandomBase + r7 * spotLightAngleRandomRange);
             spotlight.Range = spotLightRangeRandomBase + r8 * spotLightRangeRandomRange;
             spotlight.Strength = spotlightStrength;
-            spotlight.Bias = XMConvertToRadians(5.0f); // expand end cap 5 degrees
-            spotlight.Enabled = true;
-
+            
             if ((1 + randomPointLightCount + i) < MAX_LIGHTS)
             {
                 m_Scene.Lights[1 + randomPointLightCount + i] = spotlight;
@@ -2133,6 +2115,9 @@ bool SimpleObj::LoadContent()
 
         hr = CreateConstantBuffer(sizeof(struct DispatchParams), &m_d3dConstantBuffers[CB_DispatchParams]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_DispatchParams");
+
+        hr = CreateConstantBuffer(sizeof(struct CullLightBias), &m_d3dConstantBuffers[CB_CullLightBias]);
+        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_CullLightBias");
     }
 
     // setup BlendState & DepthStencilState

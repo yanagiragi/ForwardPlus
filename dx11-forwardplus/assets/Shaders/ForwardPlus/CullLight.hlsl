@@ -31,7 +31,7 @@ cbuffer LightProperties : register(b2)
     //----------------------------------- (16 byte boundary)
     float4 GlobalAmbient;               // 16 bytes
     //----------------------------------- (16 byte boundary)
-    struct LightProperties Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
+    struct Light Lights[MAX_LIGHTS];    // 80 * 8 = 640 bytes
 };  // Total:  
 
 cbuffer DebugProperties : register(b3)
@@ -39,6 +39,14 @@ cbuffer DebugProperties : register(b3)
     int DebugMode;                  // 4 bytes
     float DepthPower;               // 4 bytes
     float DebugPadding[2];          // 8 bytes
+                                    //----------(16 byte boundary)
+}; // Total:                        // 16 bytes (1 * 16 byte boundary)
+
+cbuffer CullLightBias : register(b4)
+{
+    float PointLightBias;           // 4 bytes
+    float SpotLightBias;            // 4 bytes
+    float BiasPadding[2];           // 8 bytes
                                     //----------(16 byte boundary)
 }; // Total:                        // 16 bytes (1 * 16 byte boundary)
 
@@ -162,61 +170,62 @@ void main(ComputeShaderInput IN)
     // Each thread in a group will cull 1 light until all lights have been culled.
     for ( uint i = IN.groupIndex; i < MAX_LIGHTS; i += BLOCK_SIZE * BLOCK_SIZE )
     {
-        if ( Lights[i].Enabled )
+        if (Lights[i].Strength < LIGHT_EPSILON)
         {
-            LightProperties light = Lights[i];
-
-            switch ( light.LightType )
+            continue;
+        }
+        
+        Light light = Lights[i];
+        switch ( light.LightType )
+        {
+            case POINT_LIGHT:
             {
-                case POINT_LIGHT:
+                Sphere sphere = { light.PositionVS.xyz, light.Range + PointLightBias };
+                if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS) )
                 {
-                    Sphere sphere = { light.PositionVS.xyz, light.Range + light.Bias };
-                    if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS) )
-                    {
-                        // Add light to light list for transparent geometry.
-                        // t_AppendLight( i );
-    
-                        if ( !SphereInsidePlane( sphere, minPlane ) )
-                        {
-                            // Add light to light list for opaque geometry.
-                            o_AppendLight( i );
-                        }
-                    }
-                }
-                break;
-
-                case SPOT_LIGHT:
-                {
-                    // SpotAngle is already in radian unit
-                    float coneRadius = tan( light.SpotAngle + light.Bias ) * light.Range;
-
-                    // Since we treat light direction as vector starts from point to light,
-                    // we need to negate the direction to get correct cone direction
-                    Cone cone = { light.PositionVS.xyz, light.Range, -light.DirectionVS.xyz, coneRadius };
-                    
-                    if ( ConeInsideFrustum( cone, GroupFrustum, nearClipVS, maxDepthVS ) )
-                    {
-                        // Add light to light list for transparent geometry.
-                        // t_AppendLight( i );
-    
-                        if ( !ConeInsidePlane( cone, minPlane ) )
-                        {
-                            // Add light to light list for opaque geometry.
-                            o_AppendLight( i );
-                        }
-                    }
-                }
-                break;
-
-                case DIRECTIONAL_LIGHT:
-                {
-                    // Directional lights always get added to our light list.
-                    // (Hopefully there are not too many directional lights!)
+                    // Add light to light list for transparent geometry.
                     // t_AppendLight( i );
-                    o_AppendLight( i );
+
+                    if ( !SphereInsidePlane( sphere, minPlane ) )
+                    {
+                        // Add light to light list for opaque geometry.
+                        o_AppendLight( i );
+                    }
                 }
-                break;
             }
+            break;
+
+            case SPOT_LIGHT:
+            {
+                // SpotAngle is already in radian unit
+                float coneRadius = tan( light.SpotAngle + SpotLightBias ) * light.Range;
+
+                // Since we treat light direction as vector starts from point to light,
+                // we need to negate the direction to get correct cone direction
+                Cone cone = { light.PositionVS.xyz, light.Range, -light.DirectionVS.xyz, coneRadius };
+                
+                if ( ConeInsideFrustum( cone, GroupFrustum, nearClipVS, maxDepthVS ) )
+                {
+                    // Add light to light list for transparent geometry.
+                    // t_AppendLight( i );
+
+                    if ( !ConeInsidePlane( cone, minPlane ) )
+                    {
+                        // Add light to light list for opaque geometry.
+                        o_AppendLight( i );
+                    }
+                }
+            }
+            break;
+
+            case DIRECTIONAL_LIGHT:
+            {
+                // Directional lights always get added to our light list.
+                // (Hopefully there are not too many directional lights!)
+                // t_AppendLight( i );
+                o_AppendLight( i );
+            }
+            break;
         }
     }
  

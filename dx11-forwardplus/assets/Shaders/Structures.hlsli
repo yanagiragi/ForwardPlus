@@ -1,5 +1,7 @@
 #define MAX_TEXTURE 64
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 512
+
+#define LIGHT_EPSILON 0.01
 
 // Light types.
 #define DIRECTIONAL_LIGHT 0
@@ -11,26 +13,20 @@
 // Structures
 // 
 // ==============================================================
-struct LightProperties
+struct Light
 {
     float4      PositionWS;             // 16 bytes
     float4      PositionVS;             // 16 bytes
-    //----------------------------------- (16 byte boundary)
     float4      DirectionWS;            // 16 bytes
     float4      DirectionVS;            // 16 bytes
-    //----------------------------------- (16 byte boundary)
     float4      Color;                  // 16 bytes
     //----------------------------------- (16 byte boundary)
     float       SpotAngle;              // 4 bytes
     float       Range;                  // 4 bytes
     int         LightType;              // 4 bytes
-    bool        Enabled;                // 4 bytes
-    //----------------------------------- (16 byte boundary)
     float       Strength;               // 4 bytes
-    float       Bias;                   // 4 bytes
-    float2      Padding;                // 8 bytes
     //----------------------------------- (16 byte boundary)
-};  // Total:                           // 80 bytes (5 * 16)
+};  // Total:                           // 96 bytes (6 * 16)
 
 struct MaterialProperties
 {

@@ -4,7 +4,8 @@
 
 using namespace DirectX::SimpleMath;
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 512
+#define LIGHT_EPSILON 0.01
 
 enum class LightType
 {
@@ -18,23 +19,16 @@ struct Light
 {
     Vector4     PositionWS;                         // 16 bytes
     Vector4     PositionVS;                         // 16 bytes
-    //--------------------------------------------------------- (16 byte boundary)
     Vector4     DirectionWS;                        // 16 bytes
     Vector4     DirectionVS;                        // 16 bytes
-    //--------------------------------------------------------- (16 byte boundary)
     Vector4     Color = Vector4(1, 1, 1, 1);        // 16 bytes
     //--------------------------------------------------------- (16 byte boundary)
     float       SpotAngle = 0.0f;                   // 4 bytes. Angle in radians.
     float       Range = 1.0f;                       // 4 bytes
     int         LightType = 0;                      // 4 bytes
-    int         Enabled = false;                    // 4 bytes
+    float       Strength = 0.0f;                    // 4 bytes. Strength = 0 equals not enabled
     //--------------------------------------------------------- (16 byte boundary)
-    float       Strength = 0.0f;                    // 4 bytes
-    float       Bias;                               // 4 bytes
-    float       Padding[2];                         // 8 bytes
-    //--------------------------------------------------------- (16 byte boundary)
-
-};  // Total:                                       // 112 bytes (7 * 16)
+};  // Total:                                       // 96 bytes (6 * 16)
 
 struct LightProperties
 {
@@ -44,8 +38,15 @@ struct LightProperties
     {}
 
     Vector4   EyePosition;
-    //----------------------------------- (16 byte boundary)
     Vector4   GlobalAmbient;
     //----------------------------------- (16 byte boundary)
-    Light     Lights[MAX_LIGHTS]; // 80 * 8 bytes
+    Light     Lights[MAX_LIGHTS];
 };  // Total:                                  672 bytes (42 * 16)
+
+struct CullLightBias
+{
+    float PointLightBias = 3.0f;                                // expand range 1 unit
+    float SpotLightBias = DirectX::XMConvertToRadians(5.0f);    // expand end cap 5 degrees
+    float Padding[2];
+    //----------------------------------- (16 byte boundary)
+};

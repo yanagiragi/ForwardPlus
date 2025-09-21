@@ -156,7 +156,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
 
             for (int i = -1; i < MAX_LIGHTS; ++i)
             {
-                if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
+                if (i != m_LightCalculationCount || (i != -1 && m_Scene.Lights[i].Strength < LIGHT_EPSILON))
                 {
                     continue;
                 }
@@ -206,7 +206,7 @@ void SimpleObj::RenderScene_Forward(RenderEventArgs& e)
             bool hasDrawAnyModel = false;
             for (int i = -1; i < MAX_LIGHTS; ++i)
             {
-                if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
+                if (i != m_LightCalculationCount || (i != -1 && m_Scene.Lights[i].Strength < LIGHT_EPSILON))
                 {
                     continue;
                 }

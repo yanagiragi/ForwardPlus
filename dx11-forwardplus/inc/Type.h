@@ -21,6 +21,7 @@ namespace Yr
         CB_ScreenToViewParams,
         CB_LightCalculationOptions,
         CB_DispatchParams,
+        CB_CullLightBias,
         NumConstantBuffers
     };
 

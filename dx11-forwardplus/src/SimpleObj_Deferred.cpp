@@ -338,7 +338,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
         for (int i = 0; i < m_LightCalculationCount; ++i)
         {
             auto light = &m_Scene.Lights[i];
-            if (!light->Enabled)
+            if (light->Strength < LIGHT_EPSILON)
             {
                 continue;
             }
@@ -374,7 +374,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Stencil()
     for (int i = 0; i < m_LightCalculationCount; ++i)
     {
         auto light = &m_Scene.Lights[i];
-        if (!light->Enabled)
+        if (light->Strength < LIGHT_EPSILON)
         {
             continue;
         }
@@ -548,7 +548,7 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Single()
 
     for (int i = -1; i < MAX_LIGHTS; ++i)
     {
-        if (i != m_LightCalculationCount || (i != -1 && !m_Scene.Lights[i].Enabled))
+        if (i != m_LightCalculationCount || (i != -1 && m_Scene.Lights[i].Strength < LIGHT_EPSILON))
         {
             continue;
         }
