@@ -152,6 +152,7 @@ int Application::Run()
     static float totalTime = 0.0f;
     static const float targetFramerate = 30.0f;
     static const float maxTimeStep = 1.0f / targetFramerate;
+    static const bool capDeltaTime = false; // don't cap delta time since we want to see actual elapsed time
 
     while ( msg.message != WM_QUIT )
     {
@@ -168,7 +169,10 @@ int Application::Run()
 
             // Cap the delta time to the max time step (useful if your 
             // debugging and you don't want the deltaTime value to explode.
-            deltaTime = std::min<float>(deltaTime, maxTimeStep);
+            if (capDeltaTime)
+            {
+                deltaTime = std::min<float>(deltaTime, maxTimeStep);
+            }
 
             totalTime += deltaTime;
 
