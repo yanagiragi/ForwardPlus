@@ -169,6 +169,10 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
     D3D11_VIEWPORT viewport = m_Camera.get_Viewport();
     m_d3dDeviceContext->RSSetViewports(1, &viewport);
 
+    // set blend state to no blend
+    UINT sampleMask = 0xffffffff;
+    m_d3dDeviceContext->OMSetBlendState(nullptr, nullptr, sampleMask);
+
     // Setup the vertex shader stage
     m_d3dDeviceContext->VSSetShader(m_d3dDeferredLightingVertexShader.Get(), nullptr, 0);
 
@@ -176,7 +180,8 @@ void SimpleObj::RenderScene_Deferred_LightingPass_Loop()
     m_d3dDeviceContext->PSSetShader(m_d3dDeferredLighting_LoopLight_PixelShader.Get(), nullptr, 0);
     ID3D11Buffer* buffers[] = {
         m_d3dConstantBuffers[CB_Light].Get(),
-        m_d3dConstantBuffers[CB_ScreenToViewParams].Get()
+        m_d3dConstantBuffers[CB_ScreenToViewParams].Get(),
+        m_d3dConstantBuffers[CB_LightCalculationOptions].Get()
     };
     m_d3dDeviceContext->PSSetConstantBuffers(
         0,

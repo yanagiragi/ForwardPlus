@@ -706,6 +706,15 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         int renderMode = (int)m_RenderMode;
         if (ImGui::Combo("Render Techniques", &renderMode, "Forward\0Deferred\0Forward Plus\0"))
         {
+            if (m_RenderMode != (RenderMode)renderMode)
+            {
+                // Though it may be fine to not clear states when switch render mode,
+                // however we found out start new render mode with fresh states makes us
+                // easier to spot incorrect state setting (i.e., rely on other previous draw calls)
+                m_d3dDeviceContext->Flush();
+                m_d3dDeviceContext->ClearState();
+            }
+
             m_RenderMode = (RenderMode)renderMode;
         }
 
