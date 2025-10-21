@@ -541,6 +541,11 @@ void SimpleObj::RenderScene(RenderEventArgs& e)
 /// </summary>
 void SimpleObj::RenderDebug(RenderEventArgs& e)
 {
+    if (!m_DebugDrawLightBounds)
+    {
+        return;
+    }
+
     // set target view to main RTV
     m_d3dDeviceContext->OMSetRenderTargets(
         1,                                      // number of render target to bind
@@ -568,6 +573,15 @@ void SimpleObj::RenderDebug(RenderEventArgs& e)
         for (auto i = 0; i < MAX_LIGHTS; ++i)
         {
             auto light = &m_Scene.Lights[i];
+
+            if (m_LightCalculationMode == LightCalculationMode::Loop && i >= m_LightCalculationCount)
+            {
+                continue;
+            }
+            else if (m_LightCalculationMode == LightCalculationMode::Single && i != m_LightCalculationCount)
+            {
+                continue;
+            }
 
             if (light->Strength < LIGHT_EPSILON)
             {
@@ -1056,6 +1070,13 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         }
     }
 
+    if (ImGui::CollapsingHeader("Other"))
+    {
+        bool drawLightBounds = m_DebugDrawLightBounds;
+        ImGui::Checkbox("DrawLightBounds", &drawLightBounds);
+        m_DebugDrawLightBounds = drawLightBounds;
+    }
+
     if (m_ShowGizmoWindow)
     {
         if (ImGui::Begin(format("Gizmo: %s", m_GizmoWindowNameGetter()).c_str(), &m_ShowGizmoWindow))
@@ -1082,6 +1103,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         }
         ImGui::End();
     }
+
 
     // Actual Rendering
     ImGui::Render();

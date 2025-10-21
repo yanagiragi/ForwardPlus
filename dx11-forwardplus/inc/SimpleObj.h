@@ -314,6 +314,7 @@ namespace Yr
         Vector2 m_ScreenDimensions;
         bool m_frustumComputed = false;
         const int AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200;
+        bool m_DebugDrawLightBounds = false;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;
