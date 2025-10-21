@@ -78,6 +78,7 @@ namespace Yr
         void LoadSampler();
         void LoadBasicScene();
         void LoadSponzaScene();
+        void RandomizeLights();
 
         void DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate);
         void DrawInstancedEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate);
@@ -315,6 +316,20 @@ namespace Yr
         bool m_frustumComputed = false;
         const int AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200;
         bool m_DebugDrawLightBounds = false;
+
+        Vector3 m_positionRandomRangeCenter;
+        Vector3 m_positionRandomRangeExtents;
+
+        float m_pointLightRangeRandomBase = 100.0f;
+        float m_pointLightRangeRandomRange = 200.0f;
+
+        float m_spotLightAngleRandomBase = 30.0f;
+        float m_spotLightAngleRandomRange = 30.0f;
+        float m_spotLightRangeRandomBase = 200.0f;
+        float m_spotLightRangeRandomRange = 200.0f;
+
+        float m_pointLightStrength = 3.0f;
+        float m_spotlightStrength = 5.0f;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;

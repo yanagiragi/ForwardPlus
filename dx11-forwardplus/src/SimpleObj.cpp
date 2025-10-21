@@ -998,7 +998,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
             if (ImGui::TreeNode(name))
             {
-
                 ImGui::BeginDisabled();
                 bool enabled = light->Strength > LIGHT_EPSILON;
                 ImGui::Checkbox("Enabled", &enabled);
@@ -1070,11 +1069,82 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         }
     }
 
-    if (ImGui::CollapsingHeader("Other"))
+    if (ImGui::CollapsingHeader("Debug Setting"))
     {
         bool drawLightBounds = m_DebugDrawLightBounds;
         ImGui::Checkbox("DrawLightBounds", &drawLightBounds);
         m_DebugDrawLightBounds = drawLightBounds;
+
+        auto name = "Random Light Setting";
+        ImGui::PushID(name);
+        if (ImGui::TreeNode(name))
+        {
+            if (ImGui::Button("Randomize Light"))
+            {
+                RandomizeLights();
+            }
+
+            ImGui::BeginDisabled();
+            {
+                float rangeCenter[3] = { m_positionRandomRangeCenter.x, m_positionRandomRangeCenter.y, m_positionRandomRangeCenter.z };
+                ImGui::DragFloat3("m_positionRandomRangeCenter", rangeCenter, dragSpeed);
+
+                float rangeExtents[3] = { m_positionRandomRangeExtents.x, m_positionRandomRangeExtents.y, m_positionRandomRangeExtents.z };
+                ImGui::DragFloat3("m_positionRandomRangeExtents", rangeExtents, dragSpeed);
+            }
+            ImGui::EndDisabled();
+
+            auto name = "Point Light Random Setting";
+            ImGui::PushID(name);
+            if (ImGui::TreeNode(name))
+            {
+                float scale = m_pointLightStrength;
+                ImGui::DragFloat("Strength", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_pointLightStrength = scale;
+
+                scale = m_pointLightRangeRandomBase;
+                ImGui::DragFloat("Range Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_pointLightRangeRandomBase = scale;
+
+                scale = m_pointLightRangeRandomRange;
+                ImGui::DragFloat("Range Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_pointLightRangeRandomRange = scale;
+
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+
+            name = "Spot Light Random Setting";
+            ImGui::PushID(name);
+            if (ImGui::TreeNode(name))
+            {
+                float scale = m_spotlightStrength;
+                ImGui::DragFloat("Strength", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_spotlightStrength = scale;
+
+                scale = m_spotLightAngleRandomBase;
+                ImGui::DragFloat("Angle Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_pointLightRangeRandomRange = scale;
+
+                scale = m_spotLightAngleRandomBase;
+                ImGui::DragFloat("Angle Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_spotLightAngleRandomRange = scale;
+
+                scale = m_spotLightRangeRandomBase;
+                ImGui::DragFloat("Range Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_spotLightRangeRandomBase = scale;
+
+                scale = m_spotLightRangeRandomRange;
+                ImGui::DragFloat("Range Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                m_spotLightRangeRandomRange = scale;
+
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
     }
 
     if (m_ShowGizmoWindow)
@@ -1188,89 +1258,81 @@ void Yr::SimpleObj::LoadSponzaScene()
     // increase far plane distance
     farPlane = 10000.f;
 
+    m_positionRandomRangeCenter = Vector3(0, 500, 0);
+    m_positionRandomRangeExtents = Vector3(1400, 600, 400);
+
     // Load Lights
+    RandomizeLights();
+}
+
+void Yr::SimpleObj::RandomizeLights()
+{
+    struct Light directional;
+    directional.LightType = (int)LightType::Directional;
+    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
+    auto directionV3 = Vector3(1.0, 0.5, 0.25);
+    directionV3.Normalize();
+    directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+    directional.Strength = 0.5f;
+
+    m_Scene.Lights[0] = directional;
+
+    const int randomPointLightCount = MAX_LIGHTS / 2;
+    const int randomSpotLightCount = MAX_LIGHTS / 2 - 1;
+
+    for (int i = 0; i < randomPointLightCount; ++i)
     {
-        struct Light directional;
-        directional.LightType = (int)LightType::Directional;
-        directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
-        auto directionV3 = Vector3(1.0, 0.5, 0.25);
-        directionV3.Normalize();
-        directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-        directional.Strength = 0.5f;
+        float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 
-        m_Scene.Lights[0] = directional;
+        Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
+        Vector3 position = randOneNegativeOne * m_positionRandomRangeExtents + m_positionRandomRangeCenter;
 
-        const int randomPointLightCount = MAX_LIGHTS / 2;
-        const int randomSpotLightCount = MAX_LIGHTS / 2 - 1;
+        struct Light point;
+        point.LightType = (int)LightType::Point;
+        point.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
+        point.Range = m_pointLightRangeRandomBase + r4 * m_pointLightRangeRandomRange;
+        point.Strength = m_pointLightStrength;
 
-        Vector3 positionRandomRangeCenter = Vector3(0, 500, 0);
-        Vector3 positionRandomRangeExtents = Vector3(1400, 600, 400);
-        
-        float pointLightRangeRandomBase = 100.0f;
-        float pointLightRangeRandomRange = 200.0f;
-        
-        float spotLightAngleRandomBase = 30.0f;
-        float spotLightAngleRandomRange = 30.0f;
-        float spotLightRangeRandomBase = 200.0f;
-        float spotLightRangeRandomRange = 200.0f;
-        
-        float pointLightStrength = 3.0f;
-        float spotlightStrength = 5.0f;
-
-        for (int i = 0; i < randomPointLightCount; ++i)
+        if ((1 + i) < MAX_LIGHTS)
         {
-            float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-
-            Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
-            Vector3 position = randOneNegativeOne * positionRandomRangeExtents + positionRandomRangeCenter;
-
-            struct Light point;
-            point.LightType = (int)LightType::Point;
-            point.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
-            point.Range = pointLightRangeRandomBase + r4 * pointLightRangeRandomRange;
-            point.Strength = pointLightStrength;
-            
-            if ((1 + i) < MAX_LIGHTS)
-            {
-                m_Scene.Lights[1 + i] = point;
-            }
+            m_Scene.Lights[1 + i] = point;
         }
+    }
 
-        for (int i = 0; i < randomSpotLightCount; ++i)
+    for (int i = 0; i < randomSpotLightCount; ++i)
+    {
+        float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+        float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r5 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r6 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+        float r7 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r8 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+        Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
+        Vector3 position = randOneNegativeOne * m_positionRandomRangeExtents + m_positionRandomRangeCenter;
+
+        struct Light spotlight;
+        spotlight.LightType = (int)LightType::Spotlight;
+        spotlight.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
+
+        Vector3 directionV3 = Vector3(1, 1, 1);
+        directionV3.Normalize();
+        spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
+
+        spotlight.SpotAngle = XMConvertToRadians(m_spotLightAngleRandomBase + r7 * m_spotLightAngleRandomRange);
+        spotlight.Range = m_spotLightRangeRandomBase + r8 * m_spotLightRangeRandomRange;
+        spotlight.Strength = m_spotlightStrength;
+
+        if ((1 + randomPointLightCount + i) < MAX_LIGHTS)
         {
-            float r1 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            
-            float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r5 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r6 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-
-            float r7 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            float r8 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-
-            Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
-            Vector3 position = randOneNegativeOne * positionRandomRangeExtents + positionRandomRangeCenter;
-
-            struct Light spotlight;
-            spotlight.LightType = (int)LightType::Spotlight;
-            spotlight.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
-            
-            Vector3 directionV3 = Vector3(1, 1, 1);
-            directionV3.Normalize();
-            spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-            
-            spotlight.SpotAngle = XMConvertToRadians(spotLightAngleRandomBase + r7 * spotLightAngleRandomRange);
-            spotlight.Range = spotLightRangeRandomBase + r8 * spotLightRangeRandomRange;
-            spotlight.Strength = spotlightStrength;
-            
-            if ((1 + randomPointLightCount + i) < MAX_LIGHTS)
-            {
-                m_Scene.Lights[1 + randomPointLightCount + i] = spotlight;
-            }
+            m_Scene.Lights[1 + randomPointLightCount + i] = spotlight;
         }
     }
 }
