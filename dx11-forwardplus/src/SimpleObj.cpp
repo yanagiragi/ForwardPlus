@@ -825,11 +825,11 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         m_Scene.GlobalAmbient.z = ambient[2];
 
         float scale = m_Scene.CullLightBiasSetting.PointLightBias;
-        ImGui::DragFloat("Point Light Bias", &scale, dragSpeed, 0.0f, 100.0f);
+        ImGui::SliderFloat("Point Light Bias", &scale, 0.0f, 1000.0f);
         m_Scene.CullLightBiasSetting.PointLightBias = scale;
 
         scale = XMConvertToDegrees(m_Scene.CullLightBiasSetting.SpotLightBias);
-        ImGui::DragFloat("Spot Light Bias", &scale, dragSpeed, 0.0f, 30.0f);
+        ImGui::SliderFloat("Spot Light Bias", &scale, 0.0f, 60.0f);
         m_Scene.CullLightBiasSetting.SpotLightBias = XMConvertToRadians(scale);
 
         ImGui::PopID();
@@ -1072,7 +1072,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     if (ImGui::CollapsingHeader("Debug Setting"))
     {
         bool drawLightBounds = m_DebugDrawLightBounds;
-        ImGui::Checkbox("DrawLightBounds", &drawLightBounds);
+        ImGui::Checkbox("Draw Light Bounds", &drawLightBounds);
         m_DebugDrawLightBounds = drawLightBounds;
 
         auto name = "Random Light Setting";
@@ -1084,30 +1084,45 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 RandomizeLights();
             }
 
+            int lightCount = m_pointLightCount;
+            ImGui::SliderInt("Point Light Count", &lightCount, 0.0, MAX_LIGHTS - 1);
+            m_pointLightCount = lightCount;
+
+            ImGui::BeginDisabled();
+            {
+                lightCount = MAX_LIGHTS - 1 - m_pointLightCount;
+                ImGui::SliderInt("Spot Light Count", &lightCount, 0.0, MAX_LIGHTS - 1);
+            }
+            ImGui::EndDisabled();
+
             ImGui::BeginDisabled();
             {
                 float rangeCenter[3] = { m_positionRandomRangeCenter.x, m_positionRandomRangeCenter.y, m_positionRandomRangeCenter.z };
-                ImGui::DragFloat3("m_positionRandomRangeCenter", rangeCenter, dragSpeed);
+                ImGui::DragFloat3("Random Range Center", rangeCenter, fastDragSpeed);
 
                 float rangeExtents[3] = { m_positionRandomRangeExtents.x, m_positionRandomRangeExtents.y, m_positionRandomRangeExtents.z };
-                ImGui::DragFloat3("m_positionRandomRangeExtents", rangeExtents, dragSpeed);
+                ImGui::DragFloat3("Random Range Extents", rangeExtents, fastDragSpeed);
             }
             ImGui::EndDisabled();
+
+            bool useRandomLightColor = m_useRandomLightColor;
+            ImGui::Checkbox("Random Light Color", &useRandomLightColor);
+            m_useRandomLightColor = useRandomLightColor;
 
             auto name = "Point Light Random Setting";
             ImGui::PushID(name);
             if (ImGui::TreeNode(name))
             {
                 float scale = m_pointLightStrength;
-                ImGui::DragFloat("Strength", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Strength", &scale, 1.0f, 100.0f);
                 m_pointLightStrength = scale;
 
                 scale = m_pointLightRangeRandomBase;
-                ImGui::DragFloat("Range Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Range Random Base", &scale, 1.0f, 100.0f);
                 m_pointLightRangeRandomBase = scale;
 
                 scale = m_pointLightRangeRandomRange;
-                ImGui::DragFloat("Range Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Range Random Range", &scale, 0.0f, 100.0f);
                 m_pointLightRangeRandomRange = scale;
 
                 ImGui::TreePop();
@@ -1119,23 +1134,23 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             if (ImGui::TreeNode(name))
             {
                 float scale = m_spotlightStrength;
-                ImGui::DragFloat("Strength", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Strength", &scale, 1.0f, 100.0f);
                 m_spotlightStrength = scale;
 
                 scale = m_spotLightAngleRandomBase;
-                ImGui::DragFloat("Angle Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Angle Random Base", &scale, 1.0f, 100.0f);
                 m_pointLightRangeRandomRange = scale;
 
                 scale = m_spotLightAngleRandomBase;
-                ImGui::DragFloat("Angle Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Angle Random Range", &scale, 0.0f, 100.0f);
                 m_spotLightAngleRandomRange = scale;
 
                 scale = m_spotLightRangeRandomBase;
-                ImGui::DragFloat("Range Random Base", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Range Random Base", &scale, 1.0f, 100.0f);
                 m_spotLightRangeRandomBase = scale;
 
                 scale = m_spotLightRangeRandomRange;
-                ImGui::DragFloat("Range Random Range", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Range Random Range", &scale, 0.0f, 100.0f);
                 m_spotLightRangeRandomRange = scale;
 
                 ImGui::TreePop();
@@ -1277,8 +1292,8 @@ void Yr::SimpleObj::RandomizeLights()
 
     m_Scene.Lights[0] = directional;
 
-    const int randomPointLightCount = MAX_LIGHTS / 2;
-    const int randomSpotLightCount = MAX_LIGHTS / 2 - 1;
+    const int randomPointLightCount = m_pointLightCount;
+    const int randomSpotLightCount = MAX_LIGHTS - 1 - m_pointLightCount;
 
     for (int i = 0; i < randomPointLightCount; ++i)
     {
@@ -1286,6 +1301,10 @@ void Yr::SimpleObj::RandomizeLights()
         float r2 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
         float r3 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
         float r4 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+        float r5 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r6 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r7 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 
         Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
         Vector3 position = randOneNegativeOne * m_positionRandomRangeExtents + m_positionRandomRangeCenter;
@@ -1295,6 +1314,10 @@ void Yr::SimpleObj::RandomizeLights()
         point.PositionWS = Vector4(position.x, position.y, position.z, 1.0f);
         point.Range = m_pointLightRangeRandomBase + r4 * m_pointLightRangeRandomRange;
         point.Strength = m_pointLightStrength;
+        if (m_useRandomLightColor)
+        {
+            point.Color = Vector4(r5, r6, r7, 1.0f);
+        }
 
         if ((1 + i) < MAX_LIGHTS)
         {
@@ -1315,6 +1338,10 @@ void Yr::SimpleObj::RandomizeLights()
         float r7 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
         float r8 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 
+        float r9 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r10 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r11 = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
         Vector3 randOneNegativeOne = (Vector3(r1, r2, r3) * 2.0 - Vector3::One);
         Vector3 position = randOneNegativeOne * m_positionRandomRangeExtents + m_positionRandomRangeCenter;
 
@@ -1329,6 +1356,10 @@ void Yr::SimpleObj::RandomizeLights()
         spotlight.SpotAngle = XMConvertToRadians(m_spotLightAngleRandomBase + r7 * m_spotLightAngleRandomRange);
         spotlight.Range = m_spotLightRangeRandomBase + r8 * m_spotLightRangeRandomRange;
         spotlight.Strength = m_spotlightStrength;
+        if (m_useRandomLightColor)
+        {
+            spotlight.Color = Vector4(r9, r10, r11, 1.0f);
+        }
 
         if ((1 + randomPointLightCount + i) < MAX_LIGHTS)
         {

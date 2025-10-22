@@ -317,6 +317,10 @@ namespace Yr
         const int AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200;
         bool m_DebugDrawLightBounds = false;
 
+        bool m_useRandomLightColor;
+
+        int m_pointLightCount = MAX_LIGHTS / 2;
+
         Vector3 m_positionRandomRangeCenter;
         Vector3 m_positionRandomRangeExtents;
 
