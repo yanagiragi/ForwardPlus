@@ -34,6 +34,12 @@ public:
         return Entities.size();
     }
 
+    void Clear()
+    {
+        Entities.clear();
+        InstancedEntity.clear();
+    }
+
     Vector4 GlobalAmbient = Vector4(0.05, 0.05, 0.05, 1.0);
     Light Lights[MAX_LIGHTS];
     std::vector<Entity*> Entities; // contains all entity of the scene regardless it is instanced or not

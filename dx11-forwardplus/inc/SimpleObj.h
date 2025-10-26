@@ -34,6 +34,12 @@
 
 #define BLOCK_SIZE 16
 
+enum class SceneType
+{
+    CornellBox,
+    Sponza
+};
+
 namespace Yr
 {
     class SimpleObj final : public Game
@@ -74,8 +80,8 @@ namespace Yr
         #pragma region Functions
         void LoadShaderResources();
         void LoadDebugDraw();
-        void LoadLight();
         void LoadSampler();
+        void LoadScene();
         void LoadBasicScene();
         void LoadSponzaScene();
         void RandomizeLights();
@@ -291,8 +297,9 @@ namespace Yr
         Camera m_Camera;
         Vector4 m_InitialCameraPos;
         Vector4 m_InitialCameraRot;
-        const float fovInDegree = 45.0f;
-        const float nearPlane = 0.1f;
+        float fovInDegree = 45.0f;
+        float m_AspectRatio = 1.0f;
+        float nearPlane = 0.1f;
         float farPlane = 100.f;
         float normalMovingSpeedMultipler = 4.0f;
         float shiftMovingSpeedMultipler = 8.0f;
@@ -317,8 +324,9 @@ namespace Yr
         const int AVERAGE_OVERLAPPING_LIGHTS_PER_TILE = 200;
         bool m_DebugDrawLightBounds = false;
 
-        bool m_useRandomLightColor;
+        SceneType m_SceneType = SceneType::CornellBox;
 
+        bool m_useRandomLightColor;
         int m_pointLightCount = MAX_LIGHTS / 2;
 
         Vector3 m_positionRandomRangeCenter;

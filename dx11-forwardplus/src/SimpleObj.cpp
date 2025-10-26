@@ -484,40 +484,6 @@ void SimpleObj::LoadDebugDraw()
 }
 
 /// <summary>
-/// Setup light data
-/// </summary>
-void SimpleObj::LoadLight()
-{
-    struct Light directional;
-    directional.LightType = (int)LightType::Directional;
-    directional.PositionWS = Vector4(0.0, 6.0, 0.0, 1.0f);
-    auto directionV3 = Vector3(1.0, 0.5, 0.25);
-    directionV3.Normalize();
-    directional.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-    directional.Strength = 0.5f;
-
-    struct Light point;
-    point.LightType = (int)LightType::Point;
-    point.PositionWS = Vector4(-0.5, 3.0, 0.0, 1.0f);
-    point.Range = 3.8f;
-    point.Strength = 0.5f;
-    
-    struct Light spotlight;
-    spotlight.LightType = (int)LightType::Spotlight;
-    spotlight.PositionWS = Vector4(0.178, 4.0, 0.6, 1.0f);
-    directionV3 = Vector3(0.079, -0.285, 0.976f);
-    directionV3.Normalize();
-    spotlight.DirectionWS = Vector4(directionV3.x, directionV3.y, directionV3.z, 1.0f);
-    spotlight.SpotAngle = XMConvertToRadians(16.0f);
-    spotlight.Range = 15.0f;
-    spotlight.Strength = 1.2f;
-    
-    m_Scene.Lights[0] = directional;
-    m_Scene.Lights[1] = point;
-    m_Scene.Lights[2] = spotlight;
-}
-
-/// <summary>
 /// Render render loop
 /// </summary>
 void SimpleObj::RenderScene(RenderEventArgs& e)
@@ -710,9 +676,22 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
     ImGui::Text(format("Fps: %f (%f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
     ImGui::Text(format("Draw Call: %d", m_DrawCallCount).c_str());
+    
     if (m_RenderMode == RenderMode::ForwardPlus)
     {
         ImGui::Text(format("Dispatch Call: %d", m_DispatchCallCount).c_str());
+    }
+
+    int sceneType = (int)m_SceneType;
+    if (ImGui::Combo("Scene", &sceneType, "ConrnellBox\0Sponza\0"))
+    {
+        bool hasChanged = sceneType != (int)m_SceneType;
+        m_SceneType = (SceneType)sceneType;
+
+        if (hasChanged)
+        {
+            LoadScene();
+        }
     }
 
     ImGui::PushID("Render Techniques");
@@ -752,7 +731,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth)
             {
                 float scale = m_ForwardPlusDepthPower;
-                ImGui::DragFloat("Depth Scale", &scale, dragSpeed, 1.0f, 1000.0f);
+                ImGui::SliderFloat("Depth Scale", &scale, 1.0f, 10000.0f);
                 m_ForwardPlusDepthPower = scale;
             }
             bool printDebugInfo = m_ForwardPlusPrintDebugInfo;
@@ -1189,7 +1168,6 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         ImGui::End();
     }
 
-
     // Actual Rendering
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -1259,6 +1237,31 @@ void SimpleObj::LoadBasicScene()
         m_Scene.Lights[0] = directional;
         m_Scene.Lights[1] = point;
         m_Scene.Lights[2] = spotlight;
+
+        m_LightCalculationCount = 3;
+    }
+
+    // Camera setting
+    {
+        XMVECTOR cameraPos = XMVectorSet(-4.599999, 7.500000, 28.004011, 1);
+        XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
+        XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
+
+        m_Pitch = 0.0f;
+        m_Yaw = 180.0f;
+        m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+
+        // Setup camera initlal position
+        m_InitialCameraPos = m_Camera.get_Translation();
+        m_InitialCameraRot = m_Camera.get_Rotation();
+        
+        farPlane = 100.0f;
+    }
+
+    // Controls
+    {
+        normalMovingSpeedMultipler = 4.0f;
+        shiftMovingSpeedMultipler = 8.0f;
     }
 }
 
@@ -1266,18 +1269,35 @@ void Yr::SimpleObj::LoadSponzaScene()
 {
     m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0)));
 
-    // increase camera moving speed
-    normalMovingSpeedMultipler = 800.0f;
-    shiftMovingSpeedMultipler = 1600.0f;
-
-    // increase far plane distance
-    farPlane = 10000.f;
-
+    // Load Lights
     m_positionRandomRangeCenter = Vector3(0, 500, 0);
     m_positionRandomRangeExtents = Vector3(1400, 600, 400);
-
-    // Load Lights
     RandomizeLights();
+
+    // Camera setting
+    {
+        XMVECTOR cameraPos = XMVectorSet(-795.198547, 267.165100, -72.325348, 1);
+        XMVECTOR cameraTarget = XMVectorSet(-795.198547, 267.165100, -72.325348 + 1, 1);
+        XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
+
+        m_Pitch = 5.0f;
+        m_Yaw = 90.0f;
+        m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+
+        // Setup camera initlal position
+        m_InitialCameraPos = m_Camera.get_Translation();
+        m_InitialCameraRot = m_Camera.get_Rotation();
+
+        // increase far plane distance
+        farPlane = 3000.f;
+    }
+
+    // Controls
+    {
+        // increase camera moving speed
+        normalMovingSpeedMultipler = 800.0f;
+        shiftMovingSpeedMultipler = 1600.0f;
+    }
 }
 
 void Yr::SimpleObj::RandomizeLights()
@@ -1366,6 +1386,8 @@ void Yr::SimpleObj::RandomizeLights()
             m_Scene.Lights[1 + randomPointLightCount + i] = spotlight;
         }
     }
+
+    m_LightCalculationCount = MAX_LIGHTS;
 }
 
 void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate)
@@ -1495,17 +1517,6 @@ SimpleObj::SimpleObj(Window& window)
     , m_Pitch(0.0f)
     , m_Yaw(0.0f)
 {
-    XMVECTOR cameraPos = XMVectorSet(-4.599999, 7.500000, 28.004011, 1);
-    XMVECTOR cameraTarget = XMVectorSet(0, 7, 25, 1);
-    XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
-    
-    m_Pitch = 0.0f;
-    m_Yaw = 180.0f;
-    m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
-
-    // Setup camera initlal position
-    m_InitialCameraPos = m_Camera.get_Translation();
-    m_InitialCameraRot = m_Camera.get_Rotation();
 }
 
 SimpleObj::~SimpleObj()
@@ -1832,8 +1843,8 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     m_ScreenDimensions = Vector2(e.Width, e.Height);
     
     // update camera
-    float aspectRatio = e.Width / (float)e.Height;
-    m_Camera.set_Projection(fovInDegree, aspectRatio, nearPlane, farPlane);
+    m_AspectRatio = e.Width / (float)e.Height;
+    m_Camera.set_Projection(fovInDegree, m_AspectRatio, nearPlane, farPlane);
 
     // Setup the viewports for the camera.
     D3D11_VIEWPORT viewport;
@@ -2199,6 +2210,22 @@ HRESULT SimpleObj::CreateBufferShaderResourceView(ID3D11Device* pDevice, ID3D11B
     return pDevice->CreateShaderResourceView(pBuffer, &desc, ppSRVOut);
 }
 
+void SimpleObj::LoadScene()
+{
+    m_Scene.Clear();
+
+    if (m_SceneType == SceneType::CornellBox)
+    {
+        LoadBasicScene();
+    }
+    else
+    {
+        LoadSponzaScene();
+    }
+
+    m_Camera.set_Projection(fovInDegree, m_AspectRatio, nearPlane, farPlane);
+}
+
 bool SimpleObj::LoadContent()
 {
     HRESULT hr;
@@ -2211,8 +2238,7 @@ bool SimpleObj::LoadContent()
     }
     Model::Setup(m_d3dDevice.Get(), m_d3dDeviceContext.Get(), m_d3dEffectFactory.get());
 
-    // LoadBasicScene();
-    LoadSponzaScene();
+    LoadScene();
 
     // setup CB
     {
