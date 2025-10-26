@@ -13,11 +13,12 @@ using namespace DirectX::SimpleMath;
 class Entity
 {
 public:
-    Entity(std::string name, std::string path, Vector3 position, Quaternion rotation, bool instanced = false, Entity* instancedReference = nullptr, int instancedCount = 0) :
+    Entity(std::string name, std::string path, Vector3 position, Quaternion rotation, Vector3 scale = Vector3::One, bool instanced = false, Entity* instancedReference = nullptr, int instancedCount = 0) :
         Name(name),
         ModelPath(path),
         PositionWS(position),
         Rotation(rotation),
+        Scale(scale),
         Instanced(instanced),
         InstancedReference(instancedReference),
         InstancedCount(instancedCount)
@@ -40,6 +41,7 @@ public:
     
     Vector3 PositionWS = Vector3::Zero;
     Quaternion Rotation = Quaternion::Identity;
+    Vector3 Scale = Vector3::One;
     Vector3 RotateAxisSpeed = Vector3::Zero;
     
     Matrix WorldMatrix = Matrix::Identity;

@@ -68,7 +68,7 @@ bool Model::HasExtension(const wchar_t* path, const std::wstring& ext)
     return false;
 }
 
-bool Model::Load(const char* filepath, std::vector<struct BatchedVertices>& outBatchedVertices)
+bool Model::Load(const char* filepath, Vector3 scale, std::vector<struct BatchedVertices>& outBatchedVertices)
 {
     tinyobj::ObjReaderConfig reader_config;
 
@@ -143,9 +143,9 @@ bool Model::Load(const char* filepath, std::vector<struct BatchedVertices>& outB
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
-                vertex.vertex[0] = vx;
-                vertex.vertex[1] = vy;
-                vertex.vertex[2] = vz;
+                vertex.vertex[0] = vx * scale.x;
+                vertex.vertex[1] = vy * scale.y;
+                vertex.vertex[2] = vz * scale.z;
 
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {

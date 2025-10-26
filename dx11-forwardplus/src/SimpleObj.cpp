@@ -683,7 +683,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     }
 
     int sceneType = (int)m_SceneType;
-    if (ImGui::Combo("Scene", &sceneType, "ConrnellBox\0Sponza\0"))
+    if (ImGui::Combo("Scene", &sceneType, "ConrnellBox\0Sponza\0ScaledSponza\0"))
     {
         bool hasChanged = sceneType != (int)m_SceneType;
         m_SceneType = (SceneType)sceneType;
@@ -1118,7 +1118,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
                 scale = m_spotLightAngleRandomBase;
                 ImGui::SliderFloat("Angle Random Base", &scale, 1.0f, 100.0f);
-                m_pointLightRangeRandomRange = scale;
+                m_spotLightAngleRandomRange = scale;
 
                 scale = m_spotLightAngleRandomBase;
                 ImGui::SliderFloat("Angle Random Range", &scale, 0.0f, 100.0f);
@@ -1185,8 +1185,8 @@ void SimpleObj::LoadBasicScene()
         Model::LoadTexture(L"assets\\Textures\\grid.png")
     };;
 
-    auto bunnyBase = new Entity("bunny", "assets/Models/bunny.obj", Vector3(0, 0, 0), Quaternion::Identity, false, nullptr, 2);
-    auto bunny1 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(4.5, 0, -4.5), Quaternion::Identity, true, bunnyBase);
+    auto bunnyBase = new Entity("bunny", "assets/Models/bunny.obj", Vector3(0, 0, 0), Quaternion::Identity, Vector3::One, false, nullptr, 2);
+    auto bunny1 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(4.5, 0, -4.5), Quaternion::Identity, Vector3::One, true, bunnyBase);
     bunny1->InstancedMaterial = {
         Vector4::Zero,                          // Emissive
         Vector4::One,                           // Ambient
@@ -1195,7 +1195,7 @@ void SimpleObj::LoadBasicScene()
         -1
     };
 
-    auto bunny2 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), true, bunnyBase);
+    auto bunny2 = new Entity("bunny-instanced", bunnyBase->ModelPath, Vector3(-4.5, 0, 1.0), Quaternion::CreateFromYawPitchRoll(2.7, 0, 0), Vector3::One, true, bunnyBase);
     bunny2->InstancedMaterial = {
         Vector4::Zero,                          // Emissive
         Vector4::One,                           // Ambient
@@ -1269,9 +1269,19 @@ void Yr::SimpleObj::LoadSponzaScene()
 {
     m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0)));
 
-    // Load Lights
-    m_positionRandomRangeCenter = Vector3(0, 500, 0);
-    m_positionRandomRangeExtents = Vector3(1400, 600, 400);
+    // Ramdom light settings
+    {
+        m_positionRandomRangeCenter = Vector3(0, 500, 0);
+        m_positionRandomRangeExtents = Vector3(1400, 600, 400);
+        m_pointLightRangeRandomBase = 100.0f;
+        m_pointLightRangeRandomRange = 200.0f;
+        m_spotLightAngleRandomBase = 30.0f;
+        m_spotLightAngleRandomRange = 30.0f;
+        m_spotLightRangeRandomBase = 200.0f;
+        m_spotLightRangeRandomRange = 200.0f;
+        m_pointLightStrength = 3.0f;
+        m_spotlightStrength = 5.0f;
+    }
     RandomizeLights();
 
     // Camera setting
@@ -1297,6 +1307,52 @@ void Yr::SimpleObj::LoadSponzaScene()
         // increase camera moving speed
         normalMovingSpeedMultipler = 800.0f;
         shiftMovingSpeedMultipler = 1600.0f;
+    }
+}
+
+void Yr::SimpleObj::LoadScaledSponzaScene()
+{
+    auto scale = 0.05;
+    m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), Vector3::One * scale));
+
+    // Ramdom light settings
+    {
+        m_positionRandomRangeCenter = Vector3(0, 500, 0) * scale;
+        m_positionRandomRangeExtents = Vector3(1400, 600, 400) * scale;
+        m_pointLightRangeRandomBase = 5.0f;
+        m_pointLightRangeRandomRange = 10.0f;
+        m_spotLightAngleRandomBase = 30.0f;
+        m_spotLightAngleRandomRange = 30.0f;
+        m_spotLightRangeRandomBase = 5.0f;
+        m_spotLightRangeRandomRange = 5.0f;
+        m_pointLightStrength = 2.0f;
+        m_spotlightStrength = 2.0f;
+    }
+    RandomizeLights();
+
+    // Camera setting
+    {
+        XMVECTOR cameraPos = XMVectorSet(-795.198547, 267.165100, -72.325348, 1);
+        XMVECTOR cameraTarget = XMVectorSet(-795.198547, 267.165100, -72.325348 + 1, 1);
+        XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
+
+        m_Pitch = 5.0f;
+        m_Yaw = 90.0f;
+        m_Camera.set_LookAt(cameraPos * scale, cameraTarget * scale, cameraUp);
+
+        // Setup camera initlal position
+        m_InitialCameraPos = m_Camera.get_Translation();
+        m_InitialCameraRot = m_Camera.get_Rotation();
+
+        // increase far plane distance
+        farPlane = 300.f;
+    }
+
+    // Controls
+    {
+        // increase camera moving speed
+        normalMovingSpeedMultipler = 80.0f;
+        shiftMovingSpeedMultipler = 160.0f;
     }
 }
 
@@ -2218,9 +2274,13 @@ void SimpleObj::LoadScene()
     {
         LoadBasicScene();
     }
-    else
+    else if (m_SceneType == SceneType::Sponza)
     {
         LoadSponzaScene();
+    }
+    else if (m_SceneType == SceneType::ScaledSponza)
+    {
+        LoadScaledSponzaScene();
     }
 
     m_Camera.set_Projection(fovInDegree, m_AspectRatio, nearPlane, farPlane);
@@ -2411,11 +2471,11 @@ bool SimpleObj::LoadContent()
     {
         std::vector<struct BatchedVertices> batchVertices;
         
-        Model::Load("assets/Models/UnitSphere.obj", batchVertices);
+        Model::Load("assets/Models/UnitSphere.obj", Vector3::One, batchVertices);
         m_lightVolume_sphere = batchVertices.front();
 
         batchVertices.clear();
-        Model::Load("assets/Models/UnitCone.obj", batchVertices);
+        Model::Load("assets/Models/UnitCone.obj", Vector3::One, batchVertices);
         m_lightVolume_cone = batchVertices.front();
     }
 

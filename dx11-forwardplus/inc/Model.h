@@ -28,7 +28,7 @@ struct BatchedVertices
 class Model
 {
 public:
-    static bool Load(const char* filepath, std::vector<struct BatchedVertices>& outBatchedVertices);
+    static bool Load(const char* filepath, Vector3 scale, std::vector<struct BatchedVertices>& outBatchedVertices);
 
     static void Setup(ID3D11Device* device, ID3D11DeviceContext* deviceContext, DirectX::EffectFactory* effectFactory)
     {

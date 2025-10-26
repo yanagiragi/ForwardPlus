@@ -37,7 +37,8 @@
 enum class SceneType
 {
     CornellBox,
-    Sponza
+    Sponza,
+    ScaledSponza
 };
 
 namespace Yr
@@ -84,6 +85,7 @@ namespace Yr
         void LoadScene();
         void LoadBasicScene();
         void LoadSponzaScene();
+        void LoadScaledSponzaScene();
         void RandomizeLights();
 
         void DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate);

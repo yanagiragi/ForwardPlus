@@ -54,6 +54,6 @@ void Entity::Setup()
     }
     else
     {
-        Model::Load(ModelPath.c_str(), batchedVertices);
+        Model::Load(ModelPath.c_str(), Scale, batchedVertices);
     }
 }
