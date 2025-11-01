@@ -55,3 +55,4 @@ struct LightingResult
 #define FP_DEBUG_MODE_DEPTH_TEX 2
 #define FP_DEBUG_MODE_DEPTH 3
 #define FP_DEBUG_MODE_LIGHT_MAP 4
+#define FP_DEBUG_MODE_DEPTH_DIFF 5

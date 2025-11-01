@@ -50,5 +50,10 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         color = float4(texValue.yyy / DepthPower, 1);
     }
 
+    else if (DebugMode == FP_DEBUG_MODE_DEPTH_DIFF)
+    {
+        color = float4(texValue.xy / 20.0, 0.0, 1);
+    }
+
     return color;
 }

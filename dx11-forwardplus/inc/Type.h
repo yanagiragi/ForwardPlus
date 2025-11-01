@@ -53,6 +53,7 @@ namespace Yr
         DepthTex,
         Depth,
         LightMap,
+        DepthDiff,
         LEN_DEFERRED_DEBUGMODE
     };
 

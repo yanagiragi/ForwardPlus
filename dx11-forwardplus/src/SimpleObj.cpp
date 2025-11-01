@@ -723,12 +723,12 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         if (m_RenderMode == RenderMode::ForwardPlus)
         {
             int debugMode = (int)m_ForwardPlusDebugMode;
-            if (ImGui::Combo("Debug Mode", &debugMode, "None\0UV\0DepthTex\0Depth\00Lightmap\0"))
+            if (ImGui::Combo("Debug Mode", &debugMode, "None\0UV\0DepthTex\0Depth\00Lightmap\0DepthDiff\0"))
             {
                 m_ForwardPlusDebugMode = (ForwardPlus_DebugMode)debugMode;
             }
 
-            if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth)
+            if (m_ForwardPlusDebugMode == ForwardPlus_DebugMode::Depth || m_ForwardPlusDebugMode == ForwardPlus_DebugMode::DepthTex || m_ForwardPlusDebugMode == ForwardPlus_DebugMode::DepthDiff)
             {
                 float scale = m_ForwardPlusDepthPower;
                 ImGui::SliderFloat("Depth Scale", &scale, 1.0f, 10000.0f);
@@ -1312,19 +1312,19 @@ void Yr::SimpleObj::LoadSponzaScene()
 
 void Yr::SimpleObj::LoadScaledSponzaScene()
 {
-    auto scale = 0.05;
+    auto scale = 9.999999776e-003;
     m_Scene.Add(new Entity("cornelBox", "assets/Sponza/sponza.obj", Vector3(0, 0, 0), Quaternion::CreateFromYawPitchRoll(0, 0, 0), Vector3::One * scale));
 
     // Ramdom light settings
     {
         m_positionRandomRangeCenter = Vector3(0, 500, 0) * scale;
         m_positionRandomRangeExtents = Vector3(1400, 600, 400) * scale;
-        m_pointLightRangeRandomBase = 5.0f;
-        m_pointLightRangeRandomRange = 10.0f;
+        m_pointLightRangeRandomBase = 1.5f;
+        m_pointLightRangeRandomRange = 0.0f;
         m_spotLightAngleRandomBase = 30.0f;
         m_spotLightAngleRandomRange = 30.0f;
-        m_spotLightRangeRandomBase = 5.0f;
-        m_spotLightRangeRandomRange = 5.0f;
+        m_spotLightRangeRandomBase = 2.0f;
+        m_spotLightRangeRandomRange = 2.0f;
         m_pointLightStrength = 2.0f;
         m_spotlightStrength = 2.0f;
     }

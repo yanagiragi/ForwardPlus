@@ -251,6 +251,12 @@ void main(ComputeShaderInput IN)
             o_LightGrid[IN.groupID.xy] = uint2(fDepth * DepthPower, fDepth * DepthPower); // scale to integer range
         }
         
+        else if (DebugMode == FP_DEBUG_MODE_DEPTH_DIFF)
+        {
+            fDepth = abs(fMaxDepth - fMinDepth) * 20.0 * DepthPower;
+            o_LightGrid[IN.groupID.xy] = uint2(fDepth, fDepth); // scale to integer range
+        }
+        
         // Update light grid for transparent geometry.
         // InterlockedAdd( t_LightIndexCounter[0], t_LightCount, t_LightIndexStartOffset );
         // t_LightGrid[IN.groupID.xy] = uint2( t_LightIndexStartOffset, t_LightCount );
