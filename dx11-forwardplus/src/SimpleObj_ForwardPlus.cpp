@@ -504,6 +504,7 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
         m_d3dConstantBuffers[CB_Light].Get(),
         m_d3dConstantBuffers[CB_Debug].Get(),
         m_d3dConstantBuffers[CB_CullLightBias].Get(),
+        m_d3dConstantBuffers[CB_LightCalculationOptions].Get(),
     };
 
     ComPtr<ID3D11ShaderResourceView> textures[] =

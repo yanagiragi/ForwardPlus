@@ -50,6 +50,15 @@ cbuffer CullLightBias : register(b4)
                                     //----------(16 byte boundary)
 }; // Total:                        // 16 bytes (1 * 16 byte boundary)
 
+cbuffer LightingCalculationOptions : register(b5)
+{
+    int lightingSpace;        // 4 bytes
+    int lightCount;           // 4 bytes
+    int lightIndex;           // 4 bytes
+    float padding;            // 4 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
 // The depth from the screen space texture.
 Texture2D DepthTextureVS : register( t0 );
 
@@ -93,7 +102,7 @@ void o_AppendLight( uint lightIndex )
 {
     uint index; // Index into the visible lights array.
     InterlockedAdd( o_LightCount, 1, index ); // atomic add
-    if ( index < MAX_LIGHTS )
+    if ( index < lightCount )
     {
         o_LightList[index] = lightIndex;
     }
@@ -168,7 +177,7 @@ void main(ComputeShaderInput IN)
 
     // Cull lights
     // Each thread in a group will cull 1 light until all lights have been culled.
-    for ( uint i = IN.groupIndex; i < MAX_LIGHTS; i += BLOCK_SIZE * BLOCK_SIZE )
+    for ( uint i = IN.groupIndex; i < lightCount; i += BLOCK_SIZE * BLOCK_SIZE )
     {
         if (Lights[i].Strength < LIGHT_EPSILON)
         {
