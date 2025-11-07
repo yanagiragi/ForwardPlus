@@ -173,7 +173,8 @@ void main(ComputeShaderInput IN)
  
     // Clipping plane for minimum depth value 
     // (used for testing lights within the bounds of opaque geometry).
-    Plane minPlane = { float3( 0, 0, -1 ), -minDepthVS };
+    // For RH coordinate: Use float3(0, 0, -1) instead
+    Plane minPlane = { float3( 0, 0, 1 ), -minDepthVS };
 
     // Cull lights
     // Each thread in a group will cull 1 light until all lights have been culled.
@@ -189,7 +190,7 @@ void main(ComputeShaderInput IN)
         {
             case POINT_LIGHT:
             {
-                Sphere sphere = { light.PositionVS.xyz, light.Range + PointLightBias };
+                Sphere sphere = { light.PositionVS.xyz, light.Range };
                 if ( SphereInsideFrustum( sphere, GroupFrustum, nearClipVS, maxDepthVS) )
                 {
                     // Add light to light list for transparent geometry.
@@ -207,7 +208,7 @@ void main(ComputeShaderInput IN)
             case SPOT_LIGHT:
             {
                 // SpotAngle is already in radian unit
-                float coneRadius = tan( light.SpotAngle + SpotLightBias ) * light.Range;
+                float coneRadius = tan( light.SpotAngle ) * light.Range;
 
                 // Since we treat light direction as vector starts from point to light,
                 // we need to negate the direction to get correct cone direction
