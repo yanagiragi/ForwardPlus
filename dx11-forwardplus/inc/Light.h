@@ -42,11 +42,3 @@ struct LightProperties
     //----------------------------------- (16 byte boundary)
     Light     Lights[MAX_LIGHTS];
 };  // Total:                                  672 bytes (42 * 16)
-
-struct CullLightBias
-{
-    float PointLightBias = 3.0f;                                // expand range 1 unit
-    float SpotLightBias = DirectX::XMConvertToRadians(5.0f);    // expand end cap 5 degrees
-    float Padding[2];
-    //----------------------------------- (16 byte boundary)
-};

@@ -802,15 +802,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         m_Scene.GlobalAmbient.x = ambient[0];
         m_Scene.GlobalAmbient.y = ambient[1];
         m_Scene.GlobalAmbient.z = ambient[2];
-
-        float scale = m_Scene.CullLightBiasSetting.PointLightBias;
-        ImGui::SliderFloat("Point Light Bias", &scale, 0.0f, 1000.0f);
-        m_Scene.CullLightBiasSetting.PointLightBias = scale;
-
-        scale = XMConvertToDegrees(m_Scene.CullLightBiasSetting.SpotLightBias);
-        ImGui::SliderFloat("Spot Light Bias", &scale, 0.0f, 60.0f);
-        m_Scene.CullLightBiasSetting.SpotLightBias = XMConvertToRadians(scale);
-
+        
         ImGui::PopID();
     }
 
@@ -2325,9 +2317,6 @@ bool SimpleObj::LoadContent()
 
         hr = CreateConstantBuffer(sizeof(struct DispatchParams), &m_d3dConstantBuffers[CB_DispatchParams]);
         AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_DispatchParams");
-
-        hr = CreateConstantBuffer(sizeof(struct CullLightBias), &m_d3dConstantBuffers[CB_CullLightBias]);
-        AssertIfFailed(hr, "Load Content", "Unable to create constant buffer: CB_CullLightBias");
     }
 
     // setup BlendState & DepthStencilState

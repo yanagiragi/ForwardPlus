@@ -42,15 +42,7 @@ cbuffer DebugProperties : register(b3)
                                     //----------(16 byte boundary)
 }; // Total:                        // 16 bytes (1 * 16 byte boundary)
 
-cbuffer CullLightBias : register(b4)
-{
-    float PointLightBias;           // 4 bytes
-    float SpotLightBias;            // 4 bytes
-    float BiasPadding[2];           // 8 bytes
-                                    //----------(16 byte boundary)
-}; // Total:                        // 16 bytes (1 * 16 byte boundary)
-
-cbuffer LightingCalculationOptions : register(b5)
+cbuffer LightingCalculationOptions : register(b4)
 {
     int lightingSpace;        // 4 bytes
     int lightCount;           // 4 bytes

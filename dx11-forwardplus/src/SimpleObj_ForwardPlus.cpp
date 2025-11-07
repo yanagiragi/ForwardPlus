@@ -488,10 +488,6 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
     m_DispatchParamsConstantBuffer.numThreads[2] = 1;
     m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_DispatchParams].Get(), 0, nullptr, &m_DispatchParamsConstantBuffer, 0, 0);
 
-    m_CullLightBiasConstrantBuffer.PointLightBias = m_Scene.CullLightBiasSetting.PointLightBias;
-    m_CullLightBiasConstrantBuffer.SpotLightBias = m_Scene.CullLightBiasSetting.SpotLightBias;
-    m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_CullLightBias].Get(), 0, nullptr, &m_CullLightBiasConstrantBuffer, 0, 0);
-
     // clear light index counter, other structure buffer remains dirty after calculations
     m_opaqueLightIndexCounter[0] = 0;
     m_d3dDeviceContext->UpdateSubresource(m_d3dOpaqueLightIndexCounterBuffers.Get(), 0, nullptr, m_opaqueLightIndexCounter.data(), 0, 0);
@@ -504,7 +500,6 @@ void SimpleObj::RenderScene_FowardPlus_CullLightPass()
         m_d3dConstantBuffers[CB_ScreenToViewParams].Get(),
         m_d3dConstantBuffers[CB_Light].Get(),
         m_d3dConstantBuffers[CB_Debug].Get(),
-        m_d3dConstantBuffers[CB_CullLightBias].Get(),
         m_d3dConstantBuffers[CB_LightCalculationOptions].Get(),
     };
 

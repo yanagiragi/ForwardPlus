@@ -44,6 +44,4 @@ public:
     Light Lights[MAX_LIGHTS];
     std::vector<Entity*> Entities; // contains all entity of the scene regardless it is instanced or not
     std::map<std::string, std::vector<Entity*>> InstancedEntity;
-
-    struct CullLightBias CullLightBiasSetting;
 };

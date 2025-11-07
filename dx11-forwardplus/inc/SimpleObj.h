@@ -232,7 +232,6 @@ namespace Yr
         struct ScreenToViewParams m_ScreenToViewParamsConstantBuffer;
         struct DispatchParams m_DispatchParamsConstantBuffer;
         struct LightingCalculationOptions m_LightingCalculationOptionsConstrantBuffer;
-        struct CullLightBias m_CullLightBiasConstrantBuffer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_d3dConstantBuffers[NumConstantBuffers];
 
         // Deferred Render target views
