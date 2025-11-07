@@ -966,7 +966,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
     if (ImGui::CollapsingHeader("Light List"))
     {
-        for (int i = 0; i < MAX_LIGHTS; ++i)
+        for (int i = 0; i < m_LightCalculationCount; ++i)
         {
             auto light = &m_Scene.Lights[i];
             auto lightName = format("Light (%d)", i);
