@@ -17,9 +17,19 @@ cbuffer DebugProperties : register(b1)
 {
     int DebugMode;                 // 4 bytes
     float DepthPower;         // 4 bytes
-    float padding[2];         // 8 bytes
+    float padding3[2];         // 8 bytes
                               //----------(16 byte boundary)
 }; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
+cbuffer LightingCalculationOptions : register(b2)
+{
+    int lightingSpace;        // 4 bytes
+    int lightCount;           // 4 bytes
+    int lightIndex;           // 4 bytes
+    float padding4;            // 4 bytes
+                              //----------(16 byte boundary)
+}; // Total:                  // 16 bytes (1 * 16 byte boundary)
+
 
 Texture2D<uint2> Lightmap : register(t0);
 
@@ -41,8 +51,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     else if (DebugMode == FP_DEBUG_MODE_LIGHT_MAP)
     {
-        float lightCount = texValue.y / (float)MAX_LIGHTS;
-        color = float4(lightCount, lightCount, lightCount, 1);
+        float t = texValue.y / (float)lightCount;
+        color = float4(t.xxx, 1);
     }
 
     else if (DebugMode == FP_DEBUG_MODE_DEPTH)
