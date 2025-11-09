@@ -2,6 +2,18 @@
 
 Learning and implement Forward+ using DX11 & DirectXMath. For more details please refer to [Project Readme](dx11-forwardplus/readme.md).
 
+## Table of Contents
+
+* [Comparsions](#comparsions)
+    * [Frame per second](#frame-per-second)
+    * [Increate Ratio to Forward Rendering](#increate-ratio-to-forward-rendering)
+    * [Explanations](#explanations)
+* [Screenshots](#screenshots)
+    * [Cornell Box, 1 Directional Light + 1 Point Light + 1 Spot Light](#cornell-box-1-directional-light--1-point-light--1-spot-light)
+    * [Sponza, 1 Directional Light + 256 Point Light + 255 Spot Light](#sponza-1-directional-light--256-point-light--255-spot-light)
+    * [Sponza, 1 Directional Light + 511 Large Point Light](#sponza-1-directional-light--511-large-point-light)
+    * [Sponza, 1 Directional Light + 511 Small Point Light](#sponza-1-directional-light--511-small-point-light)
+
 ## Comparsions
 
 The scene is rendered in 4K resolution on my PC (Intel Core Ultra 7 265K & Nvidia RTX 5060 Ti).
