@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <functional>
 
 // DirectX includes
@@ -113,6 +114,8 @@ namespace Yr
         void RenderScene_FowardPlus_DepthPrePass();
         void RenderScene_Deferred_DebugLightMapPass();
         void RenderScene_FowardPlus_FinalPass();
+
+        void ResetTimer();
 
         bool ResizeSwapChain(int width, int height);
 
@@ -343,6 +346,9 @@ namespace Yr
 
         float m_pointLightStrength = 3.0f;
         float m_spotlightStrength = 5.0f;
+
+        float accumulateTime = 0.0f;
+        float accumulateFrames = 0.0f;
 
         // UI Flags
         bool m_ShowGizmoWindow = false;

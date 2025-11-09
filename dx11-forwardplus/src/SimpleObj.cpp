@@ -674,7 +674,8 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     const float slowDragSpeed = 0.01f;
     const float fastDragSpeed = 5.0f;
 
-    ImGui::Text(format("Fps: %f (%f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
+    ImGui::Text(format("Cur Fps: %.2f (%.3f ms)", 1.0f / e.ElapsedTime, e.ElapsedTime).c_str());
+    ImGui::Text(format("Avg Fps: %.2f (%.3f ms, %d frames)", accumulateFrames / accumulateTime, accumulateTime / accumulateFrames, (int)accumulateFrames).c_str());
     ImGui::Text(format("Draw Call: %d", m_DrawCallCount).c_str());
     
     if (m_RenderMode == RenderMode::ForwardPlus)
@@ -706,6 +707,8 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 // easier to spot incorrect state setting (i.e., rely on other previous draw calls)
                 m_d3dDeviceContext->Flush();
                 m_d3dDeviceContext->ClearState();
+
+                ResetTimer();
             }
 
             m_RenderMode = (RenderMode)renderMode;
@@ -1131,6 +1134,19 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             ImGui::TreePop();
         }
         ImGui::PopID();
+
+        if (ImGui::Button("Log Avg Fps"))
+        {
+            std::string RenderModeStr;
+            switch (m_RenderMode)
+            {
+                case RenderMode::Forward:       RenderModeStr = "Forward";      break;
+                case RenderMode::Deferred:      RenderModeStr = "Deferred";     break;
+                case RenderMode::ForwardPlus:   RenderModeStr = "ForwardPlus";  break;
+                default:                        RenderModeStr = "Unknown";      break;
+            }
+            std::cout << "Render Mode: " << RenderModeStr << format(", Avg Fps: %.2f (%.3f ms, %d frames)", accumulateFrames / accumulateTime, accumulateTime / accumulateFrames, (int)accumulateFrames) << std::endl;
+        }
     }
 
     if (m_ShowGizmoWindow)
@@ -1711,6 +1727,9 @@ void SimpleObj::OnRender(RenderEventArgs& e)
     RenderDebug(e);
     RenderImgui(e);
     Present();
+
+    accumulateTime += e.ElapsedTime;
+    accumulateFrames += 1.0f;
 }
 
 void SimpleObj::OnKeyPressed(KeyEventArgs& e)
@@ -1903,6 +1922,14 @@ void SimpleObj::OnResize(ResizeEventArgs& e)
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     m_Camera.set_Viewport(viewport);
+
+    ResetTimer();
+}
+
+void Yr::SimpleObj::ResetTimer()
+{
+    accumulateTime = 0.0f;
+    accumulateFrames = 0.0f;
 }
 
 bool SimpleObj::ResizeSwapChain(int width, int height)
