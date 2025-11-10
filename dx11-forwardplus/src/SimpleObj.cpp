@@ -741,7 +741,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
             ImGui::Checkbox("PrintDebugInfo", &printDebugInfo);
             m_ForwardPlusPrintDebugInfo = printDebugInfo;
 
-            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, m_MaxLightCalculationCount);
         }
 
         else if (m_RenderMode == RenderMode::Deferred)
@@ -772,7 +772,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                     m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
                 }
 
-                ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+                ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, m_MaxLightCalculationCount);
             }
             
             if (m_DeferredDebugMode == Deferred_DebugMode::Depth)
@@ -791,7 +791,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
                 m_LightCalculationMode = (LightCalculationMode)lightCalculationMode;
             }
 
-            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, MAX_LIGHTS);
+            ImGui::SliderInt("Light Calc Threshold", &m_LightCalculationCount, -1.0f, m_MaxLightCalculationCount);
         }
     }
     ImGui::PopID();
@@ -961,7 +961,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
 
     if (ImGui::CollapsingHeader("Light List"))
     {
-        for (int i = 0; i < m_LightCalculationCount; ++i)
+        for (int i = 0; i < m_MaxLightCalculationCount; ++i)
         {
             auto light = &m_Scene.Lights[i];
             auto lightName = format("Light (%d)", i);
@@ -1247,6 +1247,7 @@ void SimpleObj::LoadBasicScene()
         m_Scene.Lights[2] = spotlight;
 
         m_LightCalculationCount = 3;
+        m_MaxLightCalculationCount = 3;
     }
 
     // Camera setting
@@ -1452,6 +1453,7 @@ void Yr::SimpleObj::RandomizeLights()
     }
 
     m_LightCalculationCount = MAX_LIGHTS;
+    m_MaxLightCalculationCount = MAX_LIGHTS;
 }
 
 void SimpleObj::DrawRegularEntities(std::function<void(Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>[])> bindTextureDelegate)
