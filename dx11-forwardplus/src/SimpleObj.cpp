@@ -695,6 +695,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         }
     }
 
+    bool hasChangedRenderMode = false;
     ImGui::PushID("Render Techniques");
     {
         int renderMode = (int)m_RenderMode;
@@ -702,13 +703,7 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
         {
             if (m_RenderMode != (RenderMode)renderMode)
             {
-                // Though it may be fine to not clear states when switch render mode,
-                // however we found out start new render mode with fresh states makes us
-                // easier to spot incorrect state setting (i.e., rely on other previous draw calls)
-                m_d3dDeviceContext->Flush();
-                m_d3dDeviceContext->ClearState();
-
-                ResetTimer();
+                hasChangedRenderMode = true;
             }
 
             m_RenderMode = (RenderMode)renderMode;
@@ -1179,6 +1174,17 @@ void SimpleObj::RenderImgui(RenderEventArgs& e)
     // Actual Rendering
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    if (hasChangedRenderMode)
+    {
+        // Though it may be fine to not clear states when switch render mode,
+        // however we found out start new render mode with fresh states makes us
+        // easier to spot incorrect state setting (i.e., rely on other previous draw calls)
+        m_d3dDeviceContext->Flush();
+        m_d3dDeviceContext->ClearState();
+
+        ResetTimer();
+    }
 }
 
 void SimpleObj::LoadBasicScene()
